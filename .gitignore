@@ -1,0 +1,26 @@
+# System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python Backend
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/res/
+backend/*.log
+backend/uv.lock
+
+# Node Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# General
+.env
