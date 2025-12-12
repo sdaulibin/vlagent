@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -7,10 +7,15 @@ DATABASE_URL = "postgresql+asyncpg://postgres:123456@localhost/vl_flow"
 
 engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
+
 async def init_db():
+    # Import models to register them with SQLModel
+    from apps.files.models import FileRecord, TransactionRecord
+    
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
+
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(

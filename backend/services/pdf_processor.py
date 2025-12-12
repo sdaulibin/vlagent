@@ -7,12 +7,12 @@ from pdf2image import convert_from_path
 from PIL import Image, ImageDraw
 import concurrent.futures
 from pathlib import Path
-from services.core.config import MODEL_LOCAL
-from services.core.config import RES_DIR
-from services.core.request_ai import request_stream
+from core.config import MODEL_LOCAL
+from core.config import RES_DIR
+from core.request_ai import request_stream
 import json
 import pandas as pd
-from services.core.json_repir import fix_json
+from core.json_repir import fix_json
 
 
 def split_pdf_to_images(pdf_path, output_folder, image_format='PNG', dpi=200):

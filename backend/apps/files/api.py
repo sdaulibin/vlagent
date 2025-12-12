@@ -1,32 +1,42 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from services import pdf_processor
 from typing import List
 import shutil
 import os
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
-from database import get_session
-from models import FileRecord, TransactionRecord
 
-router = APIRouter()
+from core.database import get_session
+from apps.files.models import FileRecord, TransactionRecord
+from services import pdf_processor
 
-UPLOAD_DIR = "/Users/binginx/workspace/vl_flow/res"
+router = APIRouter(prefix="/files", tags=["files"])
+
+UPLOAD_DIR = "/Users/binginx/PycharmProjects/vl_flow/backend/res"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.get("/files", response_model=List[FileRecord])
+
+@router.get("", response_model=List[FileRecord])
 async def get_files(session: AsyncSession = Depends(get_session)):
+    """获取所有文件列表"""
     statement = select(FileRecord).order_by(desc(FileRecord.created_at))
     result = await session.execute(statement)
     return result.scalars().all()
 
-@router.get("/files/{file_id}/transactions", response_model=List[TransactionRecord])
-async def get_transactions(file_id: int, session: AsyncSession = Depends(get_session)):
-    statement = select(TransactionRecord).where(TransactionRecord.file_id == file_id)
+
+@router.get("/{file_id}", response_model=FileRecord)
+async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """获取单个文件详情"""
+    statement = select(FileRecord).where(FileRecord.id == file_id)
     result = await session.execute(statement)
-    return result.scalars().all()
+    file = result.scalar_one_or_none()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    return file
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
+    """上传并处理PDF文件"""
     try:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
 
@@ -51,7 +61,6 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             transactions_to_add = []
             
             for idx, item in enumerate(raw_transactions):
-                # Create Transaction Record
                 t = TransactionRecord(
                     file_id=db_file.id,
                     sequence=str(item.get("序号", idx + 1)),
@@ -76,7 +85,6 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             
             await session.commit()
             
-            # Return transactions in frontend expected format
             return {
                 "status": "success",
                 "filename": file.filename,
@@ -85,7 +93,6 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             }
 
         except Exception as e_process:
-            # Update status to failed
             db_file.status = "failed"
             db_file.error_msg = str(e_process)
             session.add(db_file)

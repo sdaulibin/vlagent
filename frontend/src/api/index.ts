@@ -10,7 +10,7 @@ const api = axios.create({
 export const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/upload', formData);
+    const response = await api.post('/files/upload', formData);
     return response.data;
 };
 
@@ -20,6 +20,6 @@ export const getFiles = async () => {
 };
 
 export const getFileTransactions = async (fileId: number) => {
-    const response = await api.get(`/files/${fileId}/transactions`);
+    const response = await api.get(`/transactions/${fileId}`);
     return response.data;
 };
