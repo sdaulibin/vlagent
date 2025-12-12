@@ -60,26 +60,45 @@ const prevPage = () => {
                                 <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
                                     {{ (currentPage - 1) * itemsPerPage + index + 1 }}
                                 </div>
-                                <div class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div>
-                                        <p class="text-xs text-gray-400">交易日期</p>
-                                        <p class="font-medium text-gray-700">{{ item.date }}</p>
+                                <div class="flex-1">
+                                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易日期</p>
+                                            <p class="font-medium text-gray-700">{{ item.transaction_time }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易渠道</p>
+                                            <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                                {{ item.channel }}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易金额</p>
+                                            <p v-if="item.income && parseFloat(item.income) > 0" class="font-bold text-red-500">+{{ item.income }}</p>
+                                            <p v-else class="font-bold text-green-600">-{{ item.expense }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">账户余额</p>
+                                            <p class="font-medium text-gray-700">{{ item.balance }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">币种</p>
+                                            <p class="text-sm text-gray-600">{{ item.currency }}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p class="text-xs text-gray-400">交易类型</p>
-                                        <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                                            {{ item.type }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-gray-400">交易金额</p>
-                                        <p :class="`font-bold ${item.amount.startsWith('+') ? 'text-red-500' : 'text-green-600'}`">
-                                            {{ item.amount }}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs text-gray-400">摘要/备注</p>
-                                        <p class="text-sm text-gray-600 truncate" :title="item.desc">{{ item.desc }}</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <p class="text-xs text-gray-400">对方户名</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">对方账号</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_account">{{ item.counterparty_account }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">摘要/备注</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.description">{{ item.description }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

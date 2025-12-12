@@ -1,8 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import upload
+from routers import files
 
-app = FastAPI(title="VL_Flow API", description="Bank Transaction Identification Service")
+from contextlib import asynccontextmanager
+from database import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+app = FastAPI(title="VL_Flow API", description="Bank Transaction Identification Service", lifespan=lifespan)
 
 # CORS Configuration
 origins = [
@@ -19,7 +27,7 @@ app.add_middleware(
 )
 
 # Include Routers
-app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(files.router, prefix="/api", tags=["files"])
 
 @app.get("/")
 async def root():

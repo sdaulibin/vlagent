@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:15
+    container_name: vl_flow_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: vl_flow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

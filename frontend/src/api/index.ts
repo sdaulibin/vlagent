@@ -13,3 +13,13 @@ export const uploadFile = async (file: File) => {
     const response = await api.post('/upload', formData);
     return response.data;
 };
+
+export const getFiles = async () => {
+    const response = await api.get('/files');
+    return response.data;
+};
+
+export const getFileTransactions = async (fileId: number) => {
+    const response = await api.get(`/files/${fileId}/transactions`);
+    return response.data;
+};

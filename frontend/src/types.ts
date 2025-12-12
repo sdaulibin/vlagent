@@ -1,10 +1,15 @@
 export interface Transaction {
     id: number;
-    date: string;
-    type: string;
-    amount: string;
-    balance: string;
-    desc: string;
+    sequence?: string;
+    transaction_time?: string;
+    channel?: string;
+    income?: string;
+    expense?: string;
+    balance?: string;
+    currency?: string;
+    counterparty_account?: string;
+    counterparty_name?: string;
+    description?: string;
 }
 
 export interface FileItem {
