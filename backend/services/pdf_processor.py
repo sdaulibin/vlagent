@@ -393,6 +393,31 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     batch_resize_images(images_dir, compressed_dir, max_width=1200, max_height=1200, quality=85)
     print("已完成图片压缩\n")
 
+    # 2.1 提取第1页汇总数据
+    print("步骤2.1: 提取第1页汇总数据...")
+    summary_data = None
+    # 查找第1页图片
+    first_page_image = None
+    for filename in os.listdir(compressed_dir):
+        if filename.endswith('_page_001.png'):
+            first_page_image = os.path.join(compressed_dir, filename)
+            break
+    
+    if first_page_image:
+        try:
+            summary_response = read_summary_data(first_page_image)
+            fixed_summary = fix_json(summary_response)
+            summary_data = json.loads(fixed_summary)
+            # 保存汇总数据到文件
+            summary_path = os.path.join(task_dir, "summary.json")
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, ensure_ascii=False, indent=2)
+            print(f"已保存汇总数据到: {summary_path}\n")
+        except Exception as e:
+            print(f"提取汇总数据时出错: {e}\n")
+    else:
+        print("未找到第1页图片，跳过汇总数据提取\n")
+
     # 3. 在压缩图片基础上创建标记图片
     print("步骤3: 标记摘要备注列位置...")
     labeled_dir = os.path.join(task_dir, "labeled")
@@ -417,7 +442,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     print("已完成结果合并和Excel导出\n")
 
     print(f"整个处理流程已完成，结果保存在: {task_dir}")
-    return final_data
+    return {"transactions": final_data, "summary": summary_data}
 
 
 
@@ -471,20 +496,55 @@ def batch_process_images_label_multithread(compressed_dir, labeled_dir, max_work
     success_count = sum(results)
     print(f"标记完成: {success_count}/{len(image_args)} 个文件处理成功")
 
+def read_summary_data(file_path):
+    """
+    从图片中提取汇总数据（仅用于第1页）
+    
+    Args:
+        file_path (str): 图片文件路径
+        
+    Returns:
+        str: 提取的JSON汇总数据
+    """
+    result_schema = """
+    {
+    "账户名称":"",
+    "账(卡)号":"",
+    "起止日期":"",
+    "收入总笔数":"数字",
+    "收入总金额":"金额",
+    "支出总笔数":"数字",
+    "支出总金额":"金额",
+    "是否有盖章":"是/否",
+    "开户行":"印章内部的完整文字，如银行名称、分支机构名称等，例如：某某银行股份有限公司",
+    "盖章类型":"印章的用途分类，如：电子回单专用章、银行业务专用章、财务专用章、公章等"
+    }
+    """
+    prompt = f"""
+    你是一个信息提取专家。请从图片中提取银行流水的汇总信息，并按照给定的JSON schema填充。
+    
+    关于数值字段的特别说明：
+    - "收入总笔数"和"支出总笔数"：只输出纯数字，如 "5"，不要带"笔"等单位
+    - "收入总金额"和"支出总金额"：只输出纯金额数字，如 "12345.67"，不要带货币符号或"元"等单位
+    
+    关于印章识别的特别说明：
+    - "开户行"：请仔细阅读印章内部的所有文字，完整提取出来
+    - "盖章类型"：指印章的用途分类，如"电子回单专用章"等
+    - 重要：印章中的银行名称应该与文档中显示的开户行或账户信息一致，请仔细核对
+    - 如果印章文字模糊难以辨认，请根据文档上下文（如开户行信息）推断，不要随意猜测其他银行名称
+    - 只提取你能清晰看到的文字，不确定的部分请留空
+    
+    只输出合法的JSON格式，不需要任何解释。如果某个字段在图片中找不到，请填写空字符串。
+    JSON schema如下: {result_schema}
+    """
+    rest = request_stream(question=prompt,
+                          show_request=False,
+                          file_base=file_path,
+                          model=MODEL_LOCAL)
+    print(f"汇总数据提取结果: {rest}")
+
+    return rest
+
 if __name__ == "__main__":
-    # if len(sys.argv) < 2:
-    #     print("使用方法: python pdf_processor.py <pdf文件路径>")
-    #     sys.exit(1)
-    #
-    # pdf_file_path = sys.argv[1]
-    # if not os.path.exists(pdf_file_path):
-    #     print(f"错误: 文件 {pdf_file_path} 不存在")
-    #     sys.exit(1)
-    #
-    # try:
-    #     process_pdf_to_excel(pdf_file_path)
-    # except Exception as e:
-    #     print(f"处理过程中发生错误: {e}")
-    #     sys.exit(1)
     # process_pdf_to_excel("res/1齐鲁银行(1).pdf", 10)
     process_pdf_to_excel(f"{RES_DIR}/3莱商银行.pdf", 10)

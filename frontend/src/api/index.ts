@@ -23,3 +23,8 @@ export const getFileTransactions = async (fileId: number) => {
     const response = await api.get(`/transactions/${fileId}`);
     return response.data;
 };
+
+export const getFileSummary = async (fileId: number) => {
+    const response = await api.get(`/transactions/${fileId}/summary`);
+    return response.data;
+};

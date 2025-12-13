@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-vue-next';
-import type { Transaction } from '../types';
+import { CheckCircle, Clock, AlertCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-vue-next';
+import type { Transaction, Summary } from '../types';
 
 const props = defineProps<{
     results: Transaction[];
+    summary: Summary | null;
     isProcessing: boolean;
 }>();
 
@@ -46,7 +47,7 @@ const prevPage = () => {
         </h2>
         
         <div class="flex-1 overflow-hidden bg-gray-50 rounded-lg border border-gray-200 flex flex-col min-h-0">
-            <div v-if="results.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+            <div v-if="results.length === 0 && !summary" class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
                 <div class="bg-gray-100 p-6 rounded-full">
                     <AlertCircle class="w-12 h-12 text-gray-300" />
                 </div>
@@ -54,6 +55,70 @@ const prevPage = () => {
             </div>
             <div v-else class="flex flex-col h-full">
                 <div class="flex-1 overflow-auto custom-scrollbar p-4">
+                    <!-- 汇总信息区域 -->
+                    <div v-if="summary" class="summary-section mb-6">
+                        <div class="flex items-center gap-2 mb-4">
+                            <FileText class="w-5 h-5 text-blue-500" />
+                            <h3 class="font-semibold text-gray-700">汇总信息</h3>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账户名称</p>
+                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账(卡)号</p>
+                                <p class="font-medium text-gray-700">{{ summary.account_number || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">开户行</p>
+                                <p class="font-medium text-gray-700 truncate" :title="summary.bank_name">{{ summary.bank_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">起止日期</p>
+                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                            <div class="summary-item income-box">
+                                <p class="text-xs text-gray-500">收入笔数</p>
+                                <p class="font-bold text-red-500">{{ summary.income_count || '0' }} 笔</p>
+                            </div>
+                            <div class="summary-item income-box">
+                                <p class="text-xs text-gray-500">收入总额</p>
+                                <p class="font-bold text-red-500">{{ summary.income_total || '0' }}</p>
+                            </div>
+                            <div class="summary-item expense-box">
+                                <p class="text-xs text-gray-500">支出笔数</p>
+                                <p class="font-bold text-green-600">{{ summary.expense_count || '0' }} 笔</p>
+                            </div>
+                            <div class="summary-item expense-box">
+                                <p class="text-xs text-gray-500">支出总额</p>
+                                <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">是否盖章</p>
+                                <span :class="['inline-block px-2 py-0.5 rounded text-xs font-medium', summary.has_stamp === '是' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600']">
+                                    {{ summary.has_stamp || '-' }}
+                                </span>
+                            </div>
+                            <div class="summary-item" v-if="summary.stamp_type">
+                                <p class="text-xs text-gray-400">盖章类型</p>
+                                <p class="font-medium text-gray-700">{{ summary.stamp_type }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 明细列表分隔线 -->
+                    <div v-if="summary && results.length > 0" class="flex items-center gap-2 mb-4">
+                        <div class="flex-1 border-t border-gray-200"></div>
+                        <span class="text-xs text-gray-400">交易明细</span>
+                        <div class="flex-1 border-t border-gray-200"></div>
+                    </div>
+                    
+                    <!-- 交易明细列表 -->
                     <div class="space-y-4">
                         <div v-for="(item, index) in paginatedResults" :key="item.id" class="result-item transition-shadow">
                             <div class="flex items-start gap-4">
@@ -107,7 +172,7 @@ const prevPage = () => {
                 </div>
                 
                 <!-- Pagination Controls -->
-                <div class="bg-white border-t border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
+                <div v-if="results.length > 0" class="bg-white border-t border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
                     <span class="text-sm text-gray-500">
                         显示 {{ (currentPage - 1) * itemsPerPage + 1 }} 到 {{ Math.min(currentPage * itemsPerPage, results.length) }} 条，共 {{ results.length }} 条
                     </span>
@@ -140,3 +205,27 @@ const prevPage = () => {
         </div>
     </div>
 </template>
+
+<style scoped>
+.summary-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.summary-item {
+    padding: 8px 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.income-box {
+    background: #fef2f2;
+}
+
+.expense-box {
+    background: #f0fdf4;
+}
+</style>
+

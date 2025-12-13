@@ -12,6 +12,21 @@ export interface Transaction {
     description?: string;
 }
 
+export interface Summary {
+    id: number;
+    file_id?: number;
+    account_name?: string;
+    account_number?: string;
+    date_range?: string;
+    income_count?: string;
+    income_total?: string;
+    expense_count?: string;
+    expense_total?: string;
+    has_stamp?: string;
+    bank_name?: string;
+    stamp_type?: string;
+}
+
 export interface FileItem {
     id: number;
     name: string;

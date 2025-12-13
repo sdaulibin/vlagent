@@ -4,11 +4,12 @@ import { ShieldCheck } from 'lucide-vue-next';
 import FileUpload from './components/FileUpload.vue';
 import FileList from './components/FileList.vue';
 import ResultList from './components/ResultList.vue';
-import { uploadFile, getFiles, getFileTransactions } from './api';
-import type { FileItem, Transaction } from './types';
+import { uploadFile, getFiles, getFileTransactions, getFileSummary } from './api';
+import type { FileItem, Transaction, Summary } from './types';
 
 const files = ref<FileItem[]>([]);
 const results = ref<Transaction[]>([]);
+const summary = ref<Summary | null>(null);
 const isProcessing = ref(false);
 
 const loadFiles = async () => {
@@ -17,9 +18,8 @@ const loadFiles = async () => {
         files.value = fileList.map((f: any) => ({
             id: f.id,
             name: f.filename,
-            size: '', // Size not stored in DB currently
+            size: '',
             status: f.status === 'done' ? 'done' : f.status === 'processing' ? 'uploading' : 'error',
-            // No rawFile needed for display
         }));
     } catch (e) {
         console.error("Failed to load files", e);
@@ -32,11 +32,7 @@ onMounted(() => {
 
 const handleFileSelect = async (fileList: FileList) => {
     if (fileList.length === 0) return;
-
     isProcessing.value = true;
-    
-    // Note: We are uploading one by one and refreshing the list
-    // Ideally we should optimistically update UI, but for now we stick to simple logic
     
     for (const file of Array.from(fileList)) {
         try {
@@ -53,21 +49,24 @@ const handleFileSelect = async (fileList: FileList) => {
 const handleSelectFile = async (id: number) => {
     try {
         isProcessing.value = true;
-        const txs = await getFileTransactions(id);
+        const [txs, summaryData] = await Promise.all([
+            getFileTransactions(id),
+            getFileSummary(id)
+        ]);
         results.value = txs;
+        summary.value = summaryData;
     } catch (e) {
-        console.error("Failed to load transactions", e);
+        console.error("Failed to load file data", e);
     } finally {
         isProcessing.value = false;
     }
 };
 
 const handleDeleteFile = (id: number) => {
-    // Current backend doesn't support delete, just remove from UI for now or ignore
-    // To be implemented in backend if needed
     files.value = files.value.filter(f => f.id !== id);
     if (files.value.length === 0) {
         results.value = [];
+        summary.value = null;
     }
 };
 </script>
@@ -91,9 +90,8 @@ const handleDeleteFile = (id: number) => {
             </div>
 
             <!-- Right Column -->
-            <ResultList :results="results" :isProcessing="isProcessing" />
+            <ResultList :results="results" :summary="summary" :isProcessing="isProcessing" />
         </main>
     </div>
 </template>
-
 
