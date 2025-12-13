@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="vl_doc API",
+    title="vl_flow API",
     description="Bank Transaction Identification Service",
     version="1.0.0",
     lifespan=lifespan
@@ -39,7 +39,7 @@ app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to vl_doc API"}
+    return {"message": "Welcome to VL_Flow API"}
 
 
 @app.get("/health")

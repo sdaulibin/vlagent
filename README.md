@@ -1,4 +1,4 @@
-# vl_doc
+# vl_flow
 
 基于 Qwen-VL 大模型的智能文档识别与分析平台。
 
@@ -35,7 +35,7 @@ cd frontend && npm install && npm run dev
 ## 📁 项目结构
 
 ```
-vl_doc/
+vl_flow/
 ├── frontend/           # Vue 3 前端
 │   ├── src/views/      # 页面 (Home, BankStatement)
 │   ├── src/components/ # 组件
