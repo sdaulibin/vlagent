@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 # Default fallback to local postgres
-DATABASE_URL = "postgresql+asyncpg://postgres:123456@localhost/vl_flow"
+DATABASE_URL = "postgresql+asyncpg://postgres:123456@localhost/vl_doc"
 
 engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
