@@ -92,7 +92,7 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         await session.refresh(db_file)
 
         try:
-            # 处理PDF文件
+            # 提取文件内容
             result = pdf_processor.process_pdf_to_excel(file_path, max_workers=4)
             
             # 创建交易记录
@@ -159,7 +159,7 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
         filename_base = os.path.splitext(file_record.filename)[0]
         for item in os.listdir(UPLOAD_DIR):
             item_path = os.path.join(UPLOAD_DIR, item)
-            if os.path.isdir(item_path) and item.startswith(f"{filename_base}_task_"):
+            if os.path.isdir(item_path) and item.startswith(f"task_{filename_base}"):
                 shutil.rmtree(item_path)
         
         # 删除文件记录
