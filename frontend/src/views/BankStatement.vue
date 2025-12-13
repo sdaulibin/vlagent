@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router';
 import FileUpload from '../components/FileUpload.vue';
 import FileList from '../components/FileList.vue';
 import ResultList from '../components/ResultList.vue';
-import { uploadFile, getFiles, getFileTransactions, getFileSummary } from '../api';
+import { uploadFile, getFiles, getFileTransactions, getFileSummary, deleteFile } from '../api';
 import type { FileItem, Transaction, Summary } from '../types';
 
 const router = useRouter();
@@ -64,11 +64,16 @@ const handleSelectFile = async (id: number) => {
     }
 };
 
-const handleDeleteFile = (id: number) => {
-    files.value = files.value.filter(f => f.id !== id);
-    if (files.value.length === 0) {
-        results.value = [];
-        summary.value = null;
+const handleDeleteFile = async (id: number) => {
+    try {
+        await deleteFile(id);
+        files.value = files.value.filter(f => f.id !== id);
+        if (files.value.length === 0) {
+            results.value = [];
+            summary.value = null;
+        }
+    } catch (e) {
+        console.error("Failed to delete file", e);
     }
 };
 

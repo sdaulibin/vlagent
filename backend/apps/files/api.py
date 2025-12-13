@@ -128,3 +128,52 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/{file_id}")
+async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """删除文件及其关联的所有数据"""
+    try:
+        # 查询文件记录
+        statement = select(FileRecord).where(FileRecord.id == file_id)
+        result = await session.execute(statement)
+        file_record = result.scalar_one_or_none()
+        
+        if not file_record:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # 删除交易记录
+        from sqlmodel import delete
+        await session.execute(
+            delete(TransactionRecord).where(TransactionRecord.file_id == file_id)
+        )
+        
+        # 删除汇总记录
+        await session.execute(
+            delete(SummaryRecord).where(SummaryRecord.file_id == file_id)
+        )
+        
+        # 删除上传的原文件
+        if file_record.file_path and os.path.exists(file_record.file_path):
+            os.remove(file_record.file_path)
+        
+        # 删除处理过程中生成的目录 (res/文件名_task_*)
+        filename_base = os.path.splitext(file_record.filename)[0]
+        for item in os.listdir(UPLOAD_DIR):
+            item_path = os.path.join(UPLOAD_DIR, item)
+            if os.path.isdir(item_path) and item.startswith(f"{filename_base}_task_"):
+                shutil.rmtree(item_path)
+        
+        # 删除文件记录
+        await session.delete(file_record)
+        await session.commit()
+        
+        return {"status": "success", "message": f"File {file_id} deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
