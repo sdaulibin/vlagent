@@ -1,83 +1,65 @@
 # Frontend - VL_Flow
 
-VL_Flow 前端应用，基于 Vue 3 + TypeScript + Tailwind CSS 构建。
+基于 Vue 3 + TypeScript + Tailwind CSS 构建的智能文档识别前端。
 
-## 功能特性
+## ✨ 功能特性
 
-- **文件上传**: 支持拖拽上传银行流水 PDF
-- **文件列表**: 查看已上传的文件及处理状态
-- **交易展示**: 以表格形式展示识别出的交易记录
-- **分页显示**: 支持分页浏览大量交易数据
+- 📂 **场景入口首页** - 多场景识别入口
+- 📤 **文件上传** - 拖拽上传 PDF 文件
+- 📋 **汇总展示** - 账户信息和收支统计
+- 📊 **明细列表** - 分页展示交易记录
 
-## 技术栈
+## 🛠️ 技术栈
 
-- **框架**: Vue 3 (Composition API)
-- **语言**: TypeScript
-- **样式**: Tailwind CSS
-- **构建工具**: Vite
-- **HTTP 客户端**: Axios
+- Vue 3 (Composition API)
+- TypeScript
+- Tailwind CSS
+- Vue Router
+- Axios
 
-## 目录结构
+## 📁 目录结构
 
 ```
-frontend/
-├── src/
-│   ├── api/                # API 接口
-│   │   └── index.ts
-│   ├── assets/             # 静态资源
-│   │   └── main.css
-│   ├── components/         # 组件
-│   │   ├── FileList.vue    # 文件列表
-│   │   ├── FileUpload.vue  # 文件上传
-│   │   └── ResultList.vue  # 结果展示
-│   ├── types.ts            # 类型定义
-│   ├── App.vue             # 主组件
-│   └── main.ts             # 入口文件
-├── index.html
-├── package.json
-├── tailwind.config.js
-├── tsconfig.json
-└── vite.config.ts
+src/
+├── views/                  # 页面
+│   ├── Home.vue            # 首页入口
+│   └── BankStatement.vue   # 银行流水识别
+├── components/             # 组件
+│   ├── FileUpload.vue      # 文件上传
+│   ├── FileList.vue        # 文件列表
+│   └── ResultList.vue      # 结果展示
+├── router/                 # 路由
+├── api/                    # API 接口
+└── types.ts                # 类型定义
 ```
 
-## 快速开始
-
-### 1. 安装依赖
+## 🚀 快速开始
 
 ```bash
+# 安装依赖
 npm install
-```
 
-### 2. 启动开发服务器
-
-```bash
+# 启动开发服务器
 npm run dev
-```
 
-应用将在 http://localhost:5173 启动。
-
-### 3. 构建生产版本
-
-```bash
+# 构建生产版本
 npm run build
 ```
 
-## API 调用
+访问 http://localhost:5173
 
-前端通过 Axios 调用后端 API：
+## 🔗 路由
 
-| 函数 | 接口 | 说明 |
-|------|------|------|
-| `uploadFile(file)` | `POST /api/files/upload` | 上传文件 |
-| `getFiles()` | `GET /api/files` | 获取文件列表 |
-| `getFileTransactions(id)` | `GET /api/transactions/{id}` | 获取交易记录 |
+| 路径 | 页面 |
+|------|------|
+| `/` | 首页 - 场景选择 |
+| `/bank-statement` | 银行流水识别 |
 
-## 配置
+## 📡 API
 
-API 基础地址配置在 `src/api/index.ts`：
-
-```typescript
-const api = axios.create({
-    baseURL: 'http://localhost:8000/api',
-});
-```
+| 函数 | 接口 |
+|------|------|
+| `uploadFile(file)` | `POST /api/files/upload` |
+| `getFiles()` | `GET /api/files` |
+| `getFileTransactions(id)` | `GET /api/transactions/{id}` |
+| `getFileSummary(id)` | `GET /api/transactions/{id}/summary` |
