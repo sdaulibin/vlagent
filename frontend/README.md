@@ -1,65 +1,44 @@
-# Frontend - VL_Flow
+# Frontend
 
-基于 Vue 3 + TypeScript + Tailwind CSS 构建的智能文档识别前端。
+Vue 3 + TypeScript + Tailwind CSS 构建的前端应用。
 
-## ✨ 功能特性
-
-- 📂 **场景入口首页** - 多场景识别入口
-- 📤 **文件上传** - 拖拽上传 PDF 文件
-- 📋 **汇总展示** - 账户信息和收支统计
-- 📊 **明细列表** - 分页展示交易记录
-
-## 🛠️ 技术栈
-
-- Vue 3 (Composition API)
-- TypeScript
-- Tailwind CSS
-- Vue Router
-- Axios
-
-## 📁 目录结构
-
-```
-src/
-├── views/                  # 页面
-│   ├── Home.vue            # 首页入口
-│   └── BankStatement.vue   # 银行流水识别
-├── components/             # 组件
-│   ├── FileUpload.vue      # 文件上传
-│   ├── FileList.vue        # 文件列表
-│   └── ResultList.vue      # 结果展示
-├── router/                 # 路由
-├── api/                    # API 接口
-└── types.ts                # 类型定义
-```
-
-## 🚀 快速开始
+## 🚀 启动
 
 ```bash
-# 安装依赖
 npm install
-
-# 启动开发服务器
 npm run dev
-
-# 构建生产版本
-npm run build
 ```
 
 访问 http://localhost:5173
+
+## 📁 结构
+
+```
+src/
+├── views/              # 页面
+│   ├── Home.vue        # 首页入口
+│   └── BankStatement.vue
+├── components/         # 组件
+│   ├── FileUpload.vue
+│   ├── FileList.vue
+│   └── ResultList.vue
+├── router/             # 路由
+├── api/                # API 接口
+├── assets/main.css     # 全局样式
+└── types.ts            # 类型定义
+```
 
 ## 🔗 路由
 
 | 路径 | 页面 |
 |------|------|
-| `/` | 首页 - 场景选择 |
+| `/` | 首页 |
 | `/bank-statement` | 银行流水识别 |
 
-## 📡 API
+## 📡 API 函数
 
-| 函数 | 接口 |
-|------|------|
-| `uploadFile(file)` | `POST /api/files/upload` |
-| `getFiles()` | `GET /api/files` |
-| `getFileTransactions(id)` | `GET /api/transactions/{id}` |
-| `getFileSummary(id)` | `GET /api/transactions/{id}/summary` |
+- `uploadFile(file)` - 上传文件
+- `getFiles()` - 获取文件列表
+- `deleteFile(id)` - 删除文件
+- `getFileTransactions(id)` - 获取交易明细
+- `getFileSummary(id)` - 获取汇总信息
