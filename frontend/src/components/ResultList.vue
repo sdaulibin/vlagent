@@ -68,11 +68,11 @@ const prevPage = () => {
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账(卡)号</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">开户行</p>
-                                <p class="font-medium text-gray-700 truncate" :title="summary.bank_name">{{ summary.bank_name || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ summary.bank_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">起止日期</p>
@@ -97,7 +97,7 @@ const prevPage = () => {
                                 <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-4 mt-4">
+                        <!-- <div class="grid grid-cols-2 gap-4 mt-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">是否盖章</p>
                                 <span :class="['inline-block px-2 py-0.5 rounded text-xs font-medium', summary.has_stamp === '是' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600']">
@@ -108,7 +108,7 @@ const prevPage = () => {
                                 <p class="text-xs text-gray-400">盖章类型</p>
                                 <p class="font-medium text-gray-700">{{ summary.stamp_type }}</p>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                     
                     <!-- 明细列表分隔线 -->
@@ -206,26 +206,4 @@ const prevPage = () => {
     </div>
 </template>
 
-<style scoped>
-.summary-section {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 16px;
-}
-
-.summary-item {
-    padding: 8px 12px;
-    background: #f9fafb;
-    border-radius: 8px;
-}
-
-.income-box {
-    background: #fef2f2;
-}
-
-.expense-box {
-    background: #f0fdf4;
-}
-</style>
 

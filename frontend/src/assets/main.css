@@ -55,4 +55,61 @@
   .result-item {
     @apply bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow;
   }
+
+  /* Summary Section */
+  .summary-section {
+    @apply bg-white border border-gray-200 rounded-xl p-4;
+  }
+
+  .summary-item {
+    @apply py-2 px-3 bg-gray-50 rounded-lg;
+  }
+
+  .income-box {
+    @apply bg-red-50;
+  }
+
+  .expense-box {
+    @apply bg-green-50;
+  }
+
+  /* Scenario Card (Home Page) */
+  .scenario-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 24px;
+    transition: all 0.3s ease;
+  }
+
+  .scenario-card:hover:not(.cursor-not-allowed) {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  .scenario-card-icon {
+    @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-4;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
 }

@@ -72,30 +72,3 @@
 import { Scan, CreditCard, FileText, FileCheck, ArrowRight } from 'lucide-vue-next'
 </script>
 
-<style scoped>
-.scenario-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 24px;
-    transition: all 0.3s ease;
-}
-
-.scenario-card:hover:not(.cursor-not-allowed) {
-    transform: translateY(-4px);
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.card-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px;
-}
-</style>
