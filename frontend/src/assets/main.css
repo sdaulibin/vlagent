@@ -250,10 +250,11 @@
 
   .contract-doc-pane {
     @apply flex-1 flex flex-col h-full bg-white;
+    min-width: 0;
   }
 
   .contract-doc-header {
-    @apply px-4 py-3 border-b flex items-center gap-2;
+    @apply px-4 py-3 border-b flex items-center gap-2 flex-shrink-0;
   }
 
   .contract-doc-header-original {
@@ -265,15 +266,16 @@
   }
 
   .contract-doc-badge {
-    @apply px-2 py-0.5 rounded text-xs font-bold text-white;
+    @apply px-2 py-0.5 rounded text-xs font-bold text-white flex-shrink-0;
   }
 
   .contract-doc-content {
-    @apply flex-1 overflow-y-auto p-8 leading-relaxed text-slate-800;
+    @apply flex-1 overflow-y-auto p-4 leading-relaxed text-slate-800;
+    min-height: 0;
   }
 
   .contract-diff-sidebar {
-    @apply w-96 bg-white border-l border-slate-200 flex flex-col shadow-xl;
+    @apply w-80 bg-white border-l border-slate-200 flex flex-col shadow-xl flex-shrink-0;
   }
 
   .contract-filter-tab {

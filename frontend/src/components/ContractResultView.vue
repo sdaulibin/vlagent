@@ -107,7 +107,7 @@ const stats = computed(() => ({
 </script>
 
 <template>
-    <div class="h-screen flex flex-col">
+    <div class="result-container">
         <!-- Toolbar -->
         <div class="contract-toolbar">
             <div class="flex items-center gap-4">
@@ -146,16 +146,16 @@ const stats = computed(() => ({
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 flex overflow-hidden">
+        <div class="main-content">
             <!-- Document Panes -->
-            <div class="flex-1 flex">
+            <div class="doc-panes-container">
                 <!-- Original Doc -->
-                <div class="contract-doc-pane">
+                <div class="doc-pane">
                     <div class="contract-doc-header contract-doc-header-original">
                         <span class="contract-doc-badge contract-badge-original">原</span>
                         <span class="font-medium text-slate-700 truncate">{{ props.fileAName || '原文档' }}</span>
                     </div>
-                    <div id="doc-content-a" class="contract-doc-content p-0">
+                    <div id="doc-content-a" class="doc-content">
                         <!-- PDF Viewer -->
                         <iframe 
                             v-if="props.fileAType === 'pdf'" 
@@ -169,10 +169,9 @@ const stats = computed(() => ({
                         </div>
                         
                         <!-- DOC/DOCX Viewer -->
-                        <div v-else-if="props.fileAType === 'doc'" class="w-full h-full overflow-auto">
+                        <div v-else-if="props.fileAType === 'doc'" class="docx-viewer">
                             <VueOfficeDocx 
-                                :src="props.fileAPreviewUrl" 
-                                style="height: 100%; width: 100%;"
+                                :src="props.fileAPreviewUrl"
                             />
                         </div>
                         
@@ -192,12 +191,12 @@ const stats = computed(() => ({
                 <div class="w-px bg-slate-300"></div>
 
                 <!-- Compare Doc -->
-                <div class="contract-doc-pane">
+                <div class="doc-pane">
                     <div class="contract-doc-header contract-doc-header-compare">
                         <span class="contract-doc-badge contract-badge-compare">比对</span>
                         <span class="font-medium text-slate-700 truncate">{{ props.fileBName || '比对文档' }}</span>
                     </div>
-                    <div id="doc-content-b" class="contract-doc-content p-0">
+                    <div id="doc-content-b" class="doc-content">
                         <!-- PDF Viewer -->
                         <iframe 
                             v-if="props.fileBType === 'pdf'" 
@@ -211,10 +210,9 @@ const stats = computed(() => ({
                         </div>
                         
                         <!-- DOC/DOCX Viewer -->
-                        <div v-else-if="props.fileBType === 'doc'" class="w-full h-full overflow-auto">
+                        <div v-else-if="props.fileBType === 'doc'" class="docx-viewer">
                             <VueOfficeDocx 
-                                :src="props.fileBPreviewUrl" 
-                                style="height: 100%; width: 100%;"
+                                :src="props.fileBPreviewUrl"
                             />
                         </div>
                         
@@ -232,7 +230,7 @@ const stats = computed(() => ({
             </div>
 
             <!-- Diff List Sidebar -->
-            <div class="contract-diff-sidebar">
+            <div class="diff-sidebar">
                 <!-- Stats Header -->
                 <div class="p-5 border-b border-slate-100 bg-slate-50/50">
                     <div class="flex items-end justify-between mb-4">
@@ -306,3 +304,79 @@ const stats = computed(() => ({
         </div>
     </div>
 </template>
+
+<style scoped>
+.result-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.main-content {
+    height: calc(100vh - 64px);
+    display: flex;
+    overflow: hidden;
+}
+
+.doc-panes-container {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.doc-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: 50%;
+    background: white;
+    overflow: hidden;
+}
+
+.doc-content {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+}
+
+.doc-content > div,
+.doc-content > iframe {
+    height: 100%;
+    width: 100%;
+}
+
+/* VueOfficeDocx 容器样式 */
+.docx-viewer {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+.docx-viewer :deep(.docx-wrapper) {
+    padding: 20px;
+    background: #f8fafc;
+}
+
+.docx-viewer :deep(.docx) {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 0 auto;
+    padding: 40px 60px;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.diff-sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-left: 1px solid #e2e8f0;
+    box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+</style>
