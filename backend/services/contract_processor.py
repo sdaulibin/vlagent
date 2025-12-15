@@ -246,29 +246,41 @@ def compare_texts(text_a: str, text_b: str) -> list:
     Returns:
         list: 差异列表
     """
+    # 增加文本长度限制以覆盖更多内容
+    max_len = 8000
+    
     prompt = f"""
-    你是一个专业的文档比对专家。请对比以下两份文档内容，找出它们之间的差异。
+    你是一个专业的文档比对专家。请逐字逐句仔细对比以下两份文档内容，找出它们之间的所有差异。
+
+    【重要提示】
+    - 请特别注意以下类型的差异：
+      1. 文字增加或删除（如"基本信息"变为"基本信息哈哈哈"）
+      2. 数字变化（如编码、金额、日期的任何不同）
+      3. 标点符号变化
+      4. 章节标题的任何改动
+    - 即使是很小的差异也必须报告
+    - 逐段落、逐行比对，不要遗漏
 
     【原文档】
-    {text_a[:3000]}  
+    {text_a[:max_len]}  
     
     【比对文档】
-    {text_b[:3000]}
+    {text_b[:max_len]}
     
     请以 JSON 数组格式输出差异列表，每个差异项包含：
     - type: 差异类型，值为 "added"（新增）、"deleted"（删除）或 "modified"（修改）
-    - original: 原文档中的内容（删除或修改时填写）
-    - comparison: 比对文档中的内容（新增或修改时填写）
-    - location: 差异所在的章节或位置描述
+    - original: 原文档中的内容（删除或修改时填写，保留原始完整文本）
+    - comparison: 比对文档中的内容（新增或修改时填写，保留原始完整文本）
+    - location: 差异所在的章节或位置描述（如"第一章 基本信息"）
 
     示例格式：
     [
-        {{"type": "modified", "original": "原内容", "comparison": "新内容", "location": "第1章"}},
-        {{"type": "deleted", "original": "被删除的内容", "comparison": "", "location": "第2章"}},
-        {{"type": "added", "original": "", "comparison": "新增的内容", "location": "第3章"}}
+        {{"type": "modified", "original": "产品登记编码 Z7003525000319", "comparison": "产品登记编码 Z7003525000319123", "location": "基本信息"}},
+        {{"type": "modified", "original": "第一章 基本信息", "comparison": "第一章 基本信息哈哈哈", "location": "章节标题"}},
+        {{"type": "deleted", "original": "被删除的内容", "comparison": "", "location": "第2章"}}
     ]
 
-    只输出 JSON 数组，不需要任何解释。
+    请务必找出所有差异，只输出 JSON 数组，不需要任何解释。
     """
     
     result = request_stream(
