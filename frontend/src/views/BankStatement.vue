@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router';
 import FileUpload from '../components/FileUpload.vue';
 import FileList from '../components/FileList.vue';
 import ResultList from '../components/ResultList.vue';
-import { uploadFile, getFiles, getFileTransactions, getFileSummary, deleteFile } from '../api';
+import { uploadFile, getFiles, getFileTransactions, getFileSummary, deleteFile, exportExcel } from '../api';
 import type { FileItem, Transaction, Summary } from '../types';
 
 const router = useRouter();
@@ -13,6 +13,8 @@ const files = ref<FileItem[]>([]);
 const results = ref<Transaction[]>([]);
 const summary = ref<Summary | null>(null);
 const isProcessing = ref(false);
+const selectedFileId = ref<number | null>(null);
+const selectedFileName = ref('');
 
 const loadFiles = async () => {
     try {
@@ -51,6 +53,9 @@ const handleFileSelect = async (fileList: FileList) => {
 const handleSelectFile = async (id: number) => {
     try {
         isProcessing.value = true;
+        selectedFileId.value = id;
+        const file = files.value.find(f => f.id === id);
+        selectedFileName.value = file?.name || '';
         const [txs, summaryData] = await Promise.all([
             getFileTransactions(id),
             getFileSummary(id)
@@ -68,12 +73,20 @@ const handleDeleteFile = async (id: number) => {
     try {
         await deleteFile(id);
         files.value = files.value.filter(f => f.id !== id);
-        if (files.value.length === 0) {
+        if (files.value.length === 0 || selectedFileId.value === id) {
             results.value = [];
             summary.value = null;
+            selectedFileId.value = null;
+            selectedFileName.value = '';
         }
     } catch (e) {
         console.error("Failed to delete file", e);
+    }
+};
+
+const handleExport = async () => {
+    if (selectedFileId.value && selectedFileName.value) {
+        await exportExcel(selectedFileId.value, selectedFileName.value);
     }
 };
 
@@ -104,7 +117,14 @@ const goBack = () => {
             </div>
 
             <!-- Right Column -->
-            <ResultList :results="results" :summary="summary" :isProcessing="isProcessing" />
+            <ResultList 
+                :results="results" 
+                :summary="summary" 
+                :isProcessing="isProcessing"
+                :selectedFileId="selectedFileId"
+                :selectedFileName="selectedFileName"
+                @export="handleExport"
+            />
         </main>
     </div>
 </template>

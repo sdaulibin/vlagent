@@ -7,6 +7,12 @@ const props = defineProps<{
     results: Transaction[];
     summary: Summary | null;
     isProcessing: boolean;
+    selectedFileId: number | null;
+    selectedFileName: string;
+}>();
+
+const emit = defineEmits<{
+    (e: 'export'): void;
 }>();
 
 const currentPage = ref(1);
@@ -200,7 +206,11 @@ const prevPage = () => {
         </div>
         
         <div class="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
-            <button class="btn-secondary">导出 Excel</button>
+            <button 
+                class="btn-secondary" 
+                @click="emit('export')"
+                :disabled="!selectedFileId"
+            >导出 Excel</button>
             <button class="btn-primary">确认归档</button>
         </div>
     </div>

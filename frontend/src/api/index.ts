@@ -34,3 +34,20 @@ export const deleteFile = async (fileId: number) => {
     return response.data;
 };
 
+export const exportExcel = async (fileId: number, filename: string) => {
+    const response = await api.get(`/files/${fileId}/export`, {
+        responseType: 'blob'
+    });
+
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename.replace('.pdf', '.xlsx'));
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
+
+

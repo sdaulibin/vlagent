@@ -75,6 +75,82 @@ async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
     return file
 
 
+@router.get("/{file_id}/export")
+async def export_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """导出文件交易数据为 Excel"""
+    from fastapi.responses import StreamingResponse
+    from openpyxl import Workbook
+    from io import BytesIO
+    
+    # 获取文件信息
+    file_stmt = select(FileRecord).where(FileRecord.id == file_id)
+    file_result = await session.execute(file_stmt)
+    file_record = file_result.scalar_one_or_none()
+    
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # 获取交易记录
+    tx_stmt = select(TransactionRecord).where(TransactionRecord.file_id == file_id)
+    tx_result = await session.execute(tx_stmt)
+    transactions = tx_result.scalars().all()
+    
+    # 获取汇总记录
+    summary_stmt = select(SummaryRecord).where(SummaryRecord.file_id == file_id)
+    summary_result = await session.execute(summary_stmt)
+    summary = summary_result.scalar_one_or_none()
+    
+    # 创建 Excel 工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "交易明细"
+    
+    # 添加汇总信息
+    if summary:
+        ws.append(["账户名称", summary.account_name])
+        ws.append(["账(卡)号", summary.account_number])
+        ws.append(["开户行", summary.bank_name])
+        ws.append(["起止日期", summary.date_range])
+        ws.append(["收入笔数", summary.income_count])
+        ws.append(["收入总额", summary.income_total])
+        ws.append(["支出笔数", summary.expense_count])
+        ws.append(["支出总额", summary.expense_total])
+        ws.append([])  # 空行
+    
+    # 添加交易明细表头
+    headers = ["序号", "交易时间", "交易渠道", "收入", "支出", "账户余额", "币种", "对方账号", "对方户名", "摘要备注"]
+    ws.append(headers)
+    
+    # 添加交易数据
+    for tx in transactions:
+        ws.append([
+            tx.sequence,
+            tx.transaction_time,
+            tx.channel,
+            tx.income,
+            tx.expense,
+            tx.balance,
+            tx.currency,
+            tx.counterparty_account,
+            tx.counterparty_name,
+            tx.description
+        ])
+    
+    # 保存到内存
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # 生成文件名
+    filename = os.path.splitext(file_record.filename)[0] + ".xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
     """上传并处理PDF文件"""
