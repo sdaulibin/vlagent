@@ -150,42 +150,112 @@ const applyHighlight = () => {
             return [...codes, ...chinese];
         };
         
-        // 尝试不同的搜索策略
-        const searchStrategies = [
-            // 策略1: 完整文本
-            searchText,
-            // 策略2: 前50个字符
-            searchText.length > 50 ? searchText.substring(0, 50) : null,
-            // 策略3: 前30个字符
-            searchText.length > 30 ? searchText.substring(0, 30) : null,
-            // 策略4: 关键词匹配（用于表格）
-            ...extractKeywords(searchText),
-        ].filter(Boolean) as string[];
-        
-        // 尝试每个策略直到找到匹配
-        for (const variant of searchStrategies) {
-            matches = [];
-            doc.descendants((node, pos) => {
-                if (node.isText && node.text) {
-                    const text = node.text;
-                    let index = text.indexOf(variant);
-                    while (index !== -1) {
-                        matches.push({
-                            from: pos + index,
-                            to: pos + index + variant.length
-                        });
-                        index = text.indexOf(variant, index + 1);
-                    }
-                }
-            });
+        // 构建忽略空格的正则
+        const buildFuzzyRegex = (text: string): RegExp | null => {
+            // 移除现有空格
+            const cleanText = text.replace(/\s+/g, '');
+            if (cleanText.length < 2) return null;
             
-            if (matches.length > 0) {
-                console.log(`[TiptapViewer] 使用策略 "${variant.substring(0, 20)}..." 找到 ${matches.length} 个匹配`);
-                break;
+            // 每个字符之间允许任意空白
+            const pattern = cleanText.split('').map(c => {
+                // 转义特殊正则字符
+                return c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }).join('\\s*');
+            
+            return new RegExp(pattern, 'g');
+        };
+
+        // 尝试不同的搜索策略
+        // 1. 完整文本精确匹配
+        // 2. 忽略空格的模糊匹配
+        // 3. 截断文本匹配
+        // 4. 关键词匹配
+        
+        // 策略1: 完整文本精确匹配
+        let found = false;
+        
+        doc.descendants((node, pos) => {
+            if (found) return false;
+            if (node.isText && node.text) {
+                const text = node.text;
+                let index = text.indexOf(searchText);
+                if (index !== -1) {
+                    matches.push({ from: pos + index, to: pos + index + searchText.length });
+                    found = true; 
+                    console.log(`[TiptapViewer] 精确匹配成功: "${searchText}"`);
+                }
+            }
+        });
+
+        // 策略2: 忽略空格的正则匹配
+        if (!found) {
+            const fuzzyRegex = buildFuzzyRegex(searchText);
+            if (fuzzyRegex) {
+                doc.descendants((node, pos) => {
+                    if (found) return false;
+                    if (node.isText && node.text) {
+                        const text = node.text;
+                        let match;
+                        // 重置正则索引
+                        fuzzyRegex.lastIndex = 0;
+                        while ((match = fuzzyRegex.exec(text)) !== null) {
+                            matches.push({ from: pos + match.index, to: pos + match.index + match[0].length });
+                            found = true;
+                            // 只找第一个匹配
+                            break; 
+                        }
+                    }
+                });
+                if (found) console.log(`[TiptapViewer] 忽略空格匹配成功: "${searchText}"`);
             }
         }
         
-        console.log(`[TiptapViewer] 最终匹配数: ${matches.length}, 搜索: "${searchText.substring(0, 30)}..."`);
+        // 策略3: 截断文本匹配 (如果前面没找到)
+        if (!found) {
+             const truncatedVariants = [
+                searchText.length > 50 ? searchText.substring(0, 50) : null,
+                searchText.length > 30 ? searchText.substring(0, 30) : null,
+            ].filter(Boolean) as string[];
+
+            for (const variant of truncatedVariants) {
+                doc.descendants((node, pos) => {
+                    if (found) return false;
+                    if (node.isText && node.text) {
+                        const text = node.text;
+                        let index = text.indexOf(variant);
+                        if (index !== -1) {
+                            matches.push({ from: pos + index, to: pos + index + variant.length });
+                            found = true;
+                        }
+                    }
+                });
+                if (found) {
+                    console.log(`[TiptapViewer] 截断匹配成功: "${truncatedVariants[0].substring(0, 10)}..."`);
+                    break;
+                }
+            }
+        }
+
+        // 策略4: 关键词匹配 (最后尝试)
+        if (!found) {
+            const keywords = extractKeywords(searchText);
+            for (const keyword of keywords) {
+                doc.descendants((node, pos) => {
+                     // 关键词匹配不互斥，可以找多个
+                    if (node.isText && node.text) {
+                        const text = node.text;
+                        let index = text.indexOf(keyword);
+                        while (index !== -1) {
+                            matches.push({ from: pos + index, to: pos + index + keyword.length });
+                            index = text.indexOf(keyword, index + 1);
+                        }
+                    }
+                });
+            }
+            if (matches.length > 0) console.log(`[TiptapViewer] 关键词匹配成功, 找到 ${matches.length} 个`);
+        }
+        
+        console.log(`[TiptapViewer] 最终匹配数: ${matches.length}`);
         
         // 应用高亮（从后往前，避免位置偏移问题）
         const highlightColor = props.highlightColor === 'red' ? '#fecaca' : '#bbf7d0';
