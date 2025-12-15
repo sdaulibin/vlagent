@@ -308,7 +308,8 @@ def compare_texts(text_a: str, text_b: str) -> list:
     智能分块比对长文档
     """
     # 限制单个分块大小 (字符数)
-    CHUNK_SIZE = 6000
+    # 降低到 3000 以避免本地模型卡死
+    CHUNK_SIZE = 3000
     
     # 如果文档较小，直接比对
     if len(text_a) < CHUNK_SIZE and len(text_b) < CHUNK_SIZE:
@@ -329,44 +330,41 @@ def compare_texts(text_a: str, text_b: str) -> list:
     # 当前累积的待比对文本
     pending_a = []
     pending_b = []
-    current_len = 0
     
     for i, block in enumerate(matching_blocks):
         a_start, b_start, size = block
         
-        # 获取不匹配的部分 (从上一个匹配块结束到当前匹配块开始)
+        # 获取不匹配的部分
         unmatched_a = text_a[last_a:a_start]
         unmatched_b = text_b[last_b:b_start]
         
         # 获取匹配的部分
         matched_content = text_a[a_start:a_start+size]
         
-        # 将不匹配部分添加到当前累积
+        # 累积
         pending_a.append(unmatched_a)
         pending_b.append(unmatched_b)
-        
-        # 将匹配部分也添加到累积，直到累积长度超过限制
-        # 但我们需要在句子或段落边界分割，简单起见，我们在匹配块内部寻找分割点
-        # 或者简单地：如果不匹配部分+匹配部分 < CHUNK_SIZE，就继续累积
-        
         pending_a.append(matched_content)
         pending_b.append(matched_content)
         
         current_str_a = "".join(pending_a)
         current_str_b = "".join(pending_b)
         
-        # 如果当前累积的文本足够长，或者这是最后一个块
+        # 检查是否需要提交分块
         if len(current_str_a) >= CHUNK_SIZE or i == len(matching_blocks) - 1:
-            # 只有当有内容时才比对
             if current_str_a.strip() or current_str_b.strip():
-                print(f"比对分块: Size A={len(current_str_a)}, Size B={len(current_str_b)}")
-                chunk_diffs = _compare_chunk_with_ai(current_str_a, current_str_b)
-                all_diffs.extend(chunk_diffs)
+                chunk_num = len(all_diffs) + 1
+                print(f"处理分块 #{chunk_num}: Size A={len(current_str_a)}, Size B={len(current_str_b)}")
+                try:
+                    chunk_diffs = _compare_chunk_with_ai(current_str_a, current_str_b)
+                    print(f"分块 #{chunk_num} 完成，发现 {len(chunk_diffs)} 处差异")
+                    all_diffs.extend(chunk_diffs)
+                except Exception as e:
+                    print(f"分块 #{chunk_num} 处理出错: {e}")
             
-            # 重置累积
+            # 重置
             pending_a = []
             pending_b = []
-            current_len = 0
         
         last_a = a_start + size
         last_b = b_start + size
