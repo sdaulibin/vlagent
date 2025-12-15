@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue';
+import { ref, nextTick, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
     ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
-    ZoomIn, ZoomOut, ArrowRightLeft, Download, AlertCircle, CheckCircle2, FileDiff
+    ZoomIn, ZoomOut, ArrowRightLeft, Download, AlertCircle, CheckCircle2, FileDiff, Clock, Trash2
 } from 'lucide-vue-next';
-import { compareContracts, getTaskDiffs, getFilePreviewUrl } from '../api';
+import { compareContracts, getTaskDiffs, getFilePreviewUrl, getCompareTasks, deleteCompareTask } from '../api';
 
 const router = useRouter();
 
@@ -19,10 +19,63 @@ const syncScroll = ref(true);
 const currentTaskId = ref<number | null>(null);
 const errorMessage = ref('');
 
+// 比对历史
+interface TaskItem {
+    id: number;
+    file_a_name: string;
+    file_b_name: string;
+    status: string;
+    created_at: string;
+    content_a?: string;
+    content_b?: string;
+}
+const historyList = ref<TaskItem[]>([]);
+
 // 文档内容
 const contentA = ref('');
 const contentB = ref('');
 const selectedDiffId = ref<number | null>(null);
+
+// 加载历史列表
+const loadHistory = async () => {
+    try {
+        historyList.value = await getCompareTasks();
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+};
+
+// 删除历史任务
+const handleDeleteTask = async (taskId: number) => {
+    if (!confirm('确定要删除这个比对任务吗？')) return;
+    try {
+        await deleteCompareTask(taskId);
+        await loadHistory();
+    } catch (e) {
+        console.error('Failed to delete task:', e);
+    }
+};
+
+// 查看历史任务结果
+const viewHistoryTask = async (task: TaskItem) => {
+    currentTaskId.value = task.id;
+    contentA.value = task.content_a || '';
+    contentB.value = task.content_b || '';
+    
+    // 模拟 fileA 和 fileB 用于类型判断
+    fileA.value = { name: task.file_a_name } as File;
+    fileB.value = { name: task.file_b_name } as File;
+    
+    const diffsData = await getTaskDiffs(task.id);
+    diffs.value = diffsData;
+    
+    activeView.value = 'result';
+};
+
+// 初始化加载
+onMounted(() => {
+    loadHistory();
+});
 
 // 获取文件类型
 const getFileType = (filename: string | undefined): 'pdf' | 'image' | 'doc' | 'unknown' => {
@@ -282,11 +335,51 @@ const goBack = () => {
                         <h2 class="text-lg font-semibold text-slate-800">比对历史</h2>
                         <p class="text-sm text-slate-500">查看之前的比对任务</p>
                     </div>
-                    <div class="flex-1 overflow-y-auto p-4">
-                        <div class="text-center text-slate-400 py-10">
+                    <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                        <!-- Empty State -->
+                        <div v-if="historyList.length === 0" class="text-center text-slate-400 py-10">
                             <FileText class="w-12 h-12 mx-auto mb-3 opacity-30" />
                             <p>暂无比对历史</p>
                             <p class="text-sm">完成比对后会在此处显示</p>
+                        </div>
+                        
+                        <!-- History Items -->
+                        <div 
+                            v-for="task in historyList" 
+                            :key="task.id"
+                            class="p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group"
+                            @click="viewHistoryTask(task)"
+                        >
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span :class="[
+                                            'px-2 py-0.5 rounded-full text-xs font-medium',
+                                            task.status === 'done' ? 'bg-green-100 text-green-700' :
+                                            task.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                            'bg-yellow-100 text-yellow-700'
+                                        ]">
+                                            {{ task.status === 'done' ? '已完成' : task.status === 'failed' ? '失败' : '处理中' }}
+                                        </span>
+                                        <span class="text-xs text-slate-400 flex items-center gap-1">
+                                            <Clock class="w-3 h-3" />
+                                            {{ new Date(task.created_at).toLocaleString() }}
+                                        </span>
+                                    </div>
+                                    <div class="text-sm text-slate-700 truncate mb-1">
+                                        <span class="font-medium">原文档:</span> {{ task.file_a_name }}
+                                    </div>
+                                    <div class="text-sm text-slate-500 truncate">
+                                        <span class="font-medium">比对:</span> {{ task.file_b_name }}
+                                    </div>
+                                </div>
+                                <button 
+                                    @click.stop="handleDeleteTask(task.id)"
+                                    class="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                    <Trash2 class="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
