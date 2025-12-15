@@ -141,13 +141,15 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
     wb.save(output)
     output.seek(0)
     
-    # 生成文件名
+    # 生成文件名 (使用 URL 编码支持中文)
+    from urllib.parse import quote
     filename = os.path.splitext(file_record.filename)[0] + ".xlsx"
+    encoded_filename = quote(filename)
     
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
     )
 
 

@@ -2,12 +2,12 @@
 
 @layer components {
 
-  /* Containers */
+  /* ===== Common Containers ===== */
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-5;
   }
 
-  /* Titles */
+  /* ===== Titles ===== */
   .header-title {
     @apply text-3xl font-bold text-gray-800 tracking-tight;
   }
@@ -20,13 +20,13 @@
     @apply text-xl font-bold text-gray-800 mb-4 flex items-center justify-between;
   }
 
-  /* Buttons */
+  /* ===== Buttons ===== */
   .btn {
     @apply px-4 py-2 text-sm rounded-lg transition-colors;
   }
 
   .btn-primary {
-    @apply px-4 py-2 text-sm rounded-lg transition-colors text-white bg-blue-600 hover:bg-blue-700 shadow-sm;
+    @apply px-4 py-2 text-sm rounded-lg transition-colors text-white bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
@@ -41,22 +41,20 @@
     @apply p-1 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* File items */
+  /* ===== File Management ===== */
   .file-item {
     @apply bg-gray-50 rounded-lg p-3 flex items-center justify-between border border-gray-100 hover:border-blue-200 transition-all;
   }
 
-  /* Upload Area */
   .upload-area {
     @apply flex-1 border-2 border-dashed border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer relative flex flex-col items-center justify-center text-center p-4;
   }
 
-  /* Result Item */
+  /* ===== Result Display ===== */
   .result-item {
     @apply bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow;
   }
 
-  /* Summary Section */
   .summary-section {
     @apply bg-white border border-gray-200 rounded-xl p-4;
   }
@@ -73,7 +71,36 @@
     @apply bg-green-50;
   }
 
-  /* Scenario Card (Home Page) */
+  /* ===== Home Page - Dark Theme ===== */
+  .home-container {
+    @apply min-h-screen;
+    background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
+  }
+
+  .home-header {
+    @apply pt-12 pb-8 text-center;
+  }
+
+  .home-title {
+    @apply text-4xl font-bold bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #60a5fa, #a78bfa);
+  }
+
+  .home-subtitle {
+    @apply text-gray-400 text-lg;
+  }
+
+  .home-logo {
+    @apply p-3 rounded-2xl shadow-lg;
+    background: linear-gradient(to right, #3b82f6, #9333ea);
+    box-shadow: 0 10px 25px rgba(147, 51, 234, 0.3);
+  }
+
+  .home-footer {
+    @apply text-center py-8 text-gray-500 text-sm;
+  }
+
+  /* ===== Scenario Cards ===== */
   .scenario-card {
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
@@ -83,18 +110,55 @@
     transition: all 0.3s ease;
   }
 
-  .scenario-card:hover:not(.cursor-not-allowed) {
+  .scenario-card:hover:not(.scenario-card-disabled) {
     transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.2);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   }
 
+  .scenario-card-disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
   .scenario-card-icon {
     @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-4;
   }
 
-  /* Custom Scrollbar */
+  .scenario-card-title {
+    @apply text-xl font-semibold text-white mb-2;
+  }
+
+  .scenario-card-desc {
+    @apply text-gray-400 text-sm mb-4;
+  }
+
+  .scenario-card-link {
+    @apply flex items-center text-blue-400 text-sm font-medium;
+  }
+
+  .scenario-card-link:hover {
+    @apply text-blue-300;
+  }
+
+  .scenario-badge-coming {
+    @apply inline-block px-3 py-1 bg-gray-700 text-gray-400 text-xs rounded-full;
+  }
+
+  /* ===== Icon Gradients ===== */
+  .icon-gradient-blue {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+  }
+
+  .icon-gradient-green {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+  }
+
+  .icon-gradient-orange {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+  }
+
+  /* ===== Custom Scrollbar ===== */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }

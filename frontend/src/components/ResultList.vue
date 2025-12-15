@@ -207,11 +207,10 @@ const prevPage = () => {
         
         <div class="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
             <button 
-                class="btn-secondary" 
+                class="btn-primary" 
                 @click="emit('export')"
                 :disabled="!selectedFileId"
-            >导出 Excel</button>
-            <button class="btn-primary">确认归档</button>
+            >导出结果</button>
         </div>
     </div>
 </template>
