@@ -168,6 +168,8 @@ async def compare_contracts(
 @router.delete("/{task_id}")
 async def delete_compare_task(task_id: int, session: AsyncSession = Depends(get_session)):
     """删除比对任务及其差异记录"""
+    from sqlmodel import delete
+    
     # 查询任务
     statement = select(CompareTask).where(CompareTask.id == task_id)
     result = await session.execute(statement)
@@ -176,17 +178,17 @@ async def delete_compare_task(task_id: int, session: AsyncSession = Depends(get_
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # 删除差异记录
-    diff_stmt = select(DiffRecord).where(DiffRecord.task_id == task_id)
-    diff_result = await session.execute(diff_stmt)
-    diffs = diff_result.scalars().all()
-    for diff in diffs:
-        await session.delete(diff)
+    # 先删除关联的差异记录（使用 SQL DELETE）
+    delete_diffs_stmt = delete(DiffRecord).where(DiffRecord.task_id == task_id)
+    await session.execute(delete_diffs_stmt)
     
     # 删除文件
     for path in [task.file_a_path, task.file_b_path]:
-        if os.path.exists(path):
-            os.remove(path)
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                print(f"Failed to delete file {path}: {e}")
     
     # 删除任务记录
     await session.delete(task)
