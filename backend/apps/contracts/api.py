@@ -83,10 +83,17 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
     ext = os.path.splitext(filename)[1].lower()
     media_type = MIME_TYPES.get(ext, 'application/octet-stream')
     
-    return FileResponse(
-        path=file_path,
+    # 使用 inline 而不是 attachment, 让浏览器直接预览而不是下载
+    from starlette.responses import Response
+    with open(file_path, 'rb') as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
         media_type=media_type,
-        filename=filename
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
     )
 
 @router.post("/compare")
