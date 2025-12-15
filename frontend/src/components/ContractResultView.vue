@@ -6,6 +6,7 @@ import {
 } from 'lucide-vue-next';
 import VueOfficeDocx from '@vue-office/docx';
 import '@vue-office/docx/lib/index.css';
+import TiptapViewer from './TiptapViewer.vue';
 
 interface DiffItem {
     id: number;
@@ -120,6 +121,17 @@ const highlightedContentB = computed(() => {
     return escaped.replace(regex, '<mark class="bg-green-200 text-green-900 px-1 rounded">$1</mark>');
 });
 
+// 获取高亮文本 (用于 Tiptap)
+const highlightTextA = computed(() => {
+    const diff = selectedDiff.value;
+    return diff?.original_text?.trim() || '';
+});
+
+const highlightTextB = computed(() => {
+    const diff = selectedDiff.value;
+    return diff?.comparison_text?.trim() || '';
+});
+
 // 过滤后的差异列表
 const filteredDiffs = computed(() => {
     return props.diffs.filter(d => {
@@ -198,15 +210,13 @@ const stats = computed(() => ({
                         <span class="font-medium text-slate-700 truncate">{{ props.fileAName || '原文档' }}</span>
                     </div>
                     <div id="doc-content-a" class="doc-content">
-                        <!-- 差异视图 - 显示高亮文本 -->
-                        <div v-if="viewMode === 'diff'" class="p-6 overflow-auto h-full bg-slate-50">
-                            <div 
-                                v-if="props.contentA" 
-                                class="max-w-none whitespace-pre-wrap text-sm leading-relaxed select-text bg-white p-6 rounded-lg shadow-sm"
-                                v-html="highlightedContentA"
-                            ></div>
-                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                        </div>
+                        <!-- 差异视图 - 使用 Tiptap 编辑器 -->
+                        <TiptapViewer 
+                            v-if="viewMode === 'diff'"
+                            :content="props.contentA"
+                            :highlightText="highlightTextA"
+                            highlightColor="red"
+                        />
                         
                         <!-- 格式视图 -->
                         <template v-else>
@@ -252,15 +262,13 @@ const stats = computed(() => ({
                         <span class="font-medium text-slate-700 truncate">{{ props.fileBName || '比对文档' }}</span>
                     </div>
                     <div id="doc-content-b" class="doc-content">
-                        <!-- 差异视图 - 显示高亮文本 -->
-                        <div v-if="viewMode === 'diff'" class="p-6 overflow-auto h-full bg-slate-50">
-                            <div 
-                                v-if="props.contentB" 
-                                class="max-w-none whitespace-pre-wrap text-sm leading-relaxed select-text bg-white p-6 rounded-lg shadow-sm"
-                                v-html="highlightedContentB"
-                            ></div>
-                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                        </div>
+                        <!-- 差异视图 - 使用 Tiptap 编辑器 -->
+                        <TiptapViewer 
+                            v-if="viewMode === 'diff'"
+                            :content="props.contentB"
+                            :highlightText="highlightTextB"
+                            highlightColor="green"
+                        />
                         
                         <!-- 格式视图 -->
                         <template v-else>

@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "@tiptap/extension-highlight": "^3.13.0",
+    "@tiptap/starter-kit": "^3.13.0",
+    "@tiptap/vue-3": "^3.13.0",
     "@vue-office/docx": "^1.6.3",
     "axios": "^1.13.2",
     "lucide-vue-next": "^0.556.0",
