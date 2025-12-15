@@ -82,12 +82,16 @@ const selectedDiff = computed(() => {
 // 获取高亮文本 (用于 Tiptap)
 const highlightTextA = computed(() => {
     const diff = selectedDiff.value;
-    return diff?.original_text?.trim() || '';
+    const text = diff?.original_text?.trim() || '';
+    console.log('[ContractResultView] highlightTextA:', text.substring(0, 50) || '(empty)');
+    return text;
 });
 
 const highlightTextB = computed(() => {
     const diff = selectedDiff.value;
-    return diff?.comparison_text?.trim() || '';
+    const text = diff?.comparison_text?.trim() || '';
+    console.log('[ContractResultView] highlightTextB:', text.substring(0, 50) || '(empty)');
+    return text;
 });
 
 // 过滤后的差异列表

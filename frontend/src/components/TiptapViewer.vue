@@ -128,7 +128,7 @@ const applyHighlight = () => {
         return;
     }
     
-    const searchText = props.highlightText.trim();
+    let searchText = props.highlightText.trim();
     
     // 先设置内容
     editor.value.commands.setContent(textToHtml(props.content));
@@ -139,24 +139,43 @@ const applyHighlight = () => {
         
         const { state } = editor.value;
         const { doc } = state;
-        const matches: { from: number; to: number }[] = [];
+        let matches: { from: number; to: number }[] = [];
         
-        // 搜索所有匹配位置
-        doc.descendants((node, pos) => {
-            if (node.isText && node.text) {
-                const text = node.text;
-                let index = text.indexOf(searchText);
-                while (index !== -1) {
-                    matches.push({
-                        from: pos + index,
-                        to: pos + index + searchText.length
-                    });
-                    index = text.indexOf(searchText, index + 1);
+        // 尝试不同长度的搜索文本
+        const searchVariants = [
+            searchText,
+            // 如果原文本太长，尝试前50个字符
+            searchText.length > 50 ? searchText.substring(0, 50) : null,
+            // 尝试前30个字符
+            searchText.length > 30 ? searchText.substring(0, 30) : null,
+            // 尝试前20个字符
+            searchText.length > 20 ? searchText.substring(0, 20) : null,
+        ].filter(Boolean) as string[];
+        
+        // 尝试每个变体直到找到匹配
+        for (const variant of searchVariants) {
+            matches = [];
+            doc.descendants((node, pos) => {
+                if (node.isText && node.text) {
+                    const text = node.text;
+                    let index = text.indexOf(variant);
+                    while (index !== -1) {
+                        matches.push({
+                            from: pos + index,
+                            to: pos + index + variant.length
+                        });
+                        index = text.indexOf(variant, index + 1);
+                    }
                 }
+            });
+            
+            if (matches.length > 0) {
+                console.log(`[TiptapViewer] 使用变体 "${variant.substring(0, 20)}..." 找到 ${matches.length} 个匹配`);
+                break;
             }
-        });
+        }
         
-        console.log(`找到 ${matches.length} 个匹配: "${searchText.substring(0, 30)}..."`);
+        console.log(`[TiptapViewer] 最终匹配数: ${matches.length}, 搜索: "${searchText.substring(0, 30)}..."`);
         
         // 应用高亮（从后往前，避免位置偏移问题）
         const highlightColor = props.highlightColor === 'red' ? '#fecaca' : '#bbf7d0';
