@@ -217,62 +217,80 @@ const goBack = () => {
 <template>
     <div class="min-h-screen bg-slate-50">
         <!-- Upload View -->
-        <div v-if="activeView === 'upload'" class="min-h-screen flex flex-col items-center justify-center p-8">
+        <div v-if="activeView === 'upload'" class="min-h-screen flex flex-col p-8">
             <!-- Header -->
-            <div class="w-full max-w-5xl mb-8">
-                <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6">
+            <div class="w-full mb-6">
+                <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
                     <ArrowLeft class="w-5 h-5" />
                     返回首页
                 </button>
-                <div class="text-center">
-                    <div class="flex items-center justify-center gap-3 mb-4">
-                        <div class="contract-logo">
-                            <FileDiff class="w-8 h-8 text-white" />
-                        </div>
-                        <h1 class="text-3xl font-bold text-slate-900">合同比对</h1>
+                <div class="flex items-center gap-3">
+                    <div class="contract-logo">
+                        <FileDiff class="w-8 h-8 text-white" />
                     </div>
-                    <p class="text-slate-500">上传两份文档以自动识别差异，支持 PDF, Word, 图片格式</p>
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">合同比对</h1>
+                        <p class="text-sm text-slate-500">上传两份文档以自动识别差异，支持 PDF, Word, 图片格式</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Upload Areas -->
-            <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                <!-- Document A -->
-                <label class="contract-upload-area contract-upload-original">
-                    <div class="contract-upload-badge contract-badge-original">原文档</div>
-                    <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileASelect" />
-                    <div class="contract-upload-icon contract-icon-original">
-                        <FileText class="w-10 h-10" />
-                    </div>
-                    <h3 class="text-lg font-semibold text-slate-800 mb-2">
-                        {{ fileA ? fileA.name : '点击或拖拽上传原文档' }}
-                    </h3>
-                    <p class="text-sm text-slate-400">支持 PDF, Word, 图片 (最大 50MB)</p>
-                </label>
+            <!-- Main Content: Left upload, Right history -->
+            <div class="flex-1 flex gap-8">
+                <!-- Left Column: Upload Area -->
+                <div class="w-96 flex flex-col gap-6">
+                    <!-- Document A -->
+                    <label class="contract-upload-area contract-upload-original h-40">
+                        <div class="contract-upload-badge contract-badge-original">原文档</div>
+                        <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileASelect" />
+                        <div class="contract-upload-icon contract-icon-original">
+                            <FileText class="w-8 h-8" />
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-800 mb-1">
+                            {{ fileA ? fileA.name : '点击上传原文档' }}
+                        </h3>
+                        <p class="text-xs text-slate-400">PDF, Word, 图片 (最大 50MB)</p>
+                    </label>
 
-                <!-- Document B -->
-                <label class="contract-upload-area contract-upload-compare">
-                    <div class="contract-upload-badge contract-badge-compare">比对文档</div>
-                    <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileBSelect" />
-                    <div class="contract-upload-icon contract-icon-compare">
-                        <FileText class="w-10 h-10" />
+                    <!-- Document B -->
+                    <label class="contract-upload-area contract-upload-compare h-40">
+                        <div class="contract-upload-badge contract-badge-compare">比对文档</div>
+                        <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileBSelect" />
+                        <div class="contract-upload-icon contract-icon-compare">
+                            <FileText class="w-8 h-8" />
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-800 mb-1">
+                            {{ fileB ? fileB.name : '点击上传比对文档' }}
+                        </h3>
+                        <p class="text-xs text-slate-400">PDF, Word, 图片 (最大 50MB)</p>
+                    </label>
+
+                    <!-- Start Button -->
+                    <button 
+                        @click="startCompare" 
+                        :disabled="!fileA || !fileB || isProcessing"
+                        class="contract-btn-primary w-full"
+                    >
+                        <Search class="w-5 h-5" />
+                        {{ isProcessing ? '比对中...' : '开始智能比对' }}
+                    </button>
+                </div>
+
+                <!-- Right Column: History List -->
+                <div class="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                        <h2 class="text-lg font-semibold text-slate-800">比对历史</h2>
+                        <p class="text-sm text-slate-500">查看之前的比对任务</p>
                     </div>
-                    <h3 class="text-lg font-semibold text-slate-800 mb-2">
-                        {{ fileB ? fileB.name : '点击或拖拽上传比对文档' }}
-                    </h3>
-                    <p class="text-sm text-slate-400">支持 PDF, Word, 图片 (最大 50MB)</p>
-                </label>
+                    <div class="flex-1 overflow-y-auto p-4">
+                        <div class="text-center text-slate-400 py-10">
+                            <FileText class="w-12 h-12 mx-auto mb-3 opacity-30" />
+                            <p>暂无比对历史</p>
+                            <p class="text-sm">完成比对后会在此处显示</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <!-- Start Button -->
-            <button 
-                @click="startCompare" 
-                :disabled="!fileA || !fileB || isProcessing"
-                class="contract-btn-primary"
-            >
-                <Search class="w-5 h-5" />
-                {{ isProcessing ? '比对中...' : '开始智能比对' }}
-            </button>
         </div>
 
         <!-- Result View -->
