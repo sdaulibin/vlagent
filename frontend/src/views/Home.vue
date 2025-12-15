@@ -41,17 +41,20 @@
                     <span class="scenario-badge-coming">敬请期待</span>
                 </div>
 
-                <!-- 合同识别 -->
-                <div class="scenario-card scenario-card-disabled">
+                <!-- 合同比对 -->
+                <router-link to="/contract-compare" class="scenario-card group">
                     <div class="scenario-card-icon icon-gradient-orange">
-                        <FileCheck class="w-8 h-8 text-white" />
+                        <FileDiff class="w-8 h-8 text-white" />
                     </div>
-                    <h3 class="scenario-card-title">合同识别</h3>
+                    <h3 class="scenario-card-title">合同比对</h3>
                     <p class="scenario-card-desc">
-                        智能解析合同文本，提取甲乙方、金额、有效期等核心条款
+                        智能对比两份文档差异，自动识别新增、删除、修改的内容
                     </p>
-                    <span class="scenario-badge-coming">敬请期待</span>
-                </div>
+                    <div class="scenario-card-link group-hover:text-orange-300">
+                        立即使用
+                        <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                    </div>
+                </router-link>
             </div>
         </main>
 
@@ -63,5 +66,6 @@
 </template>
 
 <script setup lang="ts">
-import { Scan, CreditCard, FileText, FileCheck, ArrowRight } from 'lucide-vue-next'
+import { Scan, CreditCard, FileText, FileDiff, ArrowRight } from 'lucide-vue-next'
 </script>
+

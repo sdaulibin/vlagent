@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import BankStatement from '../views/BankStatement.vue'
+import ContractCompare from '../views/ContractCompare.vue'
 
 const routes = [
     {
@@ -12,6 +13,11 @@ const routes = [
         path: '/bank-statement',
         name: 'BankStatement',
         component: BankStatement
+    },
+    {
+        path: '/contract-compare',
+        name: 'ContractCompare',
+        component: ContractCompare
     }
 ]
 

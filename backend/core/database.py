@@ -10,7 +10,8 @@ engine = create_async_engine(DATABASE_URL, echo=True, future=True)
 
 async def init_db():
     # Import models to register them with SQLModel
-    from apps.files.models import FileRecord, TransactionRecord
+    from apps.files.models import FileRecord, TransactionRecord, SummaryRecord
+    from apps.contracts.models import CompareTask, DiffRecord
     
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
