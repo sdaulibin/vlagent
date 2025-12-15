@@ -97,6 +97,9 @@ async def compare_contracts(
 ):
     """上传两份文档并进行比对"""
     try:
+        # 确保目录存在
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
         # 保存文件
         file_a_path = os.path.join(UPLOAD_DIR, f"a_{file_a.filename}")
         file_b_path = os.path.join(UPLOAD_DIR, f"b_{file_b.filename}")
