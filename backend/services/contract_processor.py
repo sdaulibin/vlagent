@@ -235,20 +235,13 @@ def extract_document_content(file_path: str) -> str:
     return "\n\n".join(all_text)
 
 
-def compare_texts(text_a: str, text_b: str) -> list:
+def _compare_chunk_with_ai(chunk_a: str, chunk_b: str) -> list:
     """
-    使用 AI 对比两份文本的差异
-    
-    Args:
-        text_a: 原文档文本
-        text_b: 比对文档文本
+    (Internal) 使用 AI 对比文档片段
+    """
+    if not chunk_a.strip() and not chunk_b.strip():
+        return []
         
-    Returns:
-        list: 差异列表
-    """
-    # 增加文本长度限制以覆盖更多内容
-    max_len = 8000
-    
     prompt = f"""
     你是一个专业的文档比对专家。请逐字逐句仔细对比以下两份文档内容，找出它们之间的所有差异。
 
@@ -271,11 +264,11 @@ def compare_texts(text_a: str, text_b: str) -> list:
     4. **标点与格式**：
        - 句号变为逗号，或者多了/少了括号等。
 
-    【原文档】
-    {text_a[:max_len]}  
+    【原文档片段】
+    {chunk_a}  
     
-    【比对文档】
-    {text_b[:max_len]}
+    【比对文档片段】
+    {chunk_b}
     
     请以 JSON 数组格式输出差异列表，每个差异项包含：
     - type: 差异类型，值为 "added"（新增）、"deleted"（删除）或 "modified"（修改）
@@ -299,20 +292,86 @@ def compare_texts(text_a: str, text_b: str) -> list:
         model=MODEL_LOCAL
     )
     
-    # 解析 JSON
     try:
-        # 尝试修复可能的 JSON 格式问题
         fixed_json = fix_json(result)
         diffs = json.loads(fixed_json)
-        
         if isinstance(diffs, list):
             return diffs
-        else:
-            return []
+        return []
     except Exception as e:
         print(f"JSON 解析失败: {e}")
-        print(f"原始结果: {result}")
         return []
+
+
+def compare_texts(text_a: str, text_b: str) -> list:
+    """
+    智能分块比对长文档
+    """
+    # 限制单个分块大小 (字符数)
+    CHUNK_SIZE = 6000
+    
+    # 如果文档较小，直接比对
+    if len(text_a) < CHUNK_SIZE and len(text_b) < CHUNK_SIZE:
+        print(f"文档较短 ({len(text_a)} chars)，直接比对")
+        return _compare_chunk_with_ai(text_a, text_b)
+    
+    print(f"文档较长 ({len(text_a)} chars)，开始分块比对...")
+    import difflib
+    
+    # 使用 difflib 找到匹配块，以此作为分割点
+    s = difflib.SequenceMatcher(None, text_a, text_b)
+    matching_blocks = s.get_matching_blocks()
+    
+    all_diffs = []
+    last_a = 0
+    last_b = 0
+    
+    # 当前累积的待比对文本
+    pending_a = []
+    pending_b = []
+    current_len = 0
+    
+    for i, block in enumerate(matching_blocks):
+        a_start, b_start, size = block
+        
+        # 获取不匹配的部分 (从上一个匹配块结束到当前匹配块开始)
+        unmatched_a = text_a[last_a:a_start]
+        unmatched_b = text_b[last_b:b_start]
+        
+        # 获取匹配的部分
+        matched_content = text_a[a_start:a_start+size]
+        
+        # 将不匹配部分添加到当前累积
+        pending_a.append(unmatched_a)
+        pending_b.append(unmatched_b)
+        
+        # 将匹配部分也添加到累积，直到累积长度超过限制
+        # 但我们需要在句子或段落边界分割，简单起见，我们在匹配块内部寻找分割点
+        # 或者简单地：如果不匹配部分+匹配部分 < CHUNK_SIZE，就继续累积
+        
+        pending_a.append(matched_content)
+        pending_b.append(matched_content)
+        
+        current_str_a = "".join(pending_a)
+        current_str_b = "".join(pending_b)
+        
+        # 如果当前累积的文本足够长，或者这是最后一个块
+        if len(current_str_a) >= CHUNK_SIZE or i == len(matching_blocks) - 1:
+            # 只有当有内容时才比对
+            if current_str_a.strip() or current_str_b.strip():
+                print(f"比对分块: Size A={len(current_str_a)}, Size B={len(current_str_b)}")
+                chunk_diffs = _compare_chunk_with_ai(current_str_a, current_str_b)
+                all_diffs.extend(chunk_diffs)
+            
+            # 重置累积
+            pending_a = []
+            pending_b = []
+            current_len = 0
+        
+        last_a = a_start + size
+        last_b = b_start + size
+        
+    return all_diffs
 
 
 def compare_documents(file_a_path: str, file_b_path: str) -> list:
