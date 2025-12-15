@@ -127,6 +127,75 @@ def extract_text_from_docx(file_path: str) -> str:
         raise ImportError("请安装 python-docx: pip install python-docx")
 
 
+def extract_text_from_doc(file_path: str) -> str:
+    """
+    从旧版 DOC 文件中提取文本 (使用 antiword 或 textract)
+    
+    Args:
+        file_path: DOC 文件路径
+        
+    Returns:
+        str: 提取的文本内容
+    """
+    import subprocess
+    
+    # 尝试使用 antiword
+    try:
+        result = subprocess.run(
+            ['antiword', file_path],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        if result.returncode == 0:
+            return result.stdout
+    except FileNotFoundError:
+        print("antiword 未安装，尝试其他方法...")
+    except subprocess.TimeoutExpired:
+        print("antiword 超时")
+    except Exception as e:
+        print(f"antiword 失败: {e}")
+    
+    # 尝试使用 LibreOffice 转换
+    try:
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = subprocess.run(
+                ['soffice', '--headless', '--convert-to', 'txt:Text', '--outdir', temp_dir, file_path],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode == 0:
+                # 找到转换后的 txt 文件
+                txt_file = os.path.join(temp_dir, Path(file_path).stem + '.txt')
+                if os.path.exists(txt_file):
+                    with open(txt_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        return f.read()
+    except FileNotFoundError:
+        print("LibreOffice 未安装")
+    except subprocess.TimeoutExpired:
+        print("LibreOffice 转换超时")
+    except Exception as e:
+        print(f"LibreOffice 转换失败: {e}")
+    
+    # 最后尝试：读取为二进制并提取可读文本
+    print("使用基础文本提取...")
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+            # 尝试提取可读文本
+            text = content.decode('utf-8', errors='ignore')
+            # 过滤掉不可打印字符
+            import re
+            text = re.sub(r'[^\u4e00-\u9fff\u0020-\u007e\n\r\t]', '', text)
+            # 清理多余空行
+            text = re.sub(r'\n{3,}', '\n\n', text)
+            return text.strip()
+    except Exception as e:
+        raise ValueError(f"无法提取 DOC 文件内容: {e}")
+
+
 def extract_document_content(file_path: str) -> str:
     """
     提取文档的全部文本内容
@@ -138,9 +207,14 @@ def extract_document_content(file_path: str) -> str:
         str: 文档文本内容
     """
     # DOCX 文件直接提取文本
-    if file_path.lower().endswith(('.docx', '.doc')):
+    if file_path.lower().endswith('.docx'):
         print(f"提取 DOCX 文本: {file_path}")
         return extract_text_from_docx(file_path)
+    
+    # 旧版 DOC 文件
+    if file_path.lower().endswith('.doc'):
+        print(f"提取 DOC 文本: {file_path}")
+        return extract_text_from_doc(file_path)
     
     # 其他格式转图片后 OCR
     filename = Path(file_path).stem
