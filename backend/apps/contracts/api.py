@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi.responses import FileResponse
 from typing import List
 import shutil
 import os
@@ -14,6 +15,16 @@ router = APIRouter(prefix="/contracts", tags=["contracts"])
 
 UPLOAD_DIR = "/Users/binginx/PycharmProjects/vl_flow/backend/res/contracts"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# 文件类型映射
+MIME_TYPES = {
+    '.pdf': 'application/pdf',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.doc': 'application/msword',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+}
 
 
 @router.get("", response_model=List[CompareTask])
@@ -42,6 +53,41 @@ async def get_task_diffs(task_id: int, session: AsyncSession = Depends(get_sessi
     result = await session.execute(statement)
     return result.scalars().all()
 
+
+@router.get("/{task_id}/file/{doc_type}")
+async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Depends(get_session)):
+    """
+    获取比对任务的原始文件
+    doc_type: 'a' 或 'b'，分别代表原文档和比对文档
+    """
+    statement = select(CompareTask).where(CompareTask.id == task_id)
+    result = await session.execute(statement)
+    task = result.scalar_one_or_none()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if doc_type == 'a':
+        file_path = task.file_a_path
+        filename = task.file_a_name
+    elif doc_type == 'b':
+        file_path = task.file_b_path
+        filename = task.file_b_name
+    else:
+        raise HTTPException(status_code=400, detail="doc_type must be 'a' or 'b'")
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # 获取文件扩展名和 MIME 类型
+    ext = os.path.splitext(filename)[1].lower()
+    media_type = MIME_TYPES.get(ext, 'application/octet-stream')
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=filename
+    )
 
 @router.post("/compare")
 async def compare_contracts(

@@ -5,7 +5,7 @@ import {
     ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
     ZoomIn, ZoomOut, ArrowRightLeft, Download, AlertCircle, CheckCircle2, FileDiff
 } from 'lucide-vue-next';
-import { compareContracts, getTaskDiffs } from '../api';
+import { compareContracts, getTaskDiffs, getFilePreviewUrl } from '../api';
 
 const router = useRouter();
 
@@ -23,6 +23,30 @@ const errorMessage = ref('');
 const contentA = ref('');
 const contentB = ref('');
 const selectedDiffId = ref<number | null>(null);
+
+// 获取文件类型
+const getFileType = (filename: string | undefined): 'pdf' | 'image' | 'doc' | 'unknown' => {
+    if (!filename) return 'unknown';
+    const ext = filename.toLowerCase().split('.').pop();
+    if (ext === 'pdf') return 'pdf';
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(ext || '')) return 'image';
+    if (['doc', 'docx'].includes(ext || '')) return 'doc';
+    return 'unknown';
+};
+
+// 文件预览 URL
+const fileAPreviewUrl = computed(() => {
+    if (!currentTaskId.value) return '';
+    return getFilePreviewUrl(currentTaskId.value, 'a');
+});
+
+const fileBPreviewUrl = computed(() => {
+    if (!currentTaskId.value) return '';
+    return getFilePreviewUrl(currentTaskId.value, 'b');
+});
+
+const fileAType = computed(() => getFileType(fileA.value?.name));
+const fileBType = computed(() => getFileType(fileB.value?.name));
 
 // 差异数据
 interface DiffItem {
@@ -300,13 +324,28 @@ const goBack = () => {
                             <span class="contract-doc-badge contract-badge-original">原</span>
                             <span class="font-medium text-slate-700 truncate">{{ fileA?.name || '原文档' }}</span>
                         </div>
-                        <div id="doc-content-a" class="contract-doc-content">
-                            <div 
-                                v-if="contentA" 
-                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                v-html="highlightedContentA"
-                            ></div>
-                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                        <div id="doc-content-a" class="contract-doc-content p-0">
+                            <!-- PDF Viewer -->
+                            <iframe 
+                                v-if="fileAType === 'pdf'" 
+                                :src="fileAPreviewUrl" 
+                                class="w-full h-full border-0"
+                            ></iframe>
+                            
+                            <!-- Image Viewer -->
+                            <div v-else-if="fileAType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
+                                <img :src="fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
+                            </div>
+                            
+                            <!-- DOC/DOCX Text Viewer -->
+                            <div v-else class="p-6 overflow-auto h-full">
+                                <div 
+                                    v-if="contentA" 
+                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                    v-html="highlightedContentA"
+                                ></div>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                            </div>
                         </div>
                     </div>
 
@@ -319,13 +358,28 @@ const goBack = () => {
                             <span class="contract-doc-badge contract-badge-compare">比对</span>
                             <span class="font-medium text-slate-700 truncate">{{ fileB?.name || '比对文档' }}</span>
                         </div>
-                        <div id="doc-content-b" class="contract-doc-content">
-                            <div 
-                                v-if="contentB" 
-                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                v-html="highlightedContentB"
-                            ></div>
-                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                        <div id="doc-content-b" class="contract-doc-content p-0">
+                            <!-- PDF Viewer -->
+                            <iframe 
+                                v-if="fileBType === 'pdf'" 
+                                :src="fileBPreviewUrl" 
+                                class="w-full h-full border-0"
+                            ></iframe>
+                            
+                            <!-- Image Viewer -->
+                            <div v-else-if="fileBType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
+                                <img :src="fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
+                            </div>
+                            
+                            <!-- DOC/DOCX Text Viewer -->
+                            <div v-else class="p-6 overflow-auto h-full">
+                                <div 
+                                    v-if="contentB" 
+                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                    v-html="highlightedContentB"
+                                ></div>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -79,3 +79,8 @@ export const deleteCompareTask = async (taskId: number) => {
     const response = await api.delete(`/contracts/${taskId}`);
     return response.data;
 };
+
+// 获取文件预览 URL
+export const getFilePreviewUrl = (taskId: number, docType: 'a' | 'b') => {
+    return `http://localhost:8000/api/contracts/${taskId}/file/${docType}`;
+};
