@@ -3,6 +3,10 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import Table from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
 
 interface Props {
     content: string;
@@ -24,42 +28,104 @@ const editor = useEditor({
         Highlight.configure({
             multicolor: true,
         }),
+        Table.configure({
+            resizable: false,
+        }),
+        TableRow,
+        TableCell,
+        TableHeader,
     ],
     content: '',
     editable: false, // 只读模式
 });
 
+// 检测并转换表格格式 (管道分隔格式)
+const convertTableFormat = (text: string): string => {
+    const lines = text.split('\n');
+    const result: string[] = [];
+    let inTable = false;
+    let tableRows: string[][] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // 检测是否是表格行 (包含 |)
+        if (line.includes(' | ') || (line.startsWith('|') && line.endsWith('|'))) {
+            if (!inTable) {
+                inTable = true;
+                tableRows = [];
+            }
+            // 解析表格行
+            const cells = line.split(/\s*\|\s*/).filter(c => c.trim());
+            if (cells.length > 0) {
+                tableRows.push(cells);
+            }
+        } else {
+            // 结束表格
+            if (inTable && tableRows.length > 0) {
+                result.push(buildTableHtml(tableRows));
+                tableRows = [];
+                inTable = false;
+            }
+            // 普通行
+            if (line) {
+                const escapedLine = line
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                result.push(`<p>${escapedLine}</p>`);
+            } else {
+                result.push('<p><br></p>');
+            }
+        }
+    }
+    
+    // 处理末尾的表格
+    if (inTable && tableRows.length > 0) {
+        result.push(buildTableHtml(tableRows));
+    }
+    
+    return result.join('');
+};
+
+// 构建表格 HTML
+const buildTableHtml = (rows: string[][]): string => {
+    if (rows.length === 0) return '';
+    
+    let html = '<table><tbody>';
+    rows.forEach((row, rowIndex) => {
+        html += '<tr>';
+        row.forEach(cell => {
+            const tag = rowIndex === 0 ? 'th' : 'td';
+            const escapedCell = cell
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            html += `<${tag}><p>${escapedCell}</p></${tag}>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+};
+
 // 转换纯文本为 Tiptap 可用的 HTML
 const textToHtml = (text: string): string => {
     if (!text) return '<p></p>';
-    
-    // 将文本按行分割，每行转为一个段落
-    const paragraphs = text.split('\n').map(line => {
-        const escapedLine = line
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        return `<p>${escapedLine || '<br>'}</p>`;
-    });
-    
-    return paragraphs.join('');
+    return convertTableFormat(text);
 };
 
 // 应用高亮
 const applyHighlight = () => {
-    if (!editor.value || !props.highlightText) {
-        // 如果没有高亮文本，设置普通内容
-        if (editor.value) {
-            editor.value.commands.setContent(textToHtml(props.content));
-        }
+    if (!editor.value) return;
+    
+    // 如果没有高亮文本，设置普通内容
+    if (!props.highlightText || !props.highlightText.trim()) {
+        editor.value.commands.setContent(textToHtml(props.content));
         return;
     }
     
     const searchText = props.highlightText.trim();
-    if (!searchText) {
-        editor.value.commands.setContent(textToHtml(props.content));
-        return;
-    }
     
     // 先设置内容
     editor.value.commands.setContent(textToHtml(props.content));
@@ -87,27 +153,31 @@ const applyHighlight = () => {
             }
         });
         
+        console.log(`找到 ${matches.length} 个匹配: "${searchText.substring(0, 30)}..."`);
+        
         // 应用高亮（从后往前，避免位置偏移问题）
+        const highlightColor = props.highlightColor === 'red' ? '#fecaca' : '#bbf7d0';
         matches.reverse().forEach(match => {
             editor.value!
                 .chain()
                 .setTextSelection(match)
-                .setHighlight({ color: props.highlightColor === 'red' ? '#fecaca' : '#bbf7d0' })
+                .setHighlight({ color: highlightColor })
                 .run();
         });
         
+        // 滚动到第一个匹配位置
         if (matches.length > 0) {
-            const lastMatch = matches[matches.length - 1]; // 因为已经反转，最后一个是原来的第一个
-            if (lastMatch) {
-                editor.value.commands.setTextSelection(lastMatch.from);
+            const firstMatch = matches[matches.length - 1]; // 因为已经反转，最后一个是原来的第一个
+            if (firstMatch) {
+                editor.value.commands.setTextSelection(firstMatch.from);
                 
-                // 滚动到高亮位置
-                nextTick(() => {
-                    const highlightEl = editorContainer.value?.querySelector('[data-highlight]') as HTMLElement;
-                    if (highlightEl) {
-                        highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 延迟滚动以确保 DOM 更新
+                setTimeout(() => {
+                    const markEl = editorContainer.value?.querySelector('mark') as HTMLElement;
+                    if (markEl) {
+                        markEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
-                });
+                }, 150);
             }
         }
     });
@@ -120,6 +190,11 @@ watch(() => props.content, () => {
 
 // 监听高亮文本变化
 watch(() => props.highlightText, () => {
+    applyHighlight();
+});
+
+// 监听高亮颜色变化
+watch(() => props.highlightColor, () => {
     applyHighlight();
 });
 
@@ -169,8 +244,34 @@ onBeforeUnmount(() => {
     border-radius: 3px;
 }
 
-.tiptap-viewer :deep([data-highlight]) {
-    padding: 2px 4px;
-    border-radius: 3px;
+/* 表格样式 */
+.tiptap-viewer :deep(.ProseMirror table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 13px;
+}
+
+.tiptap-viewer :deep(.ProseMirror th),
+.tiptap-viewer :deep(.ProseMirror td) {
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.tiptap-viewer :deep(.ProseMirror th) {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #475569;
+}
+
+.tiptap-viewer :deep(.ProseMirror tr:nth-child(even) td) {
+    background: #f8fafc;
+}
+
+.tiptap-viewer :deep(.ProseMirror th p),
+.tiptap-viewer :deep(.ProseMirror td p) {
+    margin: 0;
 }
 </style>
