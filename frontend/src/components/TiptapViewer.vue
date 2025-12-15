@@ -119,9 +119,12 @@ const textToHtml = (text: string): string => {
 const applyHighlight = () => {
     if (!editor.value) return;
     
+    console.log(`[TiptapViewer] applyHighlight called, color=${props.highlightColor}, highlightText="${props.highlightText?.substring(0, 50) || '(empty)'}"`);
+    
     // 如果没有高亮文本，设置普通内容
     if (!props.highlightText || !props.highlightText.trim()) {
         editor.value.commands.setContent(textToHtml(props.content));
+        console.log(`[TiptapViewer] No highlight text, set plain content`);
         return;
     }
     

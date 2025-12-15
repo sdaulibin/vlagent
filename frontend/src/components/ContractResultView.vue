@@ -171,6 +171,7 @@ const stats = computed(() => ({
                         <!-- 差异视图 - 使用 Tiptap 编辑器 -->
                         <TiptapViewer 
                             v-if="viewMode === 'diff'"
+                            :key="'docA-' + props.selectedDiffId"
                             :content="props.contentA"
                             :highlightText="highlightTextA"
                             highlightColor="red"
@@ -212,6 +213,7 @@ const stats = computed(() => ({
                         <!-- 差异视图 - 使用 Tiptap 编辑器 -->
                         <TiptapViewer 
                             v-if="viewMode === 'diff'"
+                            :key="'docB-' + props.selectedDiffId"
                             :content="props.contentB"
                             :highlightText="highlightTextB"
                             highlightColor="green"
