@@ -50,4 +50,32 @@ export const exportExcel = async (fileId: number, filename: string) => {
     window.URL.revokeObjectURL(url);
 };
 
+// ===== 合同比对 API =====
 
+export const compareContracts = async (fileA: File, fileB: File) => {
+    const formData = new FormData();
+    formData.append('file_a', fileA);
+    formData.append('file_b', fileB);
+    const response = await api.post('/contracts/compare', formData);
+    return response.data;
+};
+
+export const getCompareTasks = async () => {
+    const response = await api.get('/contracts');
+    return response.data;
+};
+
+export const getCompareTask = async (taskId: number) => {
+    const response = await api.get(`/contracts/${taskId}`);
+    return response.data;
+};
+
+export const getTaskDiffs = async (taskId: number) => {
+    const response = await api.get(`/contracts/${taskId}/diffs`);
+    return response.data;
+};
+
+export const deleteCompareTask = async (taskId: number) => {
+    const response = await api.delete(`/contracts/${taskId}`);
+    return response.data;
+};

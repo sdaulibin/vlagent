@@ -5,6 +5,7 @@ import {
     ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
     ZoomIn, ZoomOut, ArrowRightLeft, Download, AlertCircle, CheckCircle2, FileDiff
 } from 'lucide-vue-next';
+import { compareContracts, getTaskDiffs } from '../api';
 
 const router = useRouter();
 
@@ -15,49 +16,35 @@ const fileA = ref<File | null>(null);
 const fileB = ref<File | null>(null);
 const filter = ref('all');
 const syncScroll = ref(true);
+const currentTaskId = ref<number | null>(null);
+const errorMessage = ref('');
 
-// 模拟差异数据
-const diffs = ref([
-    {
-        id: 1,
-        type: 'modified',
-        original: '提供统一的集成开发环境（IDE）及全套开发管理工具，支持敏捷开发与标准化交付。',
-        comparison: '支持接入行内统一运维平台进行应用自动化部署、服务管控、故障自愈、链路追踪等操作',
-        location: '2.6 开发平台 / 3.1 兼容能力',
-        status: 'pending'
-    },
-    {
-        id: 2,
-        type: 'deleted',
-        original: '2.7 运维平台：运维平台需基于容器化架构，支持DevOps自动化体系...',
-        comparison: '',
-        location: '2.7 运维平台',
-        status: 'pending'
-    },
-    {
-        id: 3,
-        type: 'added',
-        original: '',
-        comparison: '3.1 ★兼容能力：支持接入行内统一调度平台对批量任务进行操作管理',
-        location: '3.1 兼容能力',
-        status: 'pending'
-    }
-]);
+// 差异数据
+interface DiffItem {
+    id: number;
+    diff_type: string;
+    original_text: string;
+    comparison_text: string;
+    location: string;
+    status: string;
+}
+
+const diffs = ref<DiffItem[]>([]);
 
 // 计算属性
 const filteredDiffs = () => {
     return diffs.value.filter(d => {
         if (d.status === 'ignored') return false;
         if (filter.value === 'all') return true;
-        return d.type === filter.value;
+        return d.diff_type === filter.value;
     });
 };
 
 const stats = () => ({
     all: diffs.value.length,
-    added: diffs.value.filter(d => d.type === 'added').length,
-    modified: diffs.value.filter(d => d.type === 'modified').length,
-    deleted: diffs.value.filter(d => d.type === 'deleted').length,
+    added: diffs.value.filter(d => d.diff_type === 'added').length,
+    modified: diffs.value.filter(d => d.diff_type === 'modified').length,
+    deleted: diffs.value.filter(d => d.diff_type === 'deleted').length,
     ignored: diffs.value.filter(d => d.status === 'ignored').length
 });
 
@@ -66,6 +53,7 @@ const handleFileASelect = (event: Event) => {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
         fileA.value = input.files[0];
+        console.log('Selected file A:', fileA.value.name);
     }
 };
 
@@ -73,6 +61,7 @@ const handleFileBSelect = (event: Event) => {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
         fileB.value = input.files[0];
+        console.log('Selected file B:', fileB.value.name);
     }
 };
 
@@ -81,12 +70,30 @@ const startCompare = async () => {
         alert('请上传两份文档');
         return;
     }
+    
     isProcessing.value = true;
-    // TODO: 调用后端 API
-    setTimeout(() => {
-        isProcessing.value = false;
+    errorMessage.value = '';
+    
+    try {
+        console.log('Starting comparison...');
+        const result = await compareContracts(fileA.value, fileB.value);
+        console.log('Compare result:', result);
+        
+        currentTaskId.value = result.task_id;
+        
+        // 获取差异列表
+        const diffsData = await getTaskDiffs(result.task_id);
+        console.log('Diffs:', diffsData);
+        diffs.value = diffsData;
+        
         activeView.value = 'result';
-    }, 1500);
+    } catch (error: any) {
+        console.error('Compare failed:', error);
+        errorMessage.value = error.response?.data?.detail || '比对失败，请重试';
+        alert(errorMessage.value);
+    } finally {
+        isProcessing.value = false;
+    }
 };
 
 const handleIgnore = (id: number) => {
@@ -275,8 +282,8 @@ const goBack = () => {
                             class="diff-item"
                         >
                             <div class="flex justify-between items-start mb-3">
-                                <span :class="['diff-badge', `diff-badge-${diff.type}`]">
-                                    {{ diff.type === 'added' ? '新增' : diff.type === 'deleted' ? '删除' : '修改' }}
+                                <span :class="['diff-badge', `diff-badge-${diff.diff_type}`]">
+                                    {{ diff.diff_type === 'added' ? '新增' : diff.diff_type === 'deleted' ? '删除' : '修改' }}
                                 </span>
                                 <button 
                                     @click="handleIgnore(diff.id)"
@@ -287,13 +294,13 @@ const goBack = () => {
                             </div>
 
                             <div class="space-y-3">
-                                <div v-if="diff.original">
+                                <div v-if="diff.original_text">
                                     <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">原文</div>
-                                    <div class="diff-text diff-text-original">{{ diff.original }}</div>
+                                    <div class="diff-text diff-text-original">{{ diff.original_text }}</div>
                                 </div>
-                                <div v-if="diff.comparison">
+                                <div v-if="diff.comparison_text">
                                     <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">比对</div>
-                                    <div class="diff-text diff-text-compare">{{ diff.comparison }}</div>
+                                    <div class="diff-text diff-text-compare">{{ diff.comparison_text }}</div>
                                 </div>
                             </div>
 
