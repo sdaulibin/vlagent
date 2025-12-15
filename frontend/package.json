@@ -13,11 +13,9 @@
     "@tiptap/extension-highlight": "^3.13.0",
     "@tiptap/starter-kit": "^3.13.0",
     "@tiptap/vue-3": "^3.13.0",
-    "@vue-office/docx": "^1.6.3",
     "axios": "^1.13.2",
     "lucide-vue-next": "^0.556.0",
     "vue": "^3.5.24",
-    "vue-demi": "^0.14.10",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
