@@ -141,19 +141,29 @@ const applyHighlight = () => {
         const { doc } = state;
         let matches: { from: number; to: number }[] = [];
         
-        // 尝试不同长度的搜索文本
-        const searchVariants = [
+        // 提取关键词（用于表格匹配）
+        const extractKeywords = (text: string): string[] => {
+            // 提取数字编码（如 Z7003525000319）
+            const codes = text.match(/[A-Za-z0-9]{6,}/g) || [];
+            // 提取中文关键词（2字以上）
+            const chinese = text.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+            return [...codes, ...chinese];
+        };
+        
+        // 尝试不同的搜索策略
+        const searchStrategies = [
+            // 策略1: 完整文本
             searchText,
-            // 如果原文本太长，尝试前50个字符
+            // 策略2: 前50个字符
             searchText.length > 50 ? searchText.substring(0, 50) : null,
-            // 尝试前30个字符
+            // 策略3: 前30个字符
             searchText.length > 30 ? searchText.substring(0, 30) : null,
-            // 尝试前20个字符
-            searchText.length > 20 ? searchText.substring(0, 20) : null,
+            // 策略4: 关键词匹配（用于表格）
+            ...extractKeywords(searchText),
         ].filter(Boolean) as string[];
         
-        // 尝试每个变体直到找到匹配
-        for (const variant of searchVariants) {
+        // 尝试每个策略直到找到匹配
+        for (const variant of searchStrategies) {
             matches = [];
             doc.descendants((node, pos) => {
                 if (node.isText && node.text) {
@@ -170,7 +180,7 @@ const applyHighlight = () => {
             });
             
             if (matches.length > 0) {
-                console.log(`[TiptapViewer] 使用变体 "${variant.substring(0, 20)}..." 找到 ${matches.length} 个匹配`);
+                console.log(`[TiptapViewer] 使用策略 "${variant.substring(0, 20)}..." 找到 ${matches.length} 个匹配`);
                 break;
             }
         }
