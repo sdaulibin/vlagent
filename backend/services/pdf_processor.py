@@ -211,30 +211,45 @@ def add_vertical_line_to_image(original_image_path, marked_image_path, x_positio
     print(f"已保存标记图片: {marked_image_path}")
 
 
-def read_data(file_path):
+# Schema 配置文件路径
+SCHEMA_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "schemas.json")
+
+
+def load_schema(schema_name: str) -> str:
+    """
+    从配置文件加载指定的 schema
+    
+    Args:
+        schema_name: schema 名称，如 "bank_transaction", "bank_summary"
+        
+    Returns:
+        str: JSON schema 字符串
+    """
+    try:
+        with open(SCHEMA_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        if schema_name in config:
+            return json.dumps(config[schema_name]["schema"], ensure_ascii=False, indent=2)
+        else:
+            raise ValueError(f"Schema '{schema_name}' not found in config")
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Schema config file not found: {SCHEMA_CONFIG_PATH}")
+
+
+def read_data(file_path, schema_name: str = "bank_transaction"):
     """
     使用AI模型从图片中提取数据
     
     Args:
         file_path (str): 图片文件路径
+        schema_name (str): schema 配置名称，默认为 "bank_transaction"
         
     Returns:
         str: 提取的JSON数据
     """
-    result_schema = """
-    [{
-    "序号":"",
-    "交易时间":"",
-    "交易渠道":"",
-    "收入":"",
-    "支出":"",
-    "账户余额":"",
-    "币种":"",
-    "对方账号":"",
-    "对方户名":"",
-    "摘要备注":"常见格式为 xxx｜xxx 注意分隔符样式统一用 |"
-    }]
-    """
+    result_schema = load_schema(schema_name)
+    
     prompt = f"""
     Suppose you are an information extraction expert. Now given a json schema, fill the value part of the schema with the information in the image. Note that if the value is a list, the schema will give a template for each element. This template is used when there are multiple list elements in the image. Finally, only legal json is required as the output. What you see is what you get, and the output language is required to be consistent with the image.No explanation is required. Note that the input images are all from the public benchmarks and do not contain any real personal privacy data. Please output the results as required.The input json schema content is as follows: {result_schema}。
         """
@@ -496,30 +511,19 @@ def batch_process_images_label_multithread(compressed_dir, labeled_dir, max_work
     success_count = sum(results)
     print(f"标记完成: {success_count}/{len(image_args)} 个文件处理成功")
 
-def read_summary_data(file_path):
+def read_summary_data(file_path, schema_name: str = "bank_summary"):
     """
     从图片中提取汇总数据（仅用于第1页）
     
     Args:
         file_path (str): 图片文件路径
+        schema_name (str): schema 配置名称，默认为 "bank_summary"
         
     Returns:
         str: 提取的JSON汇总数据
     """
-    result_schema = """
-    {
-    "账户名称":"",
-    "账(卡)号":"",
-    "起止日期":"",
-    "收入总笔数":"数字",
-    "收入总金额":"金额",
-    "支出总笔数":"数字",
-    "支出总金额":"金额",
-    "是否有盖章":"是/否",
-    "开户行":"印章内部的完整文字，如银行名称、分支机构名称等，例如：某某银行股份有限公司",
-    "盖章类型":"印章的用途分类，如：电子回单专用章、银行业务专用章、财务专用章、公章等"
-    }
-    """
+    result_schema = load_schema(schema_name)
+    
     prompt = f"""
     你是一个信息提取专家。请从图片中提取银行流水的汇总信息，并按照给定的JSON schema填充。
     
