@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
     ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
@@ -18,6 +18,11 @@ const filter = ref('all');
 const syncScroll = ref(true);
 const currentTaskId = ref<number | null>(null);
 const errorMessage = ref('');
+
+// 文档内容
+const contentA = ref('');
+const contentB = ref('');
+const selectedDiffId = ref<number | null>(null);
 
 // 差异数据
 interface DiffItem {
@@ -80,6 +85,8 @@ const startCompare = async () => {
         console.log('Compare result:', result);
         
         currentTaskId.value = result.task_id;
+        contentA.value = result.content_a || '';
+        contentB.value = result.content_b || '';
         
         // 获取差异列表
         const diffsData = await getTaskDiffs(result.task_id);
@@ -100,6 +107,42 @@ const handleIgnore = (id: number) => {
     diffs.value = diffs.value.map(d => 
         d.id === id ? { ...d, status: 'ignored' } : d
     );
+};
+
+const handleDiffClick = async (diff: DiffItem) => {
+    selectedDiffId.value = diff.id;
+    
+    // 高亮显示相关文本
+    await nextTick();
+    
+    // 在原文档中查找并滚动
+    if (diff.original_text) {
+        const docAEl = document.getElementById('doc-content-a');
+        if (docAEl) {
+            const text = diff.original_text.substring(0, 50);
+            const content = docAEl.innerText;
+            const index = content.indexOf(text);
+            if (index > -1) {
+                // 估算滚动位置
+                const scrollRatio = index / content.length;
+                docAEl.scrollTop = scrollRatio * docAEl.scrollHeight;
+            }
+        }
+    }
+    
+    // 在比对文档中查找并滚动
+    if (diff.comparison_text) {
+        const docBEl = document.getElementById('doc-content-b');
+        if (docBEl) {
+            const text = diff.comparison_text.substring(0, 50);
+            const content = docBEl.innerText;
+            const index = content.indexOf(text);
+            if (index > -1) {
+                const scrollRatio = index / content.length;
+                docBEl.scrollTop = scrollRatio * docBEl.scrollHeight;
+            }
+        }
+    }
 };
 
 const goBack = () => {
@@ -221,9 +264,10 @@ const goBack = () => {
                             <span class="contract-doc-badge contract-badge-original">原</span>
                             <span class="font-medium text-slate-700 truncate">{{ fileA?.name || '原文档' }}</span>
                         </div>
-                        <div class="contract-doc-content">
-                            <div class="max-w-3xl mx-auto">
-                                <p class="text-slate-600">文档内容预览区域...</p>
+                        <div id="doc-content-a" class="contract-doc-content">
+                            <div class="max-w-3xl mx-auto whitespace-pre-wrap">
+                                <template v-if="contentA">{{ contentA }}</template>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                             </div>
                         </div>
                     </div>
@@ -237,9 +281,10 @@ const goBack = () => {
                             <span class="contract-doc-badge contract-badge-compare">比对</span>
                             <span class="font-medium text-slate-700 truncate">{{ fileB?.name || '比对文档' }}</span>
                         </div>
-                        <div class="contract-doc-content">
-                            <div class="max-w-3xl mx-auto">
-                                <p class="text-slate-600">文档内容预览区域...</p>
+                        <div id="doc-content-b" class="contract-doc-content">
+                            <div class="max-w-3xl mx-auto whitespace-pre-wrap">
+                                <template v-if="contentB">{{ contentB }}</template>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                             </div>
                         </div>
                     </div>
@@ -279,7 +324,8 @@ const goBack = () => {
                         <div 
                             v-for="diff in filteredDiffs()"
                             :key="diff.id"
-                            class="diff-item"
+                            :class="['diff-item', selectedDiffId === diff.id ? 'ring-2 ring-orange-500' : '']"
+                            @click="handleDiffClick(diff)"
                         >
                             <div class="flex justify-between items-start mb-3">
                                 <span :class="['diff-badge', `diff-badge-${diff.diff_type}`]">

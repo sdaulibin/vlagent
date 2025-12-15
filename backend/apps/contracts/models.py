@@ -10,6 +10,8 @@ class CompareTask(SQLModel, table=True):
     file_a_path: str = Field(description="原文档路径")
     file_b_name: str = Field(description="比对文档文件名")
     file_b_path: str = Field(description="比对文档路径")
+    content_a: Optional[str] = Field(default=None, description="原文档提取的文本内容")
+    content_b: Optional[str] = Field(default=None, description="比对文档提取的文本内容")
     status: str = Field(default="pending", description="任务状态: pending, processing, done, failed")
     error_msg: Optional[str] = Field(default=None, description="错误信息")
     created_at: datetime = Field(default_factory=datetime.now)

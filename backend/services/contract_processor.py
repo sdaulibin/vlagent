@@ -230,6 +230,21 @@ def compare_documents(file_a_path: str, file_b_path: str) -> list:
     Returns:
         list: 差异列表
     """
+    result = compare_documents_with_content(file_a_path, file_b_path)
+    return result.get("diffs", [])
+
+
+def compare_documents_with_content(file_a_path: str, file_b_path: str) -> dict:
+    """
+    比对两份文档，返回内容和差异
+    
+    Args:
+        file_a_path: 原文档路径
+        file_b_path: 比对文档路径
+        
+    Returns:
+        dict: 包含 content_a, content_b, diffs
+    """
     print(f"开始比对文档: {file_a_path} vs {file_b_path}")
     
     # 提取文本内容
@@ -244,7 +259,12 @@ def compare_documents(file_a_path: str, file_b_path: str) -> list:
     diffs = compare_texts(text_a, text_b)
     
     print(f"共发现 {len(diffs)} 处差异")
-    return diffs
+    
+    return {
+        "content_a": text_a,
+        "content_b": text_b,
+        "diffs": diffs
+    }
 
 
 if __name__ == "__main__":
@@ -255,3 +275,4 @@ if __name__ == "__main__":
     if os.path.exists(test_a) and os.path.exists(test_b):
         result = compare_documents(test_a, test_b)
         print(json.dumps(result, ensure_ascii=False, indent=2))
+

@@ -74,8 +74,16 @@ async def compare_contracts(
         await session.refresh(task)
         
         try:
-            # 执行比对
-            diffs = contract_processor.compare_documents(file_a_path, file_b_path)
+            # 执行比对并获取内容
+            result_data = contract_processor.compare_documents_with_content(file_a_path, file_b_path)
+            
+            content_a = result_data.get("content_a", "")
+            content_b = result_data.get("content_b", "")
+            diffs = result_data.get("diffs", [])
+            
+            # 更新任务内容
+            task.content_a = content_a
+            task.content_b = content_b
             
             # 保存差异记录
             for diff_data in diffs:
@@ -94,7 +102,9 @@ async def compare_contracts(
             return {
                 "status": "success",
                 "task_id": task.id,
-                "diff_count": len(diffs)
+                "diff_count": len(diffs),
+                "content_a": content_a,
+                "content_b": content_b
             }
             
         except Exception as e_compare:
