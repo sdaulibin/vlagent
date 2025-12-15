@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, nextTick, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { 
-    ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
-    ZoomIn, ZoomOut, ArrowRightLeft, Download, AlertCircle, CheckCircle2, FileDiff, Clock, Trash2
-} from 'lucide-vue-next';
+import { ArrowLeft, FileDiff } from 'lucide-vue-next';
 import { compareContracts, getTaskDiffs, getFilePreviewUrl, getCompareTasks, deleteCompareTask } from '../api';
+import ContractUpload from '../components/ContractUpload.vue';
+import ContractHistory from '../components/ContractHistory.vue';
+import ContractResultView from '../components/ContractResultView.vue';
 
 const router = useRouter();
 
@@ -17,7 +17,6 @@ const fileB = ref<File | null>(null);
 const filter = ref('all');
 const syncScroll = ref(true);
 const currentTaskId = ref<number | null>(null);
-const errorMessage = ref('');
 
 // 比对历史
 interface TaskItem {
@@ -35,6 +34,17 @@ const historyList = ref<TaskItem[]>([]);
 const contentA = ref('');
 const contentB = ref('');
 const selectedDiffId = ref<number | null>(null);
+
+// 差异数据
+interface DiffItem {
+    id: number;
+    diff_type: string;
+    original_text: string;
+    comparison_text: string;
+    location: string;
+    status: string;
+}
+const diffs = ref<DiffItem[]>([]);
 
 // 加载历史列表
 const loadHistory = async () => {
@@ -62,7 +72,6 @@ const viewHistoryTask = async (task: TaskItem) => {
     contentA.value = task.content_a || '';
     contentB.value = task.content_b || '';
     
-    // 模拟 fileA 和 fileB 用于类型判断
     fileA.value = { name: task.file_a_name } as File;
     fileB.value = { name: task.file_b_name } as File;
     
@@ -101,104 +110,7 @@ const fileBPreviewUrl = computed(() => {
 const fileAType = computed(() => getFileType(fileA.value?.name));
 const fileBType = computed(() => getFileType(fileB.value?.name));
 
-// 差异数据
-interface DiffItem {
-    id: number;
-    diff_type: string;
-    original_text: string;
-    comparison_text: string;
-    location: string;
-    status: string;
-}
-
-const diffs = ref<DiffItem[]>([]);
-
-// 获取当前选中的差异
-const selectedDiff = computed(() => {
-    if (!selectedDiffId.value) return null;
-    return diffs.value.find(d => d.id === selectedDiffId.value) || null;
-});
-
-// 高亮文本的HTML（原文档）
-const highlightedContentA = computed(() => {
-    if (!contentA.value) return '';
-    const diff = selectedDiff.value;
-    if (!diff || !diff.original_text) return escapeHtml(contentA.value);
-    
-    const searchText = diff.original_text.trim();
-    if (!searchText) return escapeHtml(contentA.value);
-    
-    const escaped = escapeHtml(contentA.value);
-    const searchEscaped = escapeHtml(searchText);
-    
-    // 高亮匹配的文本
-    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
-    return escaped.replace(regex, '<mark class="bg-red-200 text-red-900 px-1 rounded">$1</mark>');
-});
-
-// 高亮文本的HTML（比对文档）
-const highlightedContentB = computed(() => {
-    if (!contentB.value) return '';
-    const diff = selectedDiff.value;
-    if (!diff || !diff.comparison_text) return escapeHtml(contentB.value);
-    
-    const searchText = diff.comparison_text.trim();
-    if (!searchText) return escapeHtml(contentB.value);
-    
-    const escaped = escapeHtml(contentB.value);
-    const searchEscaped = escapeHtml(searchText);
-    
-    // 高亮匹配的文本
-    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
-    return escaped.replace(regex, '<mark class="bg-green-200 text-green-900 px-1 rounded">$1</mark>');
-});
-
-// 辅助函数：转义HTML
-function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// 辅助函数：转义正则表达式特殊字符
-function escapeRegExp(text: string): string {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// 计算属性
-const filteredDiffs = () => {
-    return diffs.value.filter(d => {
-        if (d.status === 'ignored') return false;
-        if (filter.value === 'all') return true;
-        return d.diff_type === filter.value;
-    });
-};
-
-const stats = () => ({
-    all: diffs.value.length,
-    added: diffs.value.filter(d => d.diff_type === 'added').length,
-    modified: diffs.value.filter(d => d.diff_type === 'modified').length,
-    deleted: diffs.value.filter(d => d.diff_type === 'deleted').length,
-    ignored: diffs.value.filter(d => d.status === 'ignored').length
-});
-
-// 事件处理
-const handleFileASelect = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-        fileA.value = input.files[0];
-        console.log('Selected file A:', fileA.value.name);
-    }
-};
-
-const handleFileBSelect = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-        fileB.value = input.files[0];
-        console.log('Selected file B:', fileB.value.name);
-    }
-};
-
+// 开始比对
 const startCompare = async () => {
     if (!fileA.value || !fileB.value) {
         alert('请上传两份文档');
@@ -206,44 +118,33 @@ const startCompare = async () => {
     }
     
     isProcessing.value = true;
-    errorMessage.value = '';
     
     try {
-        console.log('Starting comparison...');
         const result = await compareContracts(fileA.value, fileB.value);
-        console.log('Compare result:', result);
         
         currentTaskId.value = result.task_id;
         contentA.value = result.content_a || '';
         contentB.value = result.content_b || '';
         
-        // 获取差异列表
         const diffsData = await getTaskDiffs(result.task_id);
-        console.log('Diffs:', diffsData);
         diffs.value = diffsData;
         
+        await loadHistory();
         activeView.value = 'result';
     } catch (error: any) {
         console.error('Compare failed:', error);
-        errorMessage.value = error.response?.data?.detail || '比对失败，请重试';
-        alert(errorMessage.value);
+        alert(error.response?.data?.detail || '比对失败，请重试');
     } finally {
         isProcessing.value = false;
     }
 };
 
-const handleIgnore = (id: number) => {
-    diffs.value = diffs.value.map(d => 
-        d.id === id ? { ...d, status: 'ignored' } : d
-    );
-};
-
+// 处理差异点击
 const handleDiffClick = async (diff: DiffItem) => {
     selectedDiffId.value = diff.id;
     
     await nextTick();
     
-    // 滚动到高亮的文本
     setTimeout(() => {
         const markA = document.querySelector('#doc-content-a mark');
         if (markA) {
@@ -257,6 +158,14 @@ const handleDiffClick = async (diff: DiffItem) => {
     }, 100);
 };
 
+// 忽略差异
+const handleIgnore = (id: number) => {
+    diffs.value = diffs.value.map(d => 
+        d.id === id ? { ...d, status: 'ignored' } : d
+    );
+};
+
+// 返回
 const goBack = () => {
     if (activeView.value === 'result') {
         activeView.value = 'upload';
@@ -264,6 +173,15 @@ const goBack = () => {
     } else {
         router.push('/');
     }
+};
+
+// 文件选择处理
+const handleFileAUpdate = (file: File) => {
+    fileA.value = file;
+};
+
+const handleFileBUpdate = (file: File) => {
+    fileB.value = file;
 };
 </script>
 
@@ -290,284 +208,43 @@ const goBack = () => {
 
             <!-- Main Content: Left upload, Right history -->
             <div class="flex-1 flex gap-8">
-                <!-- Left Column: Upload Area -->
-                <div class="w-96 flex flex-col gap-6">
-                    <!-- Document A -->
-                    <label class="contract-upload-area contract-upload-original h-40">
-                        <div class="contract-upload-badge contract-badge-original">原文档</div>
-                        <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileASelect" />
-                        <div class="contract-upload-icon contract-icon-original">
-                            <FileText class="w-8 h-8" />
-                        </div>
-                        <h3 class="text-base font-semibold text-slate-800 mb-1">
-                            {{ fileA ? fileA.name : '点击上传原文档' }}
-                        </h3>
-                        <p class="text-xs text-slate-400">PDF, Word, 图片 (最大 50MB)</p>
-                    </label>
-
-                    <!-- Document B -->
-                    <label class="contract-upload-area contract-upload-compare h-40">
-                        <div class="contract-upload-badge contract-badge-compare">比对文档</div>
-                        <input type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.png" @change="handleFileBSelect" />
-                        <div class="contract-upload-icon contract-icon-compare">
-                            <FileText class="w-8 h-8" />
-                        </div>
-                        <h3 class="text-base font-semibold text-slate-800 mb-1">
-                            {{ fileB ? fileB.name : '点击上传比对文档' }}
-                        </h3>
-                        <p class="text-xs text-slate-400">PDF, Word, 图片 (最大 50MB)</p>
-                    </label>
-
-                    <!-- Start Button -->
-                    <button 
-                        @click="startCompare" 
-                        :disabled="!fileA || !fileB || isProcessing"
-                        class="contract-btn-primary w-full"
-                    >
-                        <Search class="w-5 h-5" />
-                        {{ isProcessing ? '比对中...' : '开始智能比对' }}
-                    </button>
-                </div>
-
-                <!-- Right Column: History List -->
-                <div class="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                        <h2 class="text-lg font-semibold text-slate-800">比对历史</h2>
-                        <p class="text-sm text-slate-500">查看之前的比对任务</p>
-                    </div>
-                    <div class="flex-1 overflow-y-auto p-4 space-y-3">
-                        <!-- Empty State -->
-                        <div v-if="historyList.length === 0" class="text-center text-slate-400 py-10">
-                            <FileText class="w-12 h-12 mx-auto mb-3 opacity-30" />
-                            <p>暂无比对历史</p>
-                            <p class="text-sm">完成比对后会在此处显示</p>
-                        </div>
-                        
-                        <!-- History Items -->
-                        <div 
-                            v-for="task in historyList" 
-                            :key="task.id"
-                            class="p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group"
-                            @click="viewHistoryTask(task)"
-                        >
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <span :class="[
-                                            'px-2 py-0.5 rounded-full text-xs font-medium',
-                                            task.status === 'done' ? 'bg-green-100 text-green-700' :
-                                            task.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                            'bg-yellow-100 text-yellow-700'
-                                        ]">
-                                            {{ task.status === 'done' ? '已完成' : task.status === 'failed' ? '失败' : '处理中' }}
-                                        </span>
-                                        <span class="text-xs text-slate-400 flex items-center gap-1">
-                                            <Clock class="w-3 h-3" />
-                                            {{ new Date(task.created_at).toLocaleString() }}
-                                        </span>
-                                    </div>
-                                    <div class="text-sm text-slate-700 truncate mb-1">
-                                        <span class="font-medium">原文档:</span> {{ task.file_a_name }}
-                                    </div>
-                                    <div class="text-sm text-slate-500 truncate">
-                                        <span class="font-medium">比对:</span> {{ task.file_b_name }}
-                                    </div>
-                                </div>
-                                <button 
-                                    @click.stop="handleDeleteTask(task.id)"
-                                    class="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                    <Trash2 class="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ContractUpload 
+                    :fileA="fileA"
+                    :fileB="fileB"
+                    :isProcessing="isProcessing"
+                    @update:fileA="handleFileAUpdate"
+                    @update:fileB="handleFileBUpdate"
+                    @compare="startCompare"
+                />
+                
+                <ContractHistory 
+                    :historyList="historyList"
+                    @view="viewHistoryTask"
+                    @delete="handleDeleteTask"
+                />
             </div>
         </div>
 
         <!-- Result View -->
-        <div v-else class="h-screen flex flex-col">
-            <!-- Toolbar -->
-            <div class="contract-toolbar">
-                <div class="flex items-center gap-4">
-                    <button @click="goBack" class="p-2 hover:bg-slate-100 rounded-lg text-slate-500">
-                        <ChevronLeft class="w-5 h-5" />
-                    </button>
-                    <div class="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-                        <button class="p-1.5 hover:bg-white rounded-md">
-                            <ChevronLeft class="w-4 h-4" />
-                        </button>
-                        <span class="text-sm font-medium w-16 text-center text-slate-600">1 / 1</span>
-                        <button class="p-1.5 hover:bg-white rounded-md">
-                            <ChevronRight class="w-4 h-4" />
-                        </button>
-                    </div>
-                    <button 
-                        @click="syncScroll = !syncScroll"
-                        :class="['contract-sync-btn', syncScroll ? 'active' : '']"
-                    >
-                        <ArrowRightLeft class="w-4 h-4" />
-                        同步翻页
-                    </button>
-                    <div class="flex items-center gap-1 text-slate-500">
-                        <button class="p-2 hover:bg-slate-100 rounded-full">
-                            <ZoomIn class="w-5 h-5" />
-                        </button>
-                        <button class="p-2 hover:bg-slate-100 rounded-full">
-                            <ZoomOut class="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-                <button class="contract-btn-export">
-                    <Download class="w-4 h-4" />
-                    导出差异报告
-                </button>
-            </div>
-
-            <!-- Main Content -->
-            <div class="flex-1 flex overflow-hidden">
-                <!-- Document Panes -->
-                <div class="flex-1 flex">
-                    <!-- Original Doc -->
-                    <div class="contract-doc-pane">
-                        <div class="contract-doc-header contract-doc-header-original">
-                            <span class="contract-doc-badge contract-badge-original">原</span>
-                            <span class="font-medium text-slate-700 truncate">{{ fileA?.name || '原文档' }}</span>
-                        </div>
-                        <div id="doc-content-a" class="contract-doc-content p-0">
-                            <!-- PDF Viewer -->
-                            <iframe 
-                                v-if="fileAType === 'pdf'" 
-                                :src="fileAPreviewUrl" 
-                                class="w-full h-full border-0"
-                            ></iframe>
-                            
-                            <!-- Image Viewer -->
-                            <div v-else-if="fileAType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
-                                <img :src="fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
-                            </div>
-                            
-                            <!-- DOC/DOCX Text Viewer -->
-                            <div v-else class="p-6 overflow-auto h-full">
-                                <div 
-                                    v-if="contentA" 
-                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                    v-html="highlightedContentA"
-                                ></div>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Divider -->
-                    <div class="w-px bg-slate-300"></div>
-
-                    <!-- Compare Doc -->
-                    <div class="contract-doc-pane">
-                        <div class="contract-doc-header contract-doc-header-compare">
-                            <span class="contract-doc-badge contract-badge-compare">比对</span>
-                            <span class="font-medium text-slate-700 truncate">{{ fileB?.name || '比对文档' }}</span>
-                        </div>
-                        <div id="doc-content-b" class="contract-doc-content p-0">
-                            <!-- PDF Viewer -->
-                            <iframe 
-                                v-if="fileBType === 'pdf'" 
-                                :src="fileBPreviewUrl" 
-                                class="w-full h-full border-0"
-                            ></iframe>
-                            
-                            <!-- Image Viewer -->
-                            <div v-else-if="fileBType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
-                                <img :src="fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
-                            </div>
-                            
-                            <!-- DOC/DOCX Text Viewer -->
-                            <div v-else class="p-6 overflow-auto h-full">
-                                <div 
-                                    v-if="contentB" 
-                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                    v-html="highlightedContentB"
-                                ></div>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Diff List Sidebar -->
-                <div class="contract-diff-sidebar">
-                    <!-- Stats Header -->
-                    <div class="p-5 border-b border-slate-100 bg-slate-50/50">
-                        <div class="flex items-end justify-between mb-4">
-                            <h2 class="text-xl font-bold text-slate-800">
-                                差异项 <span class="text-orange-600">{{ stats().all - stats().ignored }}</span>
-                            </h2>
-                            <span class="text-sm text-slate-500">已忽略 {{ stats().ignored }}</span>
-                        </div>
-
-                        <!-- Filter Tabs -->
-                        <div class="flex bg-slate-200/60 p-1 rounded-lg">
-                            <button 
-                                v-for="tab in [
-                                    { id: 'all', label: '全部', count: stats().all },
-                                    { id: 'added', label: '新增', count: stats().added },
-                                    { id: 'modified', label: '修改', count: stats().modified },
-                                    { id: 'deleted', label: '删除', count: stats().deleted }
-                                ]"
-                                :key="tab.id"
-                                @click="filter = tab.id"
-                                :class="['contract-filter-tab', filter === tab.id ? 'active' : '']"
-                            >
-                                {{ tab.label }} ({{ tab.count }})
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Diff Items -->
-                    <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-                        <div 
-                            v-for="diff in filteredDiffs()"
-                            :key="diff.id"
-                            :class="['diff-item', selectedDiffId === diff.id ? 'ring-2 ring-orange-500' : '']"
-                            @click="handleDiffClick(diff)"
-                        >
-                            <div class="flex justify-between items-start mb-3">
-                                <span :class="['diff-badge', `diff-badge-${diff.diff_type}`]">
-                                    {{ diff.diff_type === 'added' ? '新增' : diff.diff_type === 'deleted' ? '删除' : '修改' }}
-                                </span>
-                                <button 
-                                    @click="handleIgnore(diff.id)"
-                                    class="text-slate-400 hover:text-slate-600 text-xs underline"
-                                >
-                                    忽略
-                                </button>
-                            </div>
-
-                            <div class="space-y-3">
-                                <div v-if="diff.original_text">
-                                    <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">原文</div>
-                                    <div class="diff-text diff-text-original">{{ diff.original_text }}</div>
-                                </div>
-                                <div v-if="diff.comparison_text">
-                                    <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">比对</div>
-                                    <div class="diff-text diff-text-compare">{{ diff.comparison_text }}</div>
-                                </div>
-                            </div>
-
-                            <div class="mt-3 pt-3 border-t border-slate-50 flex items-center text-xs text-slate-400">
-                                <AlertCircle class="w-3 h-3 mr-1" />
-                                {{ diff.location }}
-                            </div>
-                        </div>
-
-                        <div v-if="filteredDiffs().length === 0" class="text-center py-10 text-slate-400">
-                            <CheckCircle2 class="w-10 h-10 mx-auto mb-2 opacity-50" />
-                            <p>暂无此类差异</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <ContractResultView 
+            v-else
+            :fileAName="fileA?.name || ''"
+            :fileBName="fileB?.name || ''"
+            :fileAType="fileAType"
+            :fileBType="fileBType"
+            :fileAPreviewUrl="fileAPreviewUrl"
+            :fileBPreviewUrl="fileBPreviewUrl"
+            :contentA="contentA"
+            :contentB="contentB"
+            :diffs="diffs"
+            :selectedDiffId="selectedDiffId"
+            :filter="filter"
+            :syncScroll="syncScroll"
+            @back="goBack"
+            @update:filter="filter = $event"
+            @update:syncScroll="syncScroll = $event"
+            @selectDiff="handleDiffClick"
+            @ignoreDiff="handleIgnore"
+        />
     </div>
 </template>
