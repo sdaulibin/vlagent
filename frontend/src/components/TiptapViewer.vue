@@ -41,7 +41,9 @@ const editor = useEditor({
 
 // 检测并转换表格格式 (管道分隔格式)
 const convertTableFormat = (text: string): string => {
-    const lines = text.split('\n');
+    // 处理字面量 \n (即用户看到的 "\n" 字符)
+    const normalizedText = text.replace(/\\n/g, '\n');
+    const lines = normalizedText.split('\n');
     const result: string[] = [];
     let inTable = false;
     let tableRows: string[][] = [];
