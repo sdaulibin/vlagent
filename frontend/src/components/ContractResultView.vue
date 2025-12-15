@@ -4,6 +4,8 @@ import {
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
     ArrowRightLeft, Download, AlertCircle, CheckCircle2 
 } from 'lucide-vue-next';
+import VueOfficeDocx from '@vue-office/docx';
+import '@vue-office/docx/lib/index.css';
 
 interface DiffItem {
     id: number;
@@ -56,7 +58,7 @@ const selectedDiff = computed(() => {
     return props.diffs.find(d => d.id === props.selectedDiffId) || null;
 });
 
-// 高亮文本的HTML
+// 高亮文本的HTML（仅用于无法使用 VueOfficeDocx 时的回退方案）
 const highlightedContentA = computed(() => {
     if (!props.contentA) return '';
     const diff = selectedDiff.value;
@@ -166,7 +168,15 @@ const stats = computed(() => ({
                             <img :src="props.fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                         </div>
                         
-                        <!-- DOC/DOCX Text Viewer -->
+                        <!-- DOC/DOCX Viewer -->
+                        <div v-else-if="props.fileAType === 'doc'" class="w-full h-full overflow-auto">
+                            <VueOfficeDocx 
+                                :src="props.fileAPreviewUrl" 
+                                style="height: 100%; width: 100%;"
+                            />
+                        </div>
+                        
+                        <!-- Fallback Text Viewer -->
                         <div v-else class="p-6 overflow-auto h-full">
                             <div 
                                 v-if="props.contentA" 
@@ -200,7 +210,15 @@ const stats = computed(() => ({
                             <img :src="props.fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                         </div>
                         
-                        <!-- DOC/DOCX Text Viewer -->
+                        <!-- DOC/DOCX Viewer -->
+                        <div v-else-if="props.fileBType === 'doc'" class="w-full h-full overflow-auto">
+                            <VueOfficeDocx 
+                                :src="props.fileBPreviewUrl" 
+                                style="height: 100%; width: 100%;"
+                            />
+                        </div>
+                        
+                        <!-- Fallback Text Viewer -->
                         <div v-else class="p-6 overflow-auto h-full">
                             <div 
                                 v-if="props.contentB" 
