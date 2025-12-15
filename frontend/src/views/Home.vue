@@ -14,12 +14,12 @@
         <!-- Scenario Cards -->
         <main class="max-w-5xl mx-auto px-6 pb-16">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- 银行流水识别 -->
+                <!-- 流水识别 -->
                 <router-link to="/bank-statement" class="scenario-card group">
                     <div class="scenario-card-icon icon-gradient-blue">
                         <CreditCard class="w-8 h-8 text-white" />
                     </div>
-                    <h3 class="scenario-card-title">银行流水识别</h3>
+                    <h3 class="scenario-card-title">流水识别</h3>
                     <p class="scenario-card-desc">
                         智能解析银行流水PDF，提取交易明细、账户信息和汇总统计
                     </p>

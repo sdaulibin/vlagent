@@ -96,16 +96,22 @@ const goBack = () => {
 </script>
 
 <template>
-    <div class="min-h-screen p-4 md:p-8 flex flex-col items-center">
+    <div class="min-h-screen p-4 md:p-8 flex flex-col">
         <!-- Header -->
-        <header class="w-full max-w-6xl mb-8 flex items-center gap-3">
-            <button @click="goBack" class="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                <ArrowLeft class="w-6 h-6 text-gray-600" />
+        <header class="w-full max-w-6xl mx-auto mb-6">
+            <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+                <ArrowLeft class="w-5 h-5" />
+                返回首页
             </button>
-            <div class="bg-blue-600 p-2 rounded-lg shadow-lg">
-                <ShieldCheck class="text-white w-8 h-8" />
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-3 rounded-xl shadow-lg">
+                    <ShieldCheck class="text-white w-7 h-7" />
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">流水信息识别</h1>
+                    <p class="text-sm text-slate-500">智能解析银行流水 PDF，提取交易明细和汇总统计</p>
+                </div>
             </div>
-            <h1 class="header-title">银行流水信息识别</h1>
         </header>
 
         <!-- Main Content -->
