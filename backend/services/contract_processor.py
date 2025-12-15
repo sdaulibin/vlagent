@@ -71,7 +71,7 @@ def convert_to_images(file_path: str, output_folder: str) -> list:
     """
     os.makedirs(output_folder, exist_ok=True)
     
-    # 目前支持 PDF
+    # PDF 文件
     if file_path.lower().endswith('.pdf'):
         pages = convert_from_path(file_path, dpi=200)
         image_paths = []
@@ -88,8 +88,43 @@ def convert_to_images(file_path: str, output_folder: str) -> list:
     elif file_path.lower().endswith(('.jpg', '.jpeg', '.png')):
         return [file_path]
     
+    # DOCX 文件返回空列表（使用文本提取方式）
+    elif file_path.lower().endswith(('.docx', '.doc')):
+        return []
+    
     else:
         raise ValueError(f"Unsupported file format: {file_path}")
+
+
+def extract_text_from_docx(file_path: str) -> str:
+    """
+    从 DOCX 文件中提取文本
+    
+    Args:
+        file_path: DOCX 文件路径
+        
+    Returns:
+        str: 提取的文本内容
+    """
+    try:
+        from docx import Document
+        doc = Document(file_path)
+        
+        paragraphs = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                paragraphs.append(para.text)
+        
+        # 提取表格内容
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                if row_text:
+                    paragraphs.append(row_text)
+        
+        return '\n\n'.join(paragraphs)
+    except ImportError:
+        raise ImportError("请安装 python-docx: pip install python-docx")
 
 
 def extract_document_content(file_path: str) -> str:
@@ -102,11 +137,20 @@ def extract_document_content(file_path: str) -> str:
     Returns:
         str: 文档文本内容
     """
+    # DOCX 文件直接提取文本
+    if file_path.lower().endswith(('.docx', '.doc')):
+        print(f"提取 DOCX 文本: {file_path}")
+        return extract_text_from_docx(file_path)
+    
+    # 其他格式转图片后 OCR
     filename = Path(file_path).stem
     output_folder = os.path.join(CONTRACT_OUTPUT_DIR, f"task_{filename}")
     
     # 转换为图片
     image_paths = convert_to_images(file_path, output_folder)
+    
+    if not image_paths:
+        raise ValueError(f"无法处理文件: {file_path}")
     
     # 提取每页文本
     all_text = []
