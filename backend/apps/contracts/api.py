@@ -85,14 +85,19 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
     
     # 使用 inline 而不是 attachment, 让浏览器直接预览而不是下载
     from starlette.responses import Response
+    from urllib.parse import quote
+    
     with open(file_path, 'rb') as f:
         content = f.read()
+    
+    # URL 编码文件名以处理中文字符
+    encoded_filename = quote(filename)
     
     return Response(
         content=content,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'inline; filename="{filename}"'
+            "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
         }
     )
 
