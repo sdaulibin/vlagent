@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { 
     ArrowLeft, FileText, Search, ChevronLeft, ChevronRight,
@@ -35,6 +35,58 @@ interface DiffItem {
 }
 
 const diffs = ref<DiffItem[]>([]);
+
+// 获取当前选中的差异
+const selectedDiff = computed(() => {
+    if (!selectedDiffId.value) return null;
+    return diffs.value.find(d => d.id === selectedDiffId.value) || null;
+});
+
+// 高亮文本的HTML（原文档）
+const highlightedContentA = computed(() => {
+    if (!contentA.value) return '';
+    const diff = selectedDiff.value;
+    if (!diff || !diff.original_text) return escapeHtml(contentA.value);
+    
+    const searchText = diff.original_text.trim();
+    if (!searchText) return escapeHtml(contentA.value);
+    
+    const escaped = escapeHtml(contentA.value);
+    const searchEscaped = escapeHtml(searchText);
+    
+    // 高亮匹配的文本
+    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
+    return escaped.replace(regex, '<mark class="bg-red-200 text-red-900 px-1 rounded">$1</mark>');
+});
+
+// 高亮文本的HTML（比对文档）
+const highlightedContentB = computed(() => {
+    if (!contentB.value) return '';
+    const diff = selectedDiff.value;
+    if (!diff || !diff.comparison_text) return escapeHtml(contentB.value);
+    
+    const searchText = diff.comparison_text.trim();
+    if (!searchText) return escapeHtml(contentB.value);
+    
+    const escaped = escapeHtml(contentB.value);
+    const searchEscaped = escapeHtml(searchText);
+    
+    // 高亮匹配的文本
+    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
+    return escaped.replace(regex, '<mark class="bg-green-200 text-green-900 px-1 rounded">$1</mark>');
+});
+
+// 辅助函数：转义HTML
+function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 辅助函数：转义正则表达式特殊字符
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // 计算属性
 const filteredDiffs = () => {
@@ -112,42 +164,26 @@ const handleIgnore = (id: number) => {
 const handleDiffClick = async (diff: DiffItem) => {
     selectedDiffId.value = diff.id;
     
-    // 高亮显示相关文本
     await nextTick();
     
-    // 在原文档中查找并滚动
-    if (diff.original_text) {
-        const docAEl = document.getElementById('doc-content-a');
-        if (docAEl) {
-            const text = diff.original_text.substring(0, 50);
-            const content = docAEl.innerText;
-            const index = content.indexOf(text);
-            if (index > -1) {
-                // 估算滚动位置
-                const scrollRatio = index / content.length;
-                docAEl.scrollTop = scrollRatio * docAEl.scrollHeight;
-            }
+    // 滚动到高亮的文本
+    setTimeout(() => {
+        const markA = document.querySelector('#doc-content-a mark');
+        if (markA) {
+            markA.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }
-    
-    // 在比对文档中查找并滚动
-    if (diff.comparison_text) {
-        const docBEl = document.getElementById('doc-content-b');
-        if (docBEl) {
-            const text = diff.comparison_text.substring(0, 50);
-            const content = docBEl.innerText;
-            const index = content.indexOf(text);
-            if (index > -1) {
-                const scrollRatio = index / content.length;
-                docBEl.scrollTop = scrollRatio * docBEl.scrollHeight;
-            }
+        
+        const markB = document.querySelector('#doc-content-b mark');
+        if (markB) {
+            markB.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }
+    }, 100);
 };
 
 const goBack = () => {
     if (activeView.value === 'result') {
         activeView.value = 'upload';
+        selectedDiffId.value = null;
     } else {
         router.push('/');
     }
@@ -265,10 +301,12 @@ const goBack = () => {
                             <span class="font-medium text-slate-700 truncate">{{ fileA?.name || '原文档' }}</span>
                         </div>
                         <div id="doc-content-a" class="contract-doc-content">
-                            <div class="max-w-3xl mx-auto whitespace-pre-wrap">
-                                <template v-if="contentA">{{ contentA }}</template>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
+                            <div 
+                                v-if="contentA" 
+                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                v-html="highlightedContentA"
+                            ></div>
+                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                         </div>
                     </div>
 
@@ -282,10 +320,12 @@ const goBack = () => {
                             <span class="font-medium text-slate-700 truncate">{{ fileB?.name || '比对文档' }}</span>
                         </div>
                         <div id="doc-content-b" class="contract-doc-content">
-                            <div class="max-w-3xl mx-auto whitespace-pre-wrap">
-                                <template v-if="contentB">{{ contentB }}</template>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
+                            <div 
+                                v-if="contentB" 
+                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                v-html="highlightedContentB"
+                            ></div>
+                            <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                         </div>
                     </div>
                 </div>
