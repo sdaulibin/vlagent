@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { 
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-    ArrowRightLeft, Download, AlertCircle, CheckCircle2 
+    ArrowRightLeft, Download, AlertCircle, CheckCircle2, Eye
 } from 'lucide-vue-next';
 import VueOfficeDocx from '@vue-office/docx';
 import '@vue-office/docx/lib/index.css';
@@ -40,6 +40,39 @@ const emit = defineEmits<{
     (e: 'selectDiff', diff: DiffItem): void;
     (e: 'ignoreDiff', id: number): void;
 }>();
+
+// 视图模式: 'format' = 原格式视图, 'diff' = 差异对比视图
+const viewMode = ref<'format' | 'diff'>('format');
+
+// 切换视图模式
+const toggleViewMode = () => {
+    viewMode.value = viewMode.value === 'format' ? 'diff' : 'format';
+};
+
+// 处理差异点击 - 自动切换到差异视图并滚动
+const handleDiffItemClick = async (diff: DiffItem) => {
+    emit('selectDiff', diff);
+    
+    // 自动切换到差异视图
+    if (viewMode.value === 'format') {
+        viewMode.value = 'diff';
+    }
+    
+    await nextTick();
+    
+    // 滚动到高亮位置
+    setTimeout(() => {
+        const markA = document.querySelector('#doc-content-a mark');
+        if (markA) {
+            markA.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        const markB = document.querySelector('#doc-content-b mark');
+        if (markB) {
+            markB.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 100);
+};
 
 // 辅助函数
 function escapeHtml(text: string): string {
@@ -138,6 +171,15 @@ const stats = computed(() => ({
                         <ZoomOut class="w-5 h-5" />
                     </button>
                 </div>
+                
+                <!-- 视图模式切换 -->
+                <button 
+                    @click="toggleViewMode"
+                    :class="['contract-sync-btn', viewMode === 'diff' ? 'active' : '']"
+                >
+                    <Eye class="w-4 h-4" />
+                    {{ viewMode === 'format' ? '格式视图' : '差异视图' }}
+                </button>
             </div>
             <button class="contract-btn-export">
                 <Download class="w-4 h-4" />
@@ -156,34 +198,47 @@ const stats = computed(() => ({
                         <span class="font-medium text-slate-700 truncate">{{ props.fileAName || '原文档' }}</span>
                     </div>
                     <div id="doc-content-a" class="doc-content">
-                        <!-- PDF Viewer -->
-                        <iframe 
-                            v-if="props.fileAType === 'pdf'" 
-                            :src="props.fileAPreviewUrl" 
-                            class="w-full h-full border-0"
-                        ></iframe>
-                        
-                        <!-- Image Viewer -->
-                        <div v-else-if="props.fileAType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
-                            <img :src="props.fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
-                        </div>
-                        
-                        <!-- DOC/DOCX Viewer -->
-                        <div v-else-if="props.fileAType === 'doc'" class="docx-viewer">
-                            <VueOfficeDocx 
-                                :src="props.fileAPreviewUrl"
-                            />
-                        </div>
-                        
-                        <!-- Fallback Text Viewer -->
-                        <div v-else class="p-6 overflow-auto h-full">
+                        <!-- 差异视图 - 显示高亮文本 -->
+                        <div v-if="viewMode === 'diff'" class="p-6 overflow-auto h-full bg-slate-50">
                             <div 
                                 v-if="props.contentA" 
-                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                class="max-w-none whitespace-pre-wrap text-sm leading-relaxed select-text bg-white p-6 rounded-lg shadow-sm"
                                 v-html="highlightedContentA"
                             ></div>
                             <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                         </div>
+                        
+                        <!-- 格式视图 -->
+                        <template v-else>
+                            <!-- PDF Viewer -->
+                            <iframe 
+                                v-if="props.fileAType === 'pdf'" 
+                                :src="props.fileAPreviewUrl" 
+                                class="w-full h-full border-0"
+                            ></iframe>
+                            
+                            <!-- Image Viewer -->
+                            <div v-else-if="props.fileAType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
+                                <img :src="props.fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
+                            </div>
+                            
+                            <!-- DOC/DOCX Viewer -->
+                            <div v-else-if="props.fileAType === 'doc'" class="docx-viewer">
+                                <VueOfficeDocx 
+                                    :src="props.fileAPreviewUrl"
+                                />
+                            </div>
+                            
+                            <!-- Fallback Text Viewer -->
+                            <div v-else class="p-6 overflow-auto h-full">
+                                <div 
+                                    v-if="props.contentA" 
+                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                    v-html="highlightedContentA"
+                                ></div>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
@@ -197,34 +252,47 @@ const stats = computed(() => ({
                         <span class="font-medium text-slate-700 truncate">{{ props.fileBName || '比对文档' }}</span>
                     </div>
                     <div id="doc-content-b" class="doc-content">
-                        <!-- PDF Viewer -->
-                        <iframe 
-                            v-if="props.fileBType === 'pdf'" 
-                            :src="props.fileBPreviewUrl" 
-                            class="w-full h-full border-0"
-                        ></iframe>
-                        
-                        <!-- Image Viewer -->
-                        <div v-else-if="props.fileBType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
-                            <img :src="props.fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
-                        </div>
-                        
-                        <!-- DOC/DOCX Viewer -->
-                        <div v-else-if="props.fileBType === 'doc'" class="docx-viewer">
-                            <VueOfficeDocx 
-                                :src="props.fileBPreviewUrl"
-                            />
-                        </div>
-                        
-                        <!-- Fallback Text Viewer -->
-                        <div v-else class="p-6 overflow-auto h-full">
+                        <!-- 差异视图 - 显示高亮文本 -->
+                        <div v-if="viewMode === 'diff'" class="p-6 overflow-auto h-full bg-slate-50">
                             <div 
                                 v-if="props.contentB" 
-                                class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                class="max-w-none whitespace-pre-wrap text-sm leading-relaxed select-text bg-white p-6 rounded-lg shadow-sm"
                                 v-html="highlightedContentB"
                             ></div>
                             <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
                         </div>
+                        
+                        <!-- 格式视图 -->
+                        <template v-else>
+                            <!-- PDF Viewer -->
+                            <iframe 
+                                v-if="props.fileBType === 'pdf'" 
+                                :src="props.fileBPreviewUrl" 
+                                class="w-full h-full border-0"
+                            ></iframe>
+                            
+                            <!-- Image Viewer -->
+                            <div v-else-if="props.fileBType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
+                                <img :src="props.fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
+                            </div>
+                            
+                            <!-- DOC/DOCX Viewer -->
+                            <div v-else-if="props.fileBType === 'doc'" class="docx-viewer">
+                                <VueOfficeDocx 
+                                    :src="props.fileBPreviewUrl"
+                                />
+                            </div>
+                            
+                            <!-- Fallback Text Viewer -->
+                            <div v-else class="p-6 overflow-auto h-full">
+                                <div 
+                                    v-if="props.contentB" 
+                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
+                                    v-html="highlightedContentB"
+                                ></div>
+                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -264,7 +332,7 @@ const stats = computed(() => ({
                         v-for="diff in filteredDiffs"
                         :key="diff.id"
                         :class="['diff-item', props.selectedDiffId === diff.id ? 'ring-2 ring-orange-500' : '']"
-                        @click="emit('selectDiff', diff)"
+                        @click="handleDiffItemClick(diff)"
                     >
                         <div class="flex justify-between items-start mb-3">
                             <span :class="['diff-badge', `diff-badge-${diff.diff_type}`]">
