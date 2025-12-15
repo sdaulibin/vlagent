@@ -4,8 +4,6 @@ import {
     ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
     ArrowRightLeft, Download, AlertCircle, CheckCircle2, Eye
 } from 'lucide-vue-next';
-import VueOfficeDocx from '@vue-office/docx';
-import '@vue-office/docx/lib/index.css';
 import TiptapViewer from './TiptapViewer.vue';
 
 interface DiffItem {
@@ -75,50 +73,10 @@ const handleDiffItemClick = async (diff: DiffItem) => {
     }, 100);
 };
 
-// 辅助函数
-function escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function escapeRegExp(text: string): string {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 // 获取当前选中的差异
 const selectedDiff = computed(() => {
     if (!props.selectedDiffId) return null;
     return props.diffs.find(d => d.id === props.selectedDiffId) || null;
-});
-
-// 高亮文本的HTML（仅用于无法使用 VueOfficeDocx 时的回退方案）
-const highlightedContentA = computed(() => {
-    if (!props.contentA) return '';
-    const diff = selectedDiff.value;
-    if (!diff || !diff.original_text) return escapeHtml(props.contentA);
-    
-    const searchText = diff.original_text.trim();
-    if (!searchText) return escapeHtml(props.contentA);
-    
-    const escaped = escapeHtml(props.contentA);
-    const searchEscaped = escapeHtml(searchText);
-    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
-    return escaped.replace(regex, '<mark class="bg-red-200 text-red-900 px-1 rounded">$1</mark>');
-});
-
-const highlightedContentB = computed(() => {
-    if (!props.contentB) return '';
-    const diff = selectedDiff.value;
-    if (!diff || !diff.comparison_text) return escapeHtml(props.contentB);
-    
-    const searchText = diff.comparison_text.trim();
-    if (!searchText) return escapeHtml(props.contentB);
-    
-    const escaped = escapeHtml(props.contentB);
-    const searchEscaped = escapeHtml(searchText);
-    const regex = new RegExp(`(${escapeRegExp(searchEscaped)})`, 'gi');
-    return escaped.replace(regex, '<mark class="bg-green-200 text-green-900 px-1 rounded">$1</mark>');
 });
 
 // 获取高亮文本 (用于 Tiptap)
@@ -232,22 +190,11 @@ const stats = computed(() => ({
                                 <img :src="props.fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                             </div>
                             
-                            <!-- DOC/DOCX Viewer -->
-                            <div v-else-if="props.fileAType === 'doc'" class="docx-viewer">
-                                <VueOfficeDocx 
-                                    :src="props.fileAPreviewUrl"
-                                />
-                            </div>
-                            
-                            <!-- Fallback Text Viewer -->
-                            <div v-else class="p-6 overflow-auto h-full">
-                                <div 
-                                    v-if="props.contentA" 
-                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                    v-html="highlightedContentA"
-                                ></div>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
+                            <!-- Text/DOC/DOCX Viewer - 使用 Tiptap -->
+                            <TiptapViewer 
+                                v-else
+                                :content="props.contentA"
+                            />
                         </template>
                     </div>
                 </div>
@@ -284,22 +231,11 @@ const stats = computed(() => ({
                                 <img :src="props.fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                             </div>
                             
-                            <!-- DOC/DOCX Viewer -->
-                            <div v-else-if="props.fileBType === 'doc'" class="docx-viewer">
-                                <VueOfficeDocx 
-                                    :src="props.fileBPreviewUrl"
-                                />
-                            </div>
-                            
-                            <!-- Fallback Text Viewer -->
-                            <div v-else class="p-6 overflow-auto h-full">
-                                <div 
-                                    v-if="props.contentB" 
-                                    class="max-w-3xl mx-auto whitespace-pre-wrap text-sm leading-relaxed select-text"
-                                    v-html="highlightedContentB"
-                                ></div>
-                                <p v-else class="text-slate-400 text-center py-10">暂无内容</p>
-                            </div>
+                            <!-- Text/DOC/DOCX Viewer - 使用 Tiptap -->
+                            <TiptapViewer 
+                                v-else
+                                :content="props.contentB"
+                            />
                         </template>
                     </div>
                 </div>
