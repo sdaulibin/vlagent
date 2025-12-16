@@ -108,21 +108,39 @@ def extract_text_from_docx(file_path: str) -> str:
     """
     try:
         from docx import Document
-        doc = Document(file_path)
+        import shutil
+        import tempfile
+        import uuid
         
-        paragraphs = []
-        for para in doc.paragraphs:
-            if para.text.strip():
-                paragraphs.append(para.text)
+        # 处理中文文件名编码问题：复制到临时目录
+        tmp_dir = tempfile.mkdtemp()
+        tmp_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}.docx")
         
-        # 提取表格内容
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
-                if row_text:
-                    paragraphs.append(row_text)
-        
-        return '\n\n'.join(paragraphs)
+        try:
+            # 使用二进制读写，避免编码问题
+            with open(file_path, 'rb') as src:
+                content = src.read()
+            with open(tmp_path, 'wb') as dst:
+                dst.write(content)
+            
+            doc = Document(tmp_path)
+            
+            paragraphs = []
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    paragraphs.append(para.text)
+            
+            # 提取表格内容
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    if row_text:
+                        paragraphs.append(row_text)
+            
+            return '\n\n'.join(paragraphs)
+        finally:
+            # 清理临时目录
+            shutil.rmtree(tmp_dir, ignore_errors=True)
     except ImportError:
         raise ImportError("请安装 python-docx: pip install python-docx")
 

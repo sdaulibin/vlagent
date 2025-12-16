@@ -39,6 +39,40 @@ const editor = useEditor({
     editable: false, // 只读模式
 });
 
+// 检测是否是被框起来的段落行 (格式: |text|，只有2个|)
+const isBoxedParagraphLine = (line: string): boolean => {
+    if (!line.startsWith('|') || !line.endsWith('|')) return false;
+    const pipeCount = (line.match(/\|/g) || []).length;
+    return pipeCount === 2;
+};
+
+// 检测是否是表格行 (有多个单元格)
+const isTableRow = (line: string): boolean => {
+    // 格式1: col1 | col2 (带空格的管道分隔符)
+    if (line.includes(' | ')) {
+        return line.split(' | ').length >= 2;
+    }
+    // 格式2: |col1|col2| (以|包围，至少3个|)
+    if (line.startsWith('|') && line.endsWith('|')) {
+        const pipeCount = (line.match(/\|/g) || []).length;
+        return pipeCount >= 3;
+    }
+    return false;
+};
+
+// 解析表格行
+const parseTableRow = (line: string): string[] => {
+    if (line.includes(' | ')) {
+        return line.split(' | ').map(c => c.trim()).filter(c => c);
+    }
+    return line.split('|').map(c => c.trim()).filter(c => c);
+};
+
+// 提取被框起来的内容 (去掉首尾的 |)
+const extractBoxedContent = (line: string): string => {
+    return line.replace(/^\|/, '').replace(/\|$/, '').trim();
+};
+
 // 检测并转换表格格式 (管道分隔格式)
 const convertTableFormat = (text: string): string => {
     // 处理字面量 \n (即用户看到的 "\n" 字符)
@@ -47,28 +81,63 @@ const convertTableFormat = (text: string): string => {
     const result: string[] = [];
     let inTable = false;
     let tableRows: string[][] = [];
+    let inBoxedParagraph = false;
+    let boxedContent: string[] = [];
     
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const line = lines[i]?.trim() || '';
         
-        // 检测是否是表格行 (包含 |)
-        if (line.includes(' | ') || (line.startsWith('|') && line.endsWith('|'))) {
+        if (isBoxedParagraphLine(line)) {
+            // 先结束表格
+            if (inTable && tableRows.length > 0) {
+                result.push(buildTableHtml(tableRows));
+                tableRows = [];
+                inTable = false;
+            }
+            // 收集被框起来的段落内容
+            inBoxedParagraph = true;
+            boxedContent.push(extractBoxedContent(line));
+        } else if (isTableRow(line)) {
+            // 先结束被框起来的段落  
+            if (inBoxedParagraph && boxedContent.length > 0) {
+                const mergedText = boxedContent.join('');
+                const escaped = mergedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                result.push(`<div class="boxed-paragraph"><p>${escaped}</p></div>`);
+                boxedContent = [];
+                inBoxedParagraph = false;
+            }
+            
             if (!inTable) {
                 inTable = true;
                 tableRows = [];
             }
             // 解析表格行
-            const cells = line.split(/\s*\|\s*/).filter(c => c.trim());
+            const cells = parseTableRow(line);
             if (cells.length > 0) {
                 tableRows.push(cells);
             }
         } else {
+            // 空行处理：如果在表格中，跳过空行继续表格
+            if (!line && inTable) {
+                continue;
+            }
+            
             // 结束表格
             if (inTable && tableRows.length > 0) {
                 result.push(buildTableHtml(tableRows));
                 tableRows = [];
                 inTable = false;
             }
+            
+            // 结束被框起来的段落
+            if (inBoxedParagraph && boxedContent.length > 0) {
+                const mergedText = boxedContent.join('');
+                const escaped = mergedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                result.push(`<div class="boxed-paragraph"><p>${escaped}</p></div>`);
+                boxedContent = [];
+                inBoxedParagraph = false;
+            }
+            
             // 普通行
             if (line) {
                 const escapedLine = line
@@ -76,8 +145,6 @@ const convertTableFormat = (text: string): string => {
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;');
                 result.push(`<p>${escapedLine}</p>`);
-            } else {
-                result.push('<p><br></p>');
             }
         }
     }
@@ -85,6 +152,13 @@ const convertTableFormat = (text: string): string => {
     // 处理末尾的表格
     if (inTable && tableRows.length > 0) {
         result.push(buildTableHtml(tableRows));
+    }
+    
+    // 处理末尾的被框起来的段落
+    if (inBoxedParagraph && boxedContent.length > 0) {
+        const mergedText = boxedContent.join('');
+        const escaped = mergedText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        result.push(`<div class="boxed-paragraph"><p>${escaped}</p></div>`);
     }
     
     return result.join('');
@@ -377,5 +451,19 @@ onBeforeUnmount(() => {
 .tiptap-viewer :deep(.ProseMirror th p),
 .tiptap-viewer :deep(.ProseMirror td p) {
     margin: 0;
+}
+
+/* 被框起来的段落样式 */
+.tiptap-viewer :deep(.ProseMirror .boxed-paragraph) {
+    border: 1px dashed #94a3b8;
+    padding: 16px 20px;
+    margin: 16px 0;
+    background: #f8fafc;
+    border-radius: 4px;
+}
+
+.tiptap-viewer :deep(.ProseMirror .boxed-paragraph p) {
+    margin: 0;
+    line-height: 1.8;
 }
 </style>
