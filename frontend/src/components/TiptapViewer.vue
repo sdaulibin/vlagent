@@ -223,7 +223,11 @@ const applyHighlight = () => {
             const codes = text.match(/[A-Za-z0-9]{6,}/g) || [];
             // 提取中文关键词（2字以上）
             const chinese = text.match(/[\u4e00-\u9fa5]{2,}/g) || [];
-            return [...codes, ...chinese];
+            // 提取小数数字（如 805.02, 1.008197）
+            const decimals = text.match(/\d+\.\d+/g) || [];
+            // 提取日期格式（如 09月30日, 2025年）
+            const dates = text.match(/\d{2,4}[年月日]/g) || [];
+            return [...decimals, ...codes, ...chinese, ...dates];
         };
         
         // 构建忽略空格的正则
