@@ -178,6 +178,7 @@ const stats = computed(() => ({
                             :key="'docA-' + props.selectedDiffId"
                             :content="props.contentA"
                             :highlightText="highlightTextA"
+                            :compareText="highlightTextB"
                             highlightColor="red"
                         />
                         
@@ -220,6 +221,7 @@ const stats = computed(() => ({
                             :key="'docB-' + props.selectedDiffId"
                             :content="props.contentB"
                             :highlightText="highlightTextB"
+                            :compareText="highlightTextA"
                             highlightColor="green"
                         />
                         

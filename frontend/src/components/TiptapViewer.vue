@@ -11,11 +11,13 @@ import { TableHeader } from '@tiptap/extension-table-header';
 interface Props {
     content: string;
     highlightText?: string;
+    compareText?: string;  // 对方的文本，用于找出真正差异
     highlightColor?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     highlightText: '',
+    compareText: '',
     highlightColor: 'yellow'
 });
 
@@ -253,15 +255,35 @@ const applyHighlight = () => {
             // 按长度降序排序（更长的关键词优先）
             all.sort((a, b) => b.length - a.length);
             
-            // 过滤掉在文档中出现太多次的关键词（可能是表头或常见词）
-            const filtered = all.filter(keyword => {
+            return all;
+        };
+        
+        // 找出两个文本中真正不同的关键词
+        const findDifferentKeywords = (textA: string, textB: string): string[] => {
+            if (!textB) {
+                // 如果没有对比文本，返回所有关键词
+                return extractKeywords(textA);
+            }
+            
+            const keywordsA = extractKeywords(textA);
+            const keywordsB = extractKeywords(textB);
+            
+            // 找出只在 textA 中出现的关键词（即真正的差异）
+            const uniqueToA = keywordsA.filter(k => !keywordsB.includes(k));
+            
+            // 如果有唯一关键词，优先使用
+            if (uniqueToA.length > 0) {
+                console.log(`[TiptapViewer] 找到唯一关键词:`, uniqueToA);
+                return uniqueToA;
+            }
+            
+            // 否则过滤掉在文档中出现太多次的关键词
+            const filtered = keywordsA.filter(keyword => {
                 const count = (fullDocText.match(new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-                // 如果出现超过3次，可能是通用词，降低优先级
                 return count <= 3;
             });
             
-            // 如果过滤后没有结果，返回原始列表
-            return filtered.length > 0 ? filtered : all.slice(0, 5);
+            return filtered.length > 0 ? filtered : keywordsA.slice(0, 5);
         };
         
         // 构建忽略空格的正则
@@ -352,7 +374,8 @@ const applyHighlight = () => {
 
         // ========== 策略5: 智能关键词匹配（优先唯一关键词）==========
         if (!found) {
-            const keywords = extractKeywords(searchText);
+            // 使用对比文本找出真正不同的关键词
+            const keywords = findDifferentKeywords(searchText, props.compareText || '');
             console.log(`[TiptapViewer] 策略5 尝试关键词:`, keywords.slice(0, 5));
             
             for (const keyword of keywords) {
