@@ -327,23 +327,24 @@ const applyHighlight = () => {
             }
         }
 
-        // 策略4: 关键词匹配 (最后尝试)
+        // 策略4: 关键词匹配 (最后尝试，只匹配第一个)
         if (!found) {
             const keywords = extractKeywords(searchText);
             for (const keyword of keywords) {
+                if (found) break;
                 doc.descendants((node, pos) => {
-                     // 关键词匹配不互斥，可以找多个
+                    if (found) return false;
                     if (node.isText && node.text) {
                         const text = node.text;
-                        let index = text.indexOf(keyword);
-                        while (index !== -1) {
+                        const index = text.indexOf(keyword);
+                        if (index !== -1) {
                             matches.push({ from: pos + index, to: pos + index + keyword.length });
-                            index = text.indexOf(keyword, index + 1);
+                            found = true;
+                            console.log(`[TiptapViewer] 关键词匹配成功: "${keyword}"`);
                         }
                     }
                 });
             }
-            if (matches.length > 0) console.log(`[TiptapViewer] 关键词匹配成功, 找到 ${matches.length} 个`);
         }
         
         console.log(`[TiptapViewer] 最终匹配数: ${matches.length}`);
