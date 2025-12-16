@@ -34,6 +34,11 @@ export const deleteFile = async (fileId: number) => {
     return response.data;
 };
 
+export const startRecognition = async (fileId: number) => {
+    const response = await api.post(`/files/${fileId}/recognize`);
+    return response.data;
+};
+
 export const exportExcel = async (fileId: number, filename: string) => {
     const response = await api.get(`/files/${fileId}/export`, {
         responseType: 'blob'

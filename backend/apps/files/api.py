@@ -155,7 +155,7 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
-    """上传并处理PDF文件"""
+    """上传文件（仅保存，不处理）"""
     try:
         file_path = os.path.join(UPLOAD_DIR, file.filename)
 
@@ -163,15 +163,49 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # 创建文件记录
-        db_file = FileRecord(filename=file.filename, file_path=file_path, status="processing")
+        # 创建文件记录 - 状态为 pending（待处理）
+        db_file = FileRecord(filename=file.filename, file_path=file_path, status="pending")
         session.add(db_file)
         await session.commit()
         await session.refresh(db_file)
 
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "file_id": db_file.id,
+            "message": "文件上传成功，请点击开始识别"
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{file_id}/recognize")
+async def start_recognition(file_id: int, session: AsyncSession = Depends(get_session)):
+    """开始识别文件内容"""
+    try:
+        # 获取文件记录
+        result = await session.execute(select(FileRecord).where(FileRecord.id == file_id))
+        db_file = result.scalar_one_or_none()
+        
+        if not db_file:
+            raise HTTPException(status_code=404, detail="文件不存在")
+        
+        if db_file.status == "done":
+            return {"status": "already_done", "message": "文件已识别完成"}
+        
+        if db_file.status == "processing":
+            return {"status": "processing", "message": "文件正在识别中"}
+        
+        # 更新状态为处理中
+        db_file.status = "processing"
+        await session.commit()
+
         try:
             # 提取文件内容
-            result = pdf_processor.process_pdf_to_excel(file_path, max_workers=4)
+            result = pdf_processor.process_pdf_to_excel(db_file.file_path, max_workers=4)
             
             # 创建交易记录
             transactions = create_transaction_records(db_file.id, result.get("transactions", []))
@@ -188,10 +222,9 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             
             return {
                 "status": "success",
-                "filename": file.filename,
                 "file_id": db_file.id,
-                "transactions": transactions,
-                "summary": summary
+                "transactions_count": len(transactions),
+                "has_summary": summary is not None
             }
 
         except Exception as e_process:
@@ -200,6 +233,8 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             await session.commit()
             raise e_process
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()

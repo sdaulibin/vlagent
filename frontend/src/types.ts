@@ -31,5 +31,5 @@ export interface FileItem {
     id: number;
     name: string;
     size: string;
-    status: 'uploading' | 'done' | 'error';
+    status: 'pending' | 'uploading' | 'done' | 'error';
 }

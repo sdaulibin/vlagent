@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { ShieldCheck, ArrowLeft } from 'lucide-vue-next';
+import { ref, onMounted, computed } from 'vue';
+import { ShieldCheck, ArrowLeft, Play } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import FileUpload from '../components/FileUpload.vue';
 import FileList from '../components/FileList.vue';
 import ResultList from '../components/ResultList.vue';
-import { uploadFile, getFiles, getFileTransactions, getFileSummary, deleteFile, exportExcel } from '../api';
+import { uploadFile, getFiles, getFileTransactions, getFileSummary, deleteFile, exportExcel, startRecognition } from '../api';
 import type { FileItem, Transaction, Summary } from '../types';
 
 const router = useRouter();
@@ -16,6 +16,11 @@ const isProcessing = ref(false);
 const selectedFileId = ref<number | null>(null);
 const selectedFileName = ref('');
 
+// 检查是否有待处理的文件
+const hasPendingFiles = computed(() => {
+    return files.value.some(f => f.status === 'pending');
+});
+
 const loadFiles = async () => {
     try {
         const fileList = await getFiles();
@@ -23,7 +28,7 @@ const loadFiles = async () => {
             id: f.id,
             name: f.filename,
             size: '',
-            status: f.status === 'done' ? 'done' : f.status === 'processing' ? 'uploading' : 'error',
+            status: f.status === 'done' ? 'done' : f.status === 'processing' ? 'uploading' : f.status === 'pending' ? 'pending' : 'error',
         }));
     } catch (e) {
         console.error("Failed to load files", e);
@@ -34,6 +39,7 @@ onMounted(() => {
     loadFiles();
 });
 
+// 文件上传（仅保存，不处理）
 const handleFileSelect = async (fileList: FileList) => {
     if (fileList.length === 0) return;
     isProcessing.value = true;
@@ -43,6 +49,32 @@ const handleFileSelect = async (fileList: FileList) => {
             await uploadFile(file);
         } catch (error) {
             console.error(error);
+        }
+    }
+    
+    await loadFiles();
+    isProcessing.value = false;
+};
+
+// 开始识别所有待处理文件
+const handleStartRecognition = async () => {
+    const pendingFiles = files.value.filter(f => f.status === 'pending');
+    if (pendingFiles.length === 0) return;
+    
+    isProcessing.value = true;
+    
+    for (const file of pendingFiles) {
+        try {
+            // 更新本地状态为处理中
+            const fileIndex = files.value.findIndex(f => f.id === file.id);
+            const foundFile = files.value[fileIndex];
+            if (foundFile) {
+                foundFile.status = 'uploading';
+            }
+            
+            await startRecognition(file.id);
+        } catch (error) {
+            console.error(`识别文件 ${file.name} 失败:`, error);
         }
     }
     
@@ -119,6 +151,18 @@ const goBack = () => {
             <!-- Left Column -->
             <div class="md:col-span-4 flex flex-col gap-6 h-full min-h-0">
                 <FileUpload :onFileSelect="handleFileSelect" />
+                
+                <!-- 开始识别按钮 -->
+                <button 
+                    v-if="hasPendingFiles"
+                    @click="handleStartRecognition"
+                    :disabled="isProcessing"
+                    class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-xl font-medium shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <Play class="w-5 h-5" />
+                    {{ isProcessing ? '识别中...' : '开始识别' }}
+                </button>
+                
                 <FileList :files="files" :onDelete="handleDeleteFile" :onSelect="handleSelectFile" />
             </div>
 
