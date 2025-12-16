@@ -44,6 +44,7 @@ def extract_text_from_image(image_path: str) -> str:
     3. 如果有表格，用文字描述表格内容
     4. 忽略页眉、页脚、页码等非正文内容
     5. 输出纯文本，不需要 JSON 格式
+    6. 如果图片中没有文字，直接返回空
     
     直接输出提取的文本内容，不需要任何解释。
     """
@@ -54,6 +55,20 @@ def extract_text_from_image(image_path: str) -> str:
         file_base=image_path,
         model=MODEL_LOCAL
     )
+    
+    # 清理无效的 OCR 结果
+    if result:
+        # 移除 markdown 代码块
+        import re
+        result = re.sub(r'```\w*\n?', '', result)
+        result = re.sub(r'```', '', result)
+        
+        # 移除 HTML 标签和无文字提示
+        result = re.sub(r'<[^>]+>', '', result)
+        result = result.replace('图中无文字信息', '')
+        result = result.replace('图中无文字', '')
+        
+        result = result.strip()
     
     return result
 

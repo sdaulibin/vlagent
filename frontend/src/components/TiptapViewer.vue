@@ -62,10 +62,21 @@ const isTableRow = (line: string): boolean => {
 
 // 解析表格行
 const parseTableRow = (line: string): string[] => {
-    if (line.includes(' | ')) {
-        return line.split(' | ').map(c => c.trim()).filter(c => c);
+    // 先移除行首尾的 |
+    let cleaned = line.replace(/^\|+/, '').replace(/\|+$/, '').trim();
+    
+    // 根据分隔符拆分
+    let cells: string[];
+    if (cleaned.includes(' | ')) {
+        cells = cleaned.split(' | ');
+    } else {
+        cells = cleaned.split('|');
     }
-    return line.split('|').map(c => c.trim()).filter(c => c);
+    
+    // 清理每个单元格：移除多余的 | 和空白
+    return cells
+        .map(c => c.replace(/^\|+/, '').replace(/\|+$/, '').trim())
+        .filter(c => c && c !== '-' && c !== '--' && c !== '---');
 };
 
 // 提取被框起来的内容 (去掉首尾的 |)
