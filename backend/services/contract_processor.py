@@ -253,72 +253,96 @@ def extract_document_content(file_path: str) -> str:
     return "\n\n".join(all_text)
 
 
-def _compare_chunk_with_ai(chunk_a: str, chunk_b: str) -> list:
+def _compare_chunk_with_difflib(chunk_a: str, chunk_b: str) -> list:
     """
-    (Internal) 使用 AI 对比文档片段
+    使用 difflib 程序化比对文档片段，精确找出所有差异
     """
+    import difflib
+    
     if not chunk_a.strip() and not chunk_b.strip():
         return []
+    
+    # 按行分割
+    lines_a = chunk_a.split('\n')
+    lines_b = chunk_b.split('\n')
+    
+    diffs = []
+    matcher = difflib.SequenceMatcher(None, lines_a, lines_b)
+    
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            continue
         
-    prompt = f"""
-    你是一个专业的文档比对专家。请逐字逐句仔细对比以下两份文档内容，找出它们之间的所有差异。
-
-    【核心指令】
-    1. **逐行比对**：请将文档按行或段落进行对齐比对，不要跳过任何内容。
-    2. **严格模式**：任何字符的不一致（包括数字、日期、标点、文字缺失）都必须报告。
-    3. **完整性检查**：特别注意内容是否被截断或变短。
-
-    【重点关注差异类型】
-    1. **内容截断/缺失**（高优先级）：
-       - 例如："报告期：2025年01月01日" 变为 "报告期："
-       - 例如："金额：100,000元" 变为 "金额："
-       - 这种情况请标记为 modified 或 deleted。
-    2. **文字增删改**：
-       - 增加："基本信息" -> "基本信息（附录）"
-       - 删除："本合同一式两份" -> "本合同"
-       - 修改："甲方" -> "卖方"
-    3. **关键数据变化**：
-       - 编码、账号、金额、日期、利率等数字的任何细微变化。
-    4. **标点与格式**：
-       - 句号变为逗号，或者多了/少了括号等。
-
-    【原文档片段】
-    {chunk_a}  
+        original_lines = lines_a[i1:i2]
+        comparison_lines = lines_b[j1:j2]
+        
+        original_text = '\n'.join(original_lines).strip()
+        comparison_text = '\n'.join(comparison_lines).strip()
+        
+        # 跳过纯空白差异
+        if not original_text and not comparison_text:
+            continue
+        
+        if tag == 'replace':
+            diffs.append({
+                "type": "modified",
+                "original": original_text,
+                "comparison": comparison_text,
+                "location": f"第{i1+1}行附近"
+            })
+        elif tag == 'delete':
+            diffs.append({
+                "type": "deleted",
+                "original": original_text,
+                "comparison": "",
+                "location": f"第{i1+1}行附近"
+            })
+        elif tag == 'insert':
+            diffs.append({
+                "type": "added",
+                "original": "",
+                "comparison": comparison_text,
+                "location": f"第{j1+1}行附近"
+            })
     
-    【比对文档片段】
-    {chunk_b}
+    # 如果按行比对没有发现差异，进行字符级比对
+    if not diffs and chunk_a.strip() != chunk_b.strip():
+        char_matcher = difflib.SequenceMatcher(None, chunk_a, chunk_b)
+        for tag, i1, i2, j1, j2 in char_matcher.get_opcodes():
+            if tag == 'equal':
+                continue
+            
+            original_chars = chunk_a[i1:i2]
+            comparison_chars = chunk_b[j1:j2]
+            
+            # 获取上下文
+            context_start = max(0, i1 - 30)
+            context_end = min(len(chunk_a), i2 + 30)
+            context = chunk_a[context_start:context_end].replace('\n', ' ')
+            
+            if tag == 'replace':
+                diffs.append({
+                    "type": "modified",
+                    "original": original_chars,
+                    "comparison": comparison_chars,
+                    "location": f"...{context}..."
+                })
+            elif tag == 'delete':
+                diffs.append({
+                    "type": "deleted",
+                    "original": original_chars,
+                    "comparison": "",
+                    "location": f"...{context}..."
+                })
+            elif tag == 'insert':
+                diffs.append({
+                    "type": "added",
+                    "original": "",
+                    "comparison": comparison_chars,
+                    "location": f"新增内容"
+                })
     
-    请以 JSON 数组格式输出差异列表，每个差异项包含：
-    - type: 差异类型，值为 "added"（新增）、"deleted"（删除）或 "modified"（修改）
-    - original: 原文档中的内容（务必提取**完整**的原始句子或段落，不要缩略）
-    - comparison: 比对文档中的内容（务必提取**完整**的比对句子或段落，不要缩略）
-    - location: 差异所在的章节、段落或上下文位置描述
-
-    示例格式：
-    [
-        {{"type": "modified", "original": "报告期：2025年07月01日-2025年09月30日", "comparison": "报告期：", "location": "基本信息"}},
-        {{"type": "modified", "original": "产品登记编码 Z7003525", "comparison": "产品登记编码 Z7003525_V2", "location": "表格第一行"}},
-        {{"type": "deleted", "original": "第三条款：本协议自签署之日起生效。", "comparison": "", "location": "第三章"}}
-    ]
-
-    请务必找出所有差异，只输出 JSON 数组，不需要任何解释。
-    """
-    
-    result = request_stream(
-        question=prompt,
-        show_request=False,
-        model=MODEL_LOCAL
-    )
-    
-    try:
-        fixed_json = fix_json(result)
-        diffs = json.loads(fixed_json)
-        if isinstance(diffs, list):
-            return diffs
-        return []
-    except Exception as e:
-        print(f"JSON 解析失败: {e}")
-        return []
+    return diffs
 
 
 def compare_texts(text_a: str, text_b: str) -> list:
@@ -332,7 +356,7 @@ def compare_texts(text_a: str, text_b: str) -> list:
     # 如果文档较小，直接比对
     if len(text_a) < CHUNK_SIZE and len(text_b) < CHUNK_SIZE:
         print(f"文档较短 ({len(text_a)} chars)，直接比对")
-        return _compare_chunk_with_ai(text_a, text_b)
+        return _compare_chunk_with_difflib(text_a, text_b)
     
     print(f"文档较长 ({len(text_a)} chars)，开始分块比对...")
     import difflib
@@ -374,7 +398,7 @@ def compare_texts(text_a: str, text_b: str) -> list:
                 chunk_num = len(all_diffs) + 1
                 print(f"处理分块 #{chunk_num}: Size A={len(current_str_a)}, Size B={len(current_str_b)}")
                 try:
-                    chunk_diffs = _compare_chunk_with_ai(current_str_a, current_str_b)
+                    chunk_diffs = _compare_chunk_with_difflib(current_str_a, current_str_b)
                     print(f"分块 #{chunk_num} 完成，发现 {len(chunk_diffs)} 处差异")
                     all_diffs.extend(chunk_diffs)
                 except Exception as e:
