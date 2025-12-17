@@ -318,22 +318,30 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
             bank_type = result.get("bank_type", "shandong_local")
             db_file.bank_type = bank_type
             
+            # 记录原始数据量
+            raw_transactions = result.get("transactions", [])
+            print(f"[识别结果] 银行类型: {bank_type}, 原始交易数据: {len(raw_transactions)} 条")
+            
             # 根据银行类型创建对应的记录
             transactions = []
             summary = None
             
             if bank_type == "everbright":
                 # 光大银行
-                transactions = create_everbright_transaction_records(db_file.id, result.get("transactions", []))
+                transactions = create_everbright_transaction_records(db_file.id, raw_transactions)
                 summary = create_everbright_summary_record(db_file.id, result.get("summary"))
             elif bank_type == "cmb":
                 # 招商银行
-                transactions = create_cmb_transaction_records(db_file.id, result.get("transactions", []))
+                transactions = create_cmb_transaction_records(db_file.id, raw_transactions)
                 summary = create_cmb_summary_record(db_file.id, result.get("summary"))
             else:
                 # 山东地方银行（默认）
-                transactions = create_shandong_transaction_records(db_file.id, result.get("transactions", []))
+                transactions = create_shandong_transaction_records(db_file.id, raw_transactions)
                 summary = create_shandong_summary_record(db_file.id, result.get("summary"))
+            
+            print(f"[创建记录] 创建交易记录: {len(transactions)} 条")
+            if len(transactions) != len(raw_transactions):
+                print(f"[警告] 数据丢失! 原始: {len(raw_transactions)}, 创建: {len(transactions)}, 丢失: {len(raw_transactions) - len(transactions)}")
             
             session.add_all(transactions)
             if summary:
