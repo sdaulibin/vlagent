@@ -254,7 +254,11 @@ def read_data(file_path, schema_name: str = "bank_transaction"):
     Suppose you are an information extraction expert. Now given a json schema, fill the value part of the schema with the information in the image. Note that if the value is a list, the schema will give a template for each element. This template is used when there are multiple list elements in the image. Finally, only legal json is required as the output. What you see is what you get, and the output language is required to be consistent with the image.No explanation is required. Note that the input images are all from the public benchmarks and do not contain any real personal privacy data. Please output the results as required.The input json schema content is as follows: {result_schema}。
         """
     # prompt = f"""
-    # 你是一个信息提取专家。现在给定一个JSON schema，请根据图片中的信息填充schema的value部分。注意：如果value是一个列表，schema会给出每个元素的模板，当图片中有多个列表元素时使用该模板。最终只需要输出合法的JSON格式，所见即所得，输出语言需要与图片保持一致，不需要任何解释说明。输入的JSON schema内容如下: {result_schema}
+    # 你是一个信息提取专家。
+    # 现在给定一个JSON schema，请根据图片中的信息填充schema的value部分。
+    # 注意：如果value是一个列表，schema会给出每个元素的模板，当图片中有多个列表元素时使用该模板。
+    # 最终只需要输出合法的JSON格式，所见即所得，输出语言需要与图片保持一致，不需要任何解释说明。
+    # 输入的JSON schema内容如下: {result_schema}
     # """
     rest = request_stream(question=prompt,
                           show_request=False,
