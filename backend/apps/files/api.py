@@ -7,7 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
 from core.database import get_session
-from apps.files.models import FileRecord, TransactionRecord, SummaryRecord
+from apps.files.models import (
+    FileRecord, 
+    # 山东地方银行
+    ShandongLocalSummary, ShandongLocalTransaction,
+    # 光大银行
+    EverbrightSummary, EverbrightTransaction,
+    # 招商银行
+    CmbSummary, CmbTransaction,
+    # 向后兼容别名
+    SummaryRecord, TransactionRecord
+)
 from services import pdf_processor
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -16,11 +26,15 @@ UPLOAD_DIR = "/Users/binginx/PycharmProjects/vl_flow/backend/res"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-def create_transaction_records(file_id: int, raw_transactions: list) -> List[TransactionRecord]:
-    """将原始交易数据转换为 TransactionRecord 对象列表"""
+# ============================================================
+# 山东地方银行（潍坊、莱商、齐鲁）记录创建
+# ============================================================
+
+def create_shandong_transaction_records(file_id: int, raw_transactions: list) -> List[ShandongLocalTransaction]:
+    """将原始交易数据转换为山东地方银行交易记录"""
     records = []
     for idx, item in enumerate(raw_transactions):
-        t = TransactionRecord(
+        t = ShandongLocalTransaction(
             file_id=file_id,
             sequence=str(item.get("序号", idx + 1)),
             transaction_time=item.get("交易时间", ""),
@@ -37,11 +51,11 @@ def create_transaction_records(file_id: int, raw_transactions: list) -> List[Tra
     return records
 
 
-def create_summary_record(file_id: int, summary_data: dict) -> Optional[SummaryRecord]:
-    """将汇总数据转换为 SummaryRecord 对象"""
+def create_shandong_summary_record(file_id: int, summary_data: dict) -> Optional[ShandongLocalSummary]:
+    """创建山东地方银行汇总记录"""
     if not summary_data:
         return None
-    return SummaryRecord(
+    return ShandongLocalSummary(
         file_id=file_id,
         account_name=summary_data.get("账户名称", ""),
         account_number=summary_data.get("账(卡)号", ""),
@@ -54,6 +68,99 @@ def create_summary_record(file_id: int, summary_data: dict) -> Optional[SummaryR
         bank_name=summary_data.get("开户行", ""),
         stamp_type=summary_data.get("盖章类型", "")
     )
+
+
+# ============================================================
+# 光大银行记录创建
+# ============================================================
+
+def create_everbright_transaction_records(file_id: int, raw_transactions: list) -> List[EverbrightTransaction]:
+    """将原始交易数据转换为光大银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = EverbrightTransaction(
+            file_id=file_id,
+            sequence=str(item.get("序号", idx + 1)),
+            transaction_date=item.get("交易日期", ""),
+            transaction_time=item.get("时间", ""),
+            debit_credit=item.get("借/贷", ""),
+            amount=item.get("交易金额", ""),
+            balance=item.get("账户余额", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_name=item.get("对方名称", ""),
+            voucher_no=item.get("凭证号", ""),
+            description=item.get("摘要", ""),
+            serial_no=item.get("流水号", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_everbright_summary_record(file_id: int, summary_data: dict) -> Optional[EverbrightSummary]:
+    """创建光大银行汇总记录"""
+    if not summary_data:
+        return None
+    return EverbrightSummary(
+        file_id=file_id,
+        account_name=summary_data.get("账户名称", ""),
+        account_number=summary_data.get("账号", ""),
+        date_range=summary_data.get("交易日期", ""),
+        debit_amount=summary_data.get("借方发生额", ""),
+        credit_amount=summary_data.get("贷方发生额", ""),
+        debit_count=summary_data.get("借方笔数", ""),
+        credit_count=summary_data.get("贷方笔数", "")
+    )
+
+
+# ============================================================
+# 招商银行记录创建
+# ============================================================
+
+def create_cmb_transaction_records(file_id: int, raw_transactions: list) -> List[CmbTransaction]:
+    """将原始交易数据转换为招商银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = CmbTransaction(
+            file_id=file_id,
+            serial_no=item.get("交易流水号", ""),
+            transaction_date=item.get("交易日期", ""),
+            debit_amount=item.get("借方出账", ""),
+            credit_amount=item.get("贷方入账", ""),
+            balance=item.get("余额", ""),
+            counterparty_name=item.get("收付方名称", ""),
+            counterparty_account=item.get("收付方账号", ""),
+            description=item.get("摘要", ""),
+            transaction_type=item.get("交易类型", ""),
+            card_no=item.get("公司一卡通号", ""),
+            print_instance_no=item.get("打印实例号", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_cmb_summary_record(file_id: int, summary_data: dict) -> Optional[CmbSummary]:
+    """创建招商银行汇总记录"""
+    if not summary_data:
+        return None
+    return CmbSummary(
+        file_id=file_id,
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("账号名", ""),
+        start_date=summary_data.get("开始日期", ""),
+        end_date=summary_data.get("结束日期", ""),
+        debit_count=summary_data.get("出账总笔数", ""),
+        credit_count=summary_data.get("入账总笔数", ""),
+        debit_total=summary_data.get("出账总金额", ""),
+        credit_total=summary_data.get("入账总金额", ""),
+        total_count=summary_data.get("笔数", "")
+    )
+
+
+# 向后兼容的别名
+create_transaction_records = create_shandong_transaction_records
+create_summary_record = create_shandong_summary_record
+
+
 
 
 @router.get("", response_model=List[FileRecord])
@@ -204,15 +311,31 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
         await session.commit()
 
         try:
-            # 提取文件内容
+            # 提取文件内容（包含银行类型识别）
             result = pdf_processor.process_pdf_to_excel(db_file.file_path, max_workers=4)
             
-            # 创建交易记录
-            transactions = create_transaction_records(db_file.id, result.get("transactions", []))
-            session.add_all(transactions)
+            # 获取银行类型
+            bank_type = result.get("bank_type", "shandong_local")
+            db_file.bank_type = bank_type
             
-            # 创建汇总记录
-            summary = create_summary_record(db_file.id, result.get("summary"))
+            # 根据银行类型创建对应的记录
+            transactions = []
+            summary = None
+            
+            if bank_type == "everbright":
+                # 光大银行
+                transactions = create_everbright_transaction_records(db_file.id, result.get("transactions", []))
+                summary = create_everbright_summary_record(db_file.id, result.get("summary"))
+            elif bank_type == "cmb":
+                # 招商银行
+                transactions = create_cmb_transaction_records(db_file.id, result.get("transactions", []))
+                summary = create_cmb_summary_record(db_file.id, result.get("summary"))
+            else:
+                # 山东地方银行（默认）
+                transactions = create_shandong_transaction_records(db_file.id, result.get("transactions", []))
+                summary = create_shandong_summary_record(db_file.id, result.get("summary"))
+            
+            session.add_all(transactions)
             if summary:
                 session.add(summary)
             
@@ -223,6 +346,7 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
             return {
                 "status": "success",
                 "file_id": db_file.id,
+                "bank_type": bank_type,
                 "transactions_count": len(transactions),
                 "has_summary": summary is not None
             }
@@ -253,15 +377,30 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
         if not file_record:
             raise HTTPException(status_code=404, detail="File not found")
         
-        # 删除交易记录
         from sqlmodel import delete
+        
+        # 删除山东地方银行记录
         await session.execute(
-            delete(TransactionRecord).where(TransactionRecord.file_id == file_id)
+            delete(ShandongLocalTransaction).where(ShandongLocalTransaction.file_id == file_id)
+        )
+        await session.execute(
+            delete(ShandongLocalSummary).where(ShandongLocalSummary.file_id == file_id)
         )
         
-        # 删除汇总记录
+        # 删除光大银行记录
         await session.execute(
-            delete(SummaryRecord).where(SummaryRecord.file_id == file_id)
+            delete(EverbrightTransaction).where(EverbrightTransaction.file_id == file_id)
+        )
+        await session.execute(
+            delete(EverbrightSummary).where(EverbrightSummary.file_id == file_id)
+        )
+        
+        # 删除招商银行记录
+        await session.execute(
+            delete(CmbTransaction).where(CmbTransaction.file_id == file_id)
+        )
+        await session.execute(
+            delete(CmbSummary).where(CmbSummary.file_id == file_id)
         )
         
         # 删除上传的原文件

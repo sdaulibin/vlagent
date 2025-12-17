@@ -211,8 +211,152 @@ def add_vertical_line_to_image(original_image_path, marked_image_path, x_positio
     print(f"已保存标记图片: {marked_image_path}")
 
 
-# Schema 配置文件路径
+# ============================================================
+# 银行模板配置
+# ============================================================
+
+# Schema 配置文件路径（保留向后兼容）
 SCHEMA_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "schemas.json")
+# 多银行 Schema 目录
+BANK_SCHEMAS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "bank_schemas")
+
+
+def load_bank_registry() -> dict:
+    """
+    加载银行名称映射表
+    
+    Returns:
+        dict: 银行名称到模板ID的映射
+    """
+    registry_path = os.path.join(BANK_SCHEMAS_DIR, "bank_registry.json")
+    try:
+        with open(registry_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"警告: 银行注册表未找到: {registry_path}")
+        return {"keywords": {}, "default": "shandong_local"}
+
+
+def load_bank_template(bank_type: str) -> dict:
+    """
+    加载指定银行的模板配置
+    
+    Args:
+        bank_type: 银行模板ID，如 "shandong_local", "everbright", "cmb"
+        
+    Returns:
+        dict: 银行模板配置，包含 summary_schema 和 transaction_schema
+    """
+    template_path = os.path.join(BANK_SCHEMAS_DIR, f"{bank_type}.json")
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"警告: 银行模板未找到: {template_path}，使用默认模板")
+        return load_bank_template("shandong_local") if bank_type != "shandong_local" else {}
+
+
+def detect_bank_from_filename(filename: str) -> str:
+    """
+    从文件名识别银行类型（优先级最高）
+    
+    Args:
+        filename: 文件名
+        
+    Returns:
+        str: 银行模板ID，未识别返回 None
+    """
+    registry = load_bank_registry()
+    keywords = registry.get("keywords", {})
+    
+    for bank_name, template_id in keywords.items():
+        if bank_name in filename:
+            print(f"从文件名 '{filename}' 识别到银行: {bank_name} -> {template_id}")
+            return template_id
+    
+    return None
+
+
+def detect_bank_from_image(image_path: str) -> str:
+    """
+    从图片识别银行类型（印章 -> Logo）
+    
+    Args:
+        image_path: 图片路径
+        
+    Returns:
+        str: 银行模板ID，未识别返回默认值
+    """
+    prompt = """
+    请识别图片中的银行名称，按以下优先级查找：
+    
+    1. 红色印章中的银行名称（最可靠）
+    2. 页面标题中的银行名称
+    3. Logo图标：
+       - 招商银行：红色葵花标志 + "招商银行" 或 "CHINA MERCHANTS BANK"
+       - 光大银行：标题含"光大银行"或"中国光大银行"
+    
+    只输出银行名称的关键词，如：
+    - "潍坊银行" 或 "莱商银行" 或 "齐鲁银行"
+    - "光大银行" 或 "中国光大银行"
+    - "招商银行"
+    
+    如果无法识别，输出"未知"。不要输出其他任何文字。
+    """
+    
+    response = request_stream(
+        question=prompt,
+        show_request=False,
+        file_base=image_path,
+        model=MODEL_LOCAL
+    )
+    
+    # 清理响应
+    bank_name = response.strip().replace('"', '').replace("'", "")
+    print(f"从图片识别到银行名称: {bank_name}")
+    
+    # 匹配到模板ID
+    registry = load_bank_registry()
+    keywords = registry.get("keywords", {})
+    
+    for keyword, template_id in keywords.items():
+        if keyword in bank_name or bank_name in keyword:
+            print(f"匹配到银行模板: {template_id}")
+            return template_id
+    
+    # 未匹配，返回默认
+    default_template = registry.get("default", "shandong_local")
+    print(f"未匹配到银行，使用默认模板: {default_template}")
+    return default_template
+
+
+def detect_bank_type(filename: str, first_page_image: str = None) -> str:
+    """
+    综合识别银行类型（按优先级）
+    
+    优先级: 文件名 > 印章/Logo
+    
+    Args:
+        filename: 文件名
+        first_page_image: 第一页图片路径（可选）
+        
+    Returns:
+        str: 银行模板ID
+    """
+    # 1. 先从文件名识别
+    bank_type = detect_bank_from_filename(filename)
+    if bank_type:
+        return bank_type
+    
+    # 2. 从图片识别
+    if first_page_image and os.path.exists(first_page_image):
+        bank_type = detect_bank_from_image(first_page_image)
+        if bank_type:
+            return bank_type
+    
+    # 3. 返回默认
+    registry = load_bank_registry()
+    return registry.get("default", "shandong_local")
 
 
 def load_schema(schema_name: str) -> str:
@@ -324,60 +468,307 @@ def batch_process_images_multithread(input_folder, output_folder, max_workers=4)
     print(f"处理完成: {success_count}/{len(image_paths)} 个文件处理成功")
 
 
+def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_local"):
+    """
+    使用指定的 schema 从图片中提取数据
+    
+    Args:
+        file_path (str): 图片文件路径
+        schema (list): 交易明细 schema
+        bank_type (str): 银行类型
+        
+    Returns:
+        str: 提取的JSON数据
+    """
+    result_schema = json.dumps(schema, ensure_ascii=False, indent=2)
+    
+    # 根据银行类型使用不同的提示词
+    if bank_type == "everbright":
+        prompt = f"""
+        你是银行流水OCR专家，请从光大银行对账单图片中提取交易明细。
+        
+        【列顺序 - 从左到右】
+        序号 | 交易日期 | 时间 | 借/贷 | 交易金额 | 账户余额 | 对方账号 | 对方名称 | 凭证号 | 摘要 | 流水号
+        
+        【关键！最后三列的区分】
+        从右往左数：
+        - 流水号（最右列）：纯数字，可能分多行显示，需合并成完整数字（如9010080+03834=901008003834）
+        - 摘要（倒数第二列）：业务描述，如"一般贷款21002"，可能有多行需合并
+        - 凭证号（倒数第三列）：可能为空！不要把摘要的内容误放到凭证号
+        
+        【常见错误】
+        ❌ 错误：凭证号="一般贷款21002404001710001", 摘要=空
+        ✅ 正确：凭证号=空或实际凭证号, 摘要="一般贷款21002 404001710001", 流水号="901008003834"
+        
+        【多行合并】
+        同一单元格内多行显示的内容，用空格合并
+        
+        请根据以下 schema 提取数据，只输出 JSON：
+        {result_schema}
+        """
+    elif bank_type == "cmb":
+        prompt = f"""
+        你是银行流水OCR专家，请从招商银行交易明细表中提取数据。
+        
+        【列顺序 - 从左到右】
+        交易流水号 | 交易日期 | 借方(出账) | 贷方(入账) | 余额 | 收(付)方名称 | 收(付)方账号 | 摘要 | 交易类型 | 公司一卡通号 | 打印实例号
+        
+        【重要！最后两列区分】
+        - 公司一卡通号（倒数第二列）：可能为空
+        - 打印实例号（最右列）：如果分多行显示，需要合并成完整值（如"536B"+"3203"+"4977"合并为"536B320349777"）
+        
+        【常见错误】
+        ❌ 错误：公司一卡通号="536B3203", 打印实例号=""
+        ✅ 正确：公司一卡通号="", 打印实例号="536B320349777"
+        
+        【多行数据】
+        如果某字段内容分多行显示，请合并所有行
+        
+        请根据以下 schema 提取数据，只输出 JSON：
+        {result_schema}
+        """
+    else:
+        # 山东地方银行默认提示
+        prompt = f"""
+        Suppose you are an information extraction expert. Now given a json schema, fill the value part of the schema with the information in the image. Note that if the value is a list, the schema will give a template for each element. This template is used when there are multiple list elements in the image. Finally, only legal json is required as the output. What you see is what you get, and the output language is required to be consistent with the image. No explanation is required. The input json schema content is as follows: {result_schema}。
+        """
+    
+    rest = request_stream(question=prompt,
+                          show_request=False,
+                          file_base=file_path,
+                          model=MODEL_LOCAL)
+    print(rest)
+
+    return rest
+
+
+
+def process_single_image_with_schema(args):
+    """
+    处理单个图片的函数（使用指定 schema），用于多线程处理
+    """
+    image_path, output_folder, schema, bank_type = args
+    try:
+        # 获取文件名（不包含扩展名）
+        filename = Path(image_path).stem
+        txt_path = os.path.join(output_folder, f"{filename}.txt")
+
+        # 使用read_data_with_schema处理图片
+        result = read_data_with_schema(image_path, schema, bank_type)
+
+        # 保存结果到txt文件
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write(result)
+
+        print(f"已处理并保存: {txt_path}")
+        return True
+    except Exception as e:
+        print(f"处理图片 {image_path} 时出错: {e}")
+        return False
+
+
+def batch_process_images_multithread_with_schema(input_folder, output_folder, schema, bank_type="shandong_local", max_workers=4):
+    """
+    使用多线程处理文件夹中的所有图片（使用指定 schema）
+    
+    Args:
+        input_folder (str): 输入文件夹路径（包含待处理的图片）
+        output_folder (str): 输出文件夹路径（保存处理结果的txt文件）
+        schema (list): 交易明细 schema
+        bank_type (str): 银行类型
+        max_workers (int): 最大线程数
+    """
+    # 创建输出文件夹
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # 支持的图片格式
+    image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp')
+
+    # 收集所有待处理的图片路径
+    image_paths = []
+    for filename in os.listdir(input_folder):
+        if filename.lower().endswith(image_extensions):
+            image_path = os.path.join(input_folder, filename)
+            image_paths.append((image_path, output_folder, schema, bank_type))
+
+    # 使用线程池处理图片
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(process_single_image_with_schema, image_paths))
+
+    success_count = sum(results)
+    print(f"处理完成: {success_count}/{len(image_paths)} 个文件处理成功")
+
+
+def read_summary_data_with_schema(file_path, schema: dict, bank_type: str):
+    """
+    使用指定的 schema 从图片中提取汇总数据
+    
+    Args:
+        file_path (str): 图片文件路径
+        schema (dict): 汇总 schema
+        bank_type (str): 银行类型
+        
+    Returns:
+        str: 提取的JSON汇总数据
+    """
+    result_schema = json.dumps(schema, ensure_ascii=False, indent=2)
+    
+    # 根据银行类型生成不同的提示词
+    if bank_type == "cmb":
+        # 招商银行：通过 Logo 识别，无需印章识别
+        prompt = f"""
+        你是银行单据OCR专家。请从图片中提取招商银行流水的汇总信息。
+        
+        【识别特征】
+        - 左上角有红色招商银行葵花 Logo
+        - 标题为"交易明细表"
+        
+        【提取要求】
+        请根据以下 schema 提取数据，只输出 JSON：
+        {result_schema}
+        """
+    elif bank_type == "everbright":
+        # 光大银行：标题识别
+        prompt = f"""
+        你是银行单据OCR专家。请从图片中提取光大银行流水的汇总信息。
+        
+        【识别特征】
+        - 标题为"中国光大银行对公账户对账单"
+        - 右上角有红色印章
+        
+        【提取要求】
+        请根据以下 schema 提取数据，只输出 JSON：
+        {result_schema}
+        """
+    else:
+        # 山东地方银行：需要印章识别
+        prompt = f"""
+        你是银行单据OCR专家。请按以下步骤提取信息：
+        
+        ████████████████████████████████████████████████████████████████
+        █  警告：本任务中最常见的错误是把账户名当成开户行！        █
+        █  账户名（如"青岛XX公司"）≠ 开户行（银行名称）           █
+        █  开户行必须且只能从红色印章中读取！                      █
+        ████████████████████████████████████████████████████████████████
+        
+        【典型错误案例】
+        ❌ 错误：看到账户名"青岛云达食品有限公司" → 填写开户行"青岛银行" 
+        ✅ 正确：忽略账户名，从红色印章读取 → 填写开户行"潍坊银行股份有限公司"
+        
+        【字符辨识 - 印章第一个字】
+        "潍"（wéi）= 潍坊银行（左边三点水）
+        "青"（qīng）= 青岛银行（上生下月）
+        "莱"（lái）= 莱商银行（上草头下来）
+        "齐"（qí）= 齐鲁银行（上两点下刀）
+        
+        请仔细看第一个字的左侧是否有三点水！
+        如果有三点水，就是"潍坊银行"，不是"青岛银行"！
+        
+        请根据以下 schema 提取数据，只输出 JSON：
+        {result_schema}
+        """
+    
+    rest = request_stream(question=prompt,
+                          show_request=False,
+                          file_base=file_path,
+                          model=MODEL_LOCAL)
+    print(f"汇总数据提取结果: {rest}")
+
+    return rest
+
+
+
+
 def process_txt_files_to_excel(input_folder, output_file):
     """
     遍历文件夹中的所有txt文件，读取其中的JSON数据，
-    合并所有数据并按照"序号"排序后输出到Excel文件中
+    合并所有数据并按照序号/流水号排序后输出到Excel文件中
     
     Args:
         input_folder (str): 包含txt文件的输入文件夹路径
         output_file (str): 输出Excel文件路径
     """
     all_data = []
+    failed_files = []
+    success_count = 0
+    total_records = 0
 
     # 遍历文件夹中的所有txt文件
-    for filename in os.listdir(input_folder):
-        if filename.lower().endswith('.txt'):
-            file_path = os.path.join(input_folder, filename)
+    txt_files = [f for f in os.listdir(input_folder) if f.lower().endswith('.txt')]
+    print(f"发现 {len(txt_files)} 个txt文件待处理")
+    
+    for filename in txt_files:
+        file_path = os.path.join(input_folder, filename)
 
+        try:
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # 修复JSON格式
+            fixed_content = fix_json(content)
+
+            # 解析JSON数据
+            data = json.loads(fixed_content)
+
+            # 如果data是列表，则扩展到all_data中
+            if isinstance(data, list):
+                record_count = len(data)
+                all_data.extend(data)
+            else:
+                # 如果是单个对象，直接添加
+                record_count = 1
+                all_data.append(data)
+
+            success_count += 1
+            total_records += record_count
+            print(f"✓ 已处理: {filename}, 包含 {record_count} 条记录")
+
+        except json.JSONDecodeError as e:
+            failed_files.append((filename, f"JSON解析错误: {e}"))
+            print(f"✗ JSON解析失败: {filename} - {e}")
+        except Exception as e:
+            failed_files.append((filename, str(e)))
+            print(f"✗ 处理失败: {filename} - {e}")
+
+    # 打印处理统计
+    print(f"\n处理统计: {success_count}/{len(txt_files)} 文件成功, 共 {total_records} 条记录")
+    if failed_files:
+        print(f"失败文件列表:")
+        for fname, error in failed_files:
+            print(f"  - {fname}: {error}")
+
+    # 智能排序：尝试多个可能的排序字段
+    if all_data:
+        # 检测可用的排序字段
+        first_record = all_data[0]
+        sort_key = None
+        
+        if "序号" in first_record:
+            sort_key = "序号"
+        elif "交易流水号" in first_record:
+            sort_key = "交易流水号"
+        elif "交易日期" in first_record:
+            sort_key = "交易日期"
+        
+        if sort_key:
             try:
-                # 读取文件内容
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-
-                # 修复JSON格式
-                fixed_content = fix_json(content)
-
-                # 解析JSON数据
-                data = json.loads(fixed_content)
-
-                # 如果data是列表，则扩展到all_data中
-                if isinstance(data, list):
-                    all_data.extend(data)
-                else:
-                    # 如果是单个对象，直接添加
-                    all_data.append(data)
-
-                print(f"已处理文件: {filename}, 包含 {len(data) if isinstance(data, list) else 1} 条记录")
-
-            except json.JSONDecodeError as e:
-                print(f"解析文件 {filename} 中的JSON时出错: {e}")
-            except Exception as e:
-                print(f"处理文件 {filename} 时出错: {e}")
-
-    # 按照"序号"排序
-    try:
-        # 确保序号是整数类型以便正确排序
-        all_data.sort(key=lambda x: int(x.get("序号", 0)))
-    except ValueError:
-        # 如果序号不是数字，按字符串排序
-        all_data.sort(key=lambda x: x.get("序号", ""))
+                # 尝试按数字排序
+                all_data.sort(key=lambda x: int(x.get(sort_key, 0)))
+                print(f"按 '{sort_key}' 字段进行数字排序")
+            except (ValueError, TypeError):
+                # 按字符串排序
+                all_data.sort(key=lambda x: str(x.get(sort_key, "")))
+                print(f"按 '{sort_key}' 字段进行字符串排序")
+        else:
+            print("未找到排序字段，保持原始顺序")
 
     # 转换为DataFrame并保存到Excel
     if all_data:
         df = pd.DataFrame(all_data)
         df.to_excel(output_file, index=False)
-        print(f"成功导出 {len(all_data)} 条记录到 {output_file}")
+        print(f"\n✓ 成功导出 {len(all_data)} 条记录到 {output_file}")
     else:
         print("没有数据可以导出")
         
@@ -386,14 +777,14 @@ def process_txt_files_to_excel(input_folder, output_file):
 
 def process_pdf_to_excel(pdf_path, max_workers=4):
     """
-    完整处理流程：PDF -> 图片 -> 压缩图片 -> AI识别 -> 合并结果 -> Excel
+    完整处理流程：PDF -> 图片 -> 银行识别 -> 压缩图片 -> AI识别 -> 合并结果 -> Excel
     
     Args:
         pdf_path (str): PDF文件路径
         max_workers (int): 处理图片的线程数
         
     Returns:
-        list: 识别出的交易数据列表
+        dict: 包含 transactions, summary, bank_type 的结果字典
     """
     # 获取PDF文件名（不含扩展名）
     pdf_filename = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -415,19 +806,35 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     batch_resize_images(images_dir, compressed_dir, max_width=1200, max_height=1200, quality=85)
     print("已完成图片压缩\n")
 
-    # 2.1 提取第1页汇总数据
-    print("步骤2.1: 提取第1页汇总数据...")
-    summary_data = None
-    # 查找第1页图片
+    # 2.1 查找第1页图片
     first_page_image = None
     for filename in os.listdir(compressed_dir):
         if filename.endswith('_page_001.png'):
             first_page_image = os.path.join(compressed_dir, filename)
             break
     
+    # 2.2 识别银行类型（新增步骤）
+    print("步骤2.2: 识别银行类型...")
+    bank_type = detect_bank_type(pdf_filename, first_page_image)
+    print(f"识别到银行类型: {bank_type}\n")
+    
+    # 加载对应的银行模板
+    bank_template = load_bank_template(bank_type)
+    
+    # 保存银行类型到配置文件
+    bank_info_path = os.path.join(task_dir, "bank_info.json")
+    with open(bank_info_path, 'w', encoding='utf-8') as f:
+        json.dump({"bank_type": bank_type, "template": bank_template.get("template_id", bank_type)}, f, ensure_ascii=False, indent=2)
+
+    # 2.3 提取第1页汇总数据（使用银行特定的 schema）
+    print("步骤2.3: 提取第1页汇总数据...")
+    summary_data = None
+    
     if first_page_image:
         try:
-            summary_response = read_summary_data(first_page_image)
+            # 使用银行特定的汇总 schema
+            summary_schema = bank_template.get("summary_schema", {})
+            summary_response = read_summary_data_with_schema(first_page_image, summary_schema, bank_type)
             fixed_summary = fix_json(summary_response)
             summary_data = json.loads(fixed_summary)
             # 保存汇总数据到文件
@@ -451,10 +858,11 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     
     print("已完成图片标记\n")
 
-    # 4. 批量处理标记后的图片并提取数据
+    # 4. 批量处理标记后的图片并提取数据（使用银行特定的 schema）
     print("步骤4: 批量处理标记图片并提取数据...")
     results_dir = os.path.join(task_dir, "results")
-    batch_process_images_multithread(labeled_dir, results_dir, max_workers=max_workers)
+    transaction_schema = bank_template.get("transaction_schema", [])
+    batch_process_images_multithread_with_schema(labeled_dir, results_dir, transaction_schema, bank_type, max_workers=max_workers)
     print("已完成图片数据提取\n")
 
     # 5. 合并结果并导出Excel
@@ -464,7 +872,11 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     print("已完成结果合并和Excel导出\n")
 
     print(f"整个处理流程已完成，结果保存在: {task_dir}")
-    return {"transactions": final_data, "summary": summary_data}
+    return {
+        "transactions": final_data, 
+        "summary": summary_data,
+        "bank_type": bank_type
+    }
 
 
 

@@ -1,0 +1,12 @@
+{
+  "keywords": {
+    "潍坊银行": "shandong_local",
+    "莱商银行": "shandong_local",
+    "齐鲁银行": "shandong_local",
+    "光大银行": "everbright",
+    "中国光大银行": "everbright",
+    "招商银行": "cmb",
+    "招行": "cmb"
+  },
+  "default": "shandong_local"
+}
