@@ -13,6 +13,7 @@ const files = ref<FileItem[]>([]);
 const results = ref<Transaction[]>([]);
 const summary = ref<Summary | null>(null);
 const isProcessing = ref(false);
+const isRecognizing = ref(false);  // 专门追踪识别过程
 const selectedFileId = ref<number | null>(null);
 const selectedFileName = ref('');
 
@@ -30,6 +31,14 @@ const loadFiles = async () => {
             size: '',
             status: f.status === 'done' ? 'done' : f.status === 'processing' ? 'uploading' : f.status === 'pending' ? 'pending' : 'error',
         }));
+        
+        // 自动选择第一个已完成的文件
+        if (!selectedFileId.value) {
+            const firstDoneFile = files.value.find(f => f.status === 'done');
+            if (firstDoneFile) {
+                handleSelectFile(firstDoneFile.id);
+            }
+        }
     } catch (e) {
         console.error("Failed to load files", e);
     }
@@ -61,7 +70,7 @@ const handleStartRecognition = async () => {
     const pendingFiles = files.value.filter(f => f.status === 'pending');
     if (pendingFiles.length === 0) return;
     
-    isProcessing.value = true;
+    isRecognizing.value = true;
     
     for (const file of pendingFiles) {
         try {
@@ -73,13 +82,23 @@ const handleStartRecognition = async () => {
             }
             
             await startRecognition(file.id);
+            
+            // 识别完成后更新状态为完成
+            if (foundFile) {
+                foundFile.status = 'done';
+            }
         } catch (error) {
             console.error(`识别文件 ${file.name} 失败:`, error);
+            // 识别失败时更新状态
+            const foundFile = files.value.find(f => f.id === file.id);
+            if (foundFile) {
+                foundFile.status = 'error';
+            }
         }
     }
     
     await loadFiles();
-    isProcessing.value = false;
+    isRecognizing.value = false;
 };
 
 const handleSelectFile = async (id: number) => {
@@ -152,18 +171,17 @@ const goBack = () => {
             <div class="md:col-span-4 flex flex-col gap-6 h-full min-h-0">
                 <FileUpload :onFileSelect="handleFileSelect" />
                 
-                <!-- 开始识别按钮 -->
+                <!-- 开始识别按钮 - 始终显示 -->
                 <button 
-                    v-if="hasPendingFiles"
                     @click="handleStartRecognition"
-                    :disabled="isProcessing"
+                    :disabled="isRecognizing || !hasPendingFiles"
                     class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-xl font-medium shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Play class="w-5 h-5" />
-                    {{ isProcessing ? '识别中...' : '开始识别' }}
+                    {{ isRecognizing ? '识别中...' : (hasPendingFiles ? '开始识别' : '暂无待识别文件') }}
                 </button>
                 
-                <FileList :files="files" :onDelete="handleDeleteFile" :onSelect="handleSelectFile" />
+                <FileList :files="files" :onDelete="handleDeleteFile" :onSelect="handleSelectFile" :selectedId="selectedFileId" />
             </div>
 
             <!-- Right Column -->
