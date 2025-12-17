@@ -6,90 +6,120 @@
 
 ### 1. 环境准备
 
-确保系统已安装以下依赖：
-
-*   **Python 3.11+**: 推荐使用 [uv](https://github.com/astral-sh/uv) 管理 Python 环境。
-*   **Poppler**: 用于 PDF 转图片处理。
+*   **Python 3.11+**: 推荐使用 [uv](https://github.com/astral-sh/uv) 管理环境
+*   **Poppler**: PDF 转图片处理
     *   macOS: `brew install poppler`
     *   Ubuntu: `sudo apt-get install poppler-utils`
-*   **PostgreSQL**: 数据库服务。
 
 ### 2. 配置环境变量
 
-复制 `.env.example` (如果存在) 或创建一个 `.env` 文件，配置关键参数：
+复制 `.env.example` 或创建 `.env` 文件：
 
 ```ini
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/vl_flow
-
 # AI Model Configuration
-LLM_MODEL_PATH=/path/to/Qwen-VL
-LLM_DEVICE=cuda  # or cpu, mps
+MODEL_LOCAL=qwen-vl-local
+MODEL_LOCAL_URL=http://localhost:8080/v1/chat/completions
+MODEL_LOCAL_KEY=your-api-key
 
-# App Settings
-DEBUG=True
+# Database (默认使用 SQLite)
+# DATABASE_URL=postgresql://user:password@localhost:5432/vl_flow
 ```
 
 ### 3. 安装与运行
 
 ```bash
-# 1. 启动数据库 (如果尚未启动)
-docker compose up -d
-
-# 2. 安装 Python 依赖
+# 安装依赖
 uv sync
 
-# 3. 运行开发服务器 (热重载)
+# 启动服务
 uv run uvicorn main:app --reload --port 8000
 ```
 
-API 文档地址: http://localhost:8000/docs
+API 文档: http://localhost:8000/docs
 
 ## 📁 目录结构
 
 ```
 backend/
-├── main.py             # 应用入口，配置中间件与全局路由
-├── api.py              # 路由注册中心
-├── core/               # 核心基础设施
-│   ├── config.py       # 环境变量与配置加载
-│   ├── database.py     # SQLModel 数据库连接会话
-│   └── request_ai.py   # 统一的 AI 模型调用接口
-├── apps/               # 业务领域模块
-│   ├── files/          # 银行流水模块 (上传、解析)
-│   ├── contracts/      # 合同比对模块 (任务管理、差异存储)
-│   └── transactions/   # 交易明细查询
-└── services/           # 通用业务服务
-    ├── pdf_processor.py      # PDF 解析与预处理
-    └── contract_processor.py # 智能合同比对核心逻辑
+├── main.py                 # 应用入口
+├── api.py                  # 路由注册
+├── core/                   # 核心基础设施
+│   ├── config.py           # 环境变量配置
+│   ├── database.py         # 数据库连接
+│   └── request_ai.py       # AI 模型调用接口
+├── apps/                   # 业务模块
+│   ├── files/              # 文件上传与银行识别
+│   │   ├── api.py          # 上传/识别 API
+│   │   └── models.py       # 数据模型 (多银行表)
+│   ├── transactions/       # 交易明细查询
+│   └── contracts/          # 合同比对
+├── config/
+│   └── bank_schemas/       # 🆕 银行模板配置
+│       ├── bank_registry.json   # 银行注册表
+│       ├── shandong_local.json  # 山东地方银行
+│       ├── everbright.json      # 光大银行
+│       └── cmb.json             # 招商银行
+└── services/               # 通用服务
+    ├── pdf_processor.py        # PDF 解析 & 银行识别
+    └── contract_processor.py   # 合同比对
 ```
 
-## 📡 API 接口说明
+## 🏦 多银行识别架构
 
-### 🏦 银行流水 (Files)
+### 银行识别流程
+
+```
+PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入对应表
+          ↓
+    1. 文件名匹配
+    2. 印章识别
+    3. Logo识别
+```
+
+### 添加新银行模板
+
+1. 在 `config/bank_schemas/` 创建新的 JSON 配置：
+
+```json
+{
+    "template_id": "new_bank",
+    "bank_names": ["新银行名称"],
+    "summary_schema": { ... },
+    "transaction_schema": [ ... ]
+}
+```
+
+2. 在 `bank_registry.json` 中注册
+3. 在 `models.py` 添加对应的数据表
+4. 在 `api.py` 添加记录创建函数
+
+## 📡 API 接口
+
+### 🏦 银行流水
+
 | 方法 | 路径 | 描述 |
 | :--- | :--- | :--- |
-| `GET` | `/api/files` | 获取已上传的文件列表 |
-| `POST` | `/api/files/upload` | 上传 PDF/Image 并触发异步解析 |
-| `GET` | `/api/transactions/{id}` | 获取特定文件的解析结果 (交易明细) |
+| `GET` | `/api/files` | 获取文件列表 |
+| `POST` | `/api/files/upload` | 上传文件 |
+| `POST` | `/api/files/{id}/recognize` | 触发识别 |
+| `GET` | `/api/transactions/{id}` | 获取交易明细与汇总 |
 
-### 📋 合同比对 (Contracts)
+### 📋 合同比对
+
 | 方法 | 路径 | 描述 |
 | :--- | :--- | :--- |
-| `POST` | `/api/contracts/compare` | 创建比对任务 (支持 PDF/Docx) |
-| `GET` | `/api/contracts/{id}` | 轮询任务状态 (Pending/Processing/Completed/Failed) |
-| `GET` | `/api/contracts/{id}/diffs` | 获取详细的差异列表与高亮坐标 |
+| `POST` | `/api/contracts/compare` | 创建比对任务 |
+| `GET` | `/api/contracts/{id}` | 查询任务状态 |
+| `GET` | `/api/contracts/{id}/diffs` | 获取差异列表 |
 
-## 🗄️ 核心数据模型
+## 🗄️ 数据模型
 
-*   **`CompareTask`**: 记录比对任务元数据，包括原文件路径、目标文件路径及当前状态。
-*   **`DiffRecord`**: 存储具体的差异点，包含差异类型 (Insert/Delete/Replace)、原始内容、修改内容及其位置信息。
+### 银行流水表结构
 
-## 💡 核心实现细节
+| 银行 | 汇总表 | 明细表 |
+| :--- | :--- | :--- |
+| 山东地方银行 | `ShandongLocalSummary` | `ShandongLocalTransaction` |
+| 光大银行 | `EverbrightSummary` | `EverbrightTransaction` |
+| 招商银行 | `CmbSummary` | `CmbTransaction` |
 
-### 智能长文档比对策略
-为了突破 LLM 的 Context Window 限制并提高比对精度，我们采用了以下策略：
-
-1.  **预处理与分块**: 使用 `difflib` 对文档进行初步的文本层面对齐，定位差异的大致区域。
-2.  **动态语义切分**: 将长文档智能切分为 ~3000 字符的语义块，确保上下文完整。
-3.  **Prompt 优化**: 针对性设计的 Prompt，专注于检测微小的语义和格式差异（如金额变动、条款修改）。
+每种银行的表结构与其 Schema 字段对应，确保数据完整性。

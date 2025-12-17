@@ -1,6 +1,6 @@
 # Frontend Application
 
-基于 **Vue 3** + **TypeScript** + **Tailwind CSS** 构建的现代化前端应用，提供直观的文档比对与分析界面。
+基于 **Vue 3** + **TypeScript** + **Tailwind CSS** 构建的现代化前端应用。
 
 ## 🚀 开发指南
 
@@ -10,22 +10,13 @@
 npm install
 ```
 
-### 2. 配置环境变量
-
-在前端根目录创建 `.env` 文件 (如有需要)，配置 API 地址：
-
-```ini
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-### 3. 常用命令
+### 2. 常用命令
 
 | 命令 | 说明 |
 | :--- | :--- |
-| `npm run dev` | 启动开发服务器 (默认端口 5173) |
+| `npm run dev` | 启动开发服务器 (端口 5173) |
 | `npm run build` | 构建生产环境代码 |
-| `npm run preview` | 预览生产构建结果 |
-| `npm run lint` | 运行代码检查 |
+| `npm run preview` | 预览生产构建 |
 
 启动后访问: http://localhost:5173
 
@@ -33,21 +24,50 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ```
 src/
-├── views/              # 页面视图
-│   ├── Home.vue          # 首页入口
-│   ├── BankStatement.vue # 银行流水识别页
-│   └── ContractCompare.vue # 合同智能比对页
-├── components/         # 公共组件
-│   ├── FileUpload.vue    # 文件上传组件
-│   ├── FileList.vue      # 文件列表展示
-│   ├── ContractResultView.vue # (核心) 左右分栏比对结果查看器
-│   └── TiptapViewer.vue       # (核心) 基于 Tiptap 的富文本查看器
-├── api/                # API 请求封装 (Axios)
-├── router/             # Vue Router 路由配置
-├── assets/             # 静态资源
-│   ├── main.css          # 全局样式
-│   └── contract.css      # 合同页面专用样式
-└── types.ts            # TypeScript 类型定义
+├── views/                  # 页面视图
+│   ├── Home.vue            # 首页
+│   ├── BankStatement.vue   # 银行流水识别页
+│   └── ContractCompare.vue # 合同比对页
+├── components/             # 组件
+│   ├── FileUpload.vue      # 文件上传
+│   ├── FileList.vue        # 文件列表
+│   ├── ResultList.vue      # 🆕 多银行识别结果展示
+│   ├── ContractResultView.vue # 合同比对结果
+│   └── TiptapViewer.vue    # 富文本查看器
+├── api/                    # API 请求封装
+├── router/                 # 路由配置
+├── types.ts                # TypeScript 类型定义
+└── assets/                 # 静态资源与样式
+```
+
+## 🏦 多银行支持
+
+### 银行类型显示
+
+`ResultList.vue` 组件支持动态展示不同银行的识别结果：
+
+| 银行类型 | 汇总信息 | 明细字段 |
+| :--- | :--- | :--- |
+| **山东地方银行** | 收入/支出总笔数、总金额 | 交易时间、对方户名、摘要备注 |
+| **光大银行** | 借方/贷方发生额、笔数 | 交易日期、借/贷、对方名称、流水号 |
+| **招商银行** | 入账/出账总笔数、总金额 | 交易流水号、收付方名称、公司一卡通号 |
+
+### 类型定义
+
+```typescript
+// types.ts
+type BankType = 'shandong_local' | 'everbright' | 'cmb';
+
+interface Summary {
+    bank_type: BankType;
+    account_name?: string;
+    // ... 各银行特有字段
+}
+
+interface Transaction {
+    bank_type: BankType;
+    // ... 各银行特有字段
+}
 ```
 
 ## 🔗 路由说明
@@ -55,28 +75,19 @@ src/
 | 路径 | 组件 | 说明 |
 | :--- | :--- | :--- |
 | `/` | `Home.vue` | 应用首页 |
-| `/bank-statement` | `BankStatement.vue` | 银行流水识别及结果展示 |
-| `/contract-compare` | `ContractCompare.vue` | 文档上传与智能比对 |
+| `/bank-statement` | `BankStatement.vue` | 银行流水识别 |
+| `/contract-compare` | `ContractCompare.vue` | 合同智能比对 |
 
-## 🧩 核心组件详解
+## 🧩 核心组件
 
-### `TiptapViewer`
-基于 [Tiptap](https://tiptap.dev/) 的高度定制化只读编辑器，主要功能包括：
-*   **HTML 渲染**: 完美还原文档中的表格、列表、标题等格式。
-*   **智能高亮**: 支持基于关键词或正则的动态高亮，自动忽略多余的空白字符。
-*   **精准定位**: 可通过 API 滚动到文档的特定位置 (如差异点)。
+### `ResultList.vue`
 
-### `ContractResultView`
-专为合同比对设计的可视化组件：
-*   **双栏布局**: 左侧显示原文档，右侧显示比对文档，支持同步滚动。
-*   **多格式预览**: 集成 PDF、图片及 Word (HTML转换) 的预览能力。
-*   **差异联动**: 点击差异列表中的项，自动在文档视图中高亮并定位到对应位置。
+银行流水识别结果展示组件，支持：
+*   **银行类型标签**: 自动识别并显示银行类型
+*   **动态汇总信息**: 根据银行类型显示对应字段
+*   **条件明细列表**: 展示银行特有的交易字段
+*   **分页浏览**: 支持大量交易记录分页
 
-## 📡 关键 API 函数
+### `TiptapViewer` & `ContractResultView`
 
-位于 `src/api` 目录：
-
-*   `uploadFile(file)`: 上传文件至后端。
-*   `compareContracts(fileA, fileB)`: 提交两个文件 ID 进行比对。
-*   `getTaskDiffs(taskId)`: 获取比对任务生成的详细差异数据。
-*   `getFilePreviewUrl(taskId, type)`: 获取用于前端展示的文件预览链接。
+合同比对相关组件，支持双栏对比、差异高亮和同步滚动。
