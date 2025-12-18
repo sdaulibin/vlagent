@@ -772,14 +772,6 @@ def process_txt_files_to_excel(input_folder, output_file):
     # 打印处理统计
     print(f"\n处理统计: {success_count}/{len(txt_files)} 文件成功, 共 {total_records} 条原始记录")
     
-    # 去重处理
-    if all_data:
-        original_count = len(all_data)
-        all_data = deduplicate_records(all_data)
-        dedup_count = len(all_data)
-        if original_count != dedup_count:
-            print(f"去重处理: 从 {original_count} 条记录减少至 {dedup_count} 条记录 (删除了 {original_count - dedup_count} 条重复项)")
-
     if failed_files:
         print(f"失败文件列表:")
         for fname, error in failed_files:
