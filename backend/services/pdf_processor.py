@@ -513,19 +513,16 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
         【列顺序 - 从左到右】
         交易流水号 | 交易日期 | 借方(出账) | 贷方(入账) | 余额 | 收(付)方名称 | 收(付)方账号 | 摘要 | 交易类型 | 公司一卡通号 | 打印实例号
         
-        【重要！提取所有行】
-        1. 仔细检查表格，确保提取每一行交易记录，不要遗漏任何行
-        2. 某些行可能跨越多个物理行显示，需要合并为一条完整记录
-        3. 页面顶部和底部的记录也要提取，即使只有部分内容可见
+        【提取指令 - 严禁遗漏第一行】
+        1. **紧贴表头提取**：表格的第一条交易记录紧跟在“打印实例号”那一行表头之下，请务必从这一行开始提取，严禁跳过首行。
+        2. **逐行输出**：请按视觉顺序每一行生成一个 JSON 对象。
+        3. **停止机制**：一旦识别到页尾（如页码信息、网址或横杠线）或重复出现的记录，必须立即停止，不得在页尾反复生成。
+        4. **字段合并**：收付方名称和账号等跨多行显示的文本，请合并到一起。
         
-        【最后两列区分】
-        - 公司一卡通号（倒数第二列）：可能为空
-        - 打印实例号（最右列）：如果分多行显示，合并为完整值
+        【输出要求】
+        只输出合法的 JSON 列表。严禁任何解释性文字。
         
-        【多行数据合并】
-        同一条记录的多行内容需要合并，如收付方名称、收付方账号、打印实例号等
-        
-        请根据以下 schema 提取数据，只输出 JSON：
+        请根据以下 schema 提取数据：
         {result_schema}
         """
     else:
@@ -681,6 +678,45 @@ def read_summary_data_with_schema(file_path, schema: dict, bank_type: str):
 
 
 
+def deduplicate_records(records: list, unique_key: str = "交易流水号") -> list:
+    """
+    对交易记录进行去重
+    
+    Args:
+        records: 原始记录列表
+        unique_key: 用于去重的唯一键，默认为'交易流水号'
+        
+    Returns:
+        list: 去重后的记录列表
+    """
+    if not records:
+        return []
+        
+    seen = set()
+    deduplicated = []
+    
+    for record in records:
+        # 尝试使用指定的唯一键，并去除空格以防OCR不一致
+        val = record.get(unique_key)
+        if isinstance(val, str):
+            val = val.replace(" ", "").strip()
+        
+        # 如果唯一键不存在或为空，则对整个记录进行哈希（转为字符串）
+        if not val:
+            # 过滤掉空的字段进行比较，同时去除值的空格
+            record_clean = {k: (str(v).replace(" ", "").strip() if v else "") for k, v in record.items() if v}
+            record_str = json.dumps(record_clean, sort_keys=True)
+            if record_str not in seen:
+                seen.add(record_str)
+                deduplicated.append(record)
+        else:
+            if val not in seen:
+                seen.add(val)
+                deduplicated.append(record)
+                
+    return deduplicated
+
+
 def process_txt_files_to_excel(input_folder, output_file):
     """
     遍历文件夹中的所有txt文件，读取其中的JSON数据，
@@ -734,7 +770,16 @@ def process_txt_files_to_excel(input_folder, output_file):
             print(f"✗ 处理失败: {filename} - {e}")
 
     # 打印处理统计
-    print(f"\n处理统计: {success_count}/{len(txt_files)} 文件成功, 共 {total_records} 条记录")
+    print(f"\n处理统计: {success_count}/{len(txt_files)} 文件成功, 共 {total_records} 条原始记录")
+    
+    # 去重处理
+    if all_data:
+        original_count = len(all_data)
+        all_data = deduplicate_records(all_data)
+        dedup_count = len(all_data)
+        if original_count != dedup_count:
+            print(f"去重处理: 从 {original_count} 条记录减少至 {dedup_count} 条记录 (删除了 {original_count - dedup_count} 条重复项)")
+
     if failed_files:
         print(f"失败文件列表:")
         for fname, error in failed_files:
@@ -801,10 +846,10 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     image_paths = split_pdf_to_images(pdf_path, images_dir, 'PNG', 200)
     print(f"已完成PDF拆分，共生成 {len(image_paths)} 张图片\n")
 
-    # 2. 压缩图片
+    # 2. 压缩图片 (提高到2000像素以保证招行流水号清晰度)
     print("步骤2: 压缩图片...")
     compressed_dir = os.path.join(task_dir, "compressed")
-    batch_resize_images(images_dir, compressed_dir, max_width=1200, max_height=1200, quality=85)
+    batch_resize_images(images_dir, compressed_dir, max_width=2000, max_height=2000, quality=85)
     print("已完成图片压缩\n")
 
     # 2.1 查找第1页图片
@@ -854,8 +899,16 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     if not os.path.exists(labeled_dir):
         os.makedirs(labeled_dir)
     
-    # 使用并发处理标记图片
-    batch_process_images_label_multithread(compressed_dir, labeled_dir, max_workers=max_workers)
+    # 招行特殊处理：不添加标记线，直接使用原始压缩图片
+    if bank_type == "cmb":
+        print("招商银行跳过标记线步骤，直接使用压缩图片")
+        import shutil
+        for filename in os.listdir(compressed_dir):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                shutil.copy2(os.path.join(compressed_dir, filename), os.path.join(labeled_dir, filename))
+    else:
+        # 使用并发处理标记图片
+        batch_process_images_label_multithread(compressed_dir, labeled_dir, max_workers=max_workers)
     
     print("已完成图片标记\n")
 
