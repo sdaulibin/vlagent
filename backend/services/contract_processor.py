@@ -484,5 +484,4 @@ if __name__ == "__main__":
     
     if os.path.exists(test_a) and os.path.exists(test_b):
         result = compare_documents(test_a, test_b)
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-
+        # 结果不再直接打印到控制台

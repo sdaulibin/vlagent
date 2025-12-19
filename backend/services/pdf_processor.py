@@ -134,7 +134,6 @@ def get_summary_column_x(file_path):
                               show_request=False,
                               file_base=file_path,
                               model=MODEL_LOCAL)
-    print(f"AI返回的x坐标响应: {response}")
 
     return response
 
@@ -160,9 +159,6 @@ def get_real_x_coordinate(file_path, image_path):
     try:
         data = json.loads(fixed_response)
     except json.JSONDecodeError as e:
-        print(f"JSON解析错误: {e}")
-        print(f"原始响应: {response}")
-        print(f"修复后响应: {fixed_response}")
         # 如果解析失败，返回默认值
         return 100
 
@@ -183,42 +179,47 @@ def get_real_x_coordinate(file_path, image_path):
 
 def add_vertical_lines_to_image(original_image_path, marked_image_path, x_positions):
     """
-    在图片的指定x位置添加多条宽度为1的黑色垂直线，并保存到新路径
+    在图片的指定x像素位置添加多条黑色垂直线
     
     Args:
         original_image_path (str): 原始图片路径
         marked_image_path (str): 标记后图片保存路径
-        x_positions (list): 垂直线的x坐标位置列表（可以是像素值或百分比）
+        x_positions (list): 垂直线的x像素坐标列表
     """
-    # 打开图片
-    image = Image.open(original_image_path)
+    if not os.path.exists(original_image_path):
+        print(f"错误: 找不到文件 {original_image_path}")
+        return
 
-    # 创建绘图对象
-    draw = ImageDraw.Draw(image)
+    try:
+        # 打开图片
+        image = Image.open(original_image_path)
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+            
+        draw = ImageDraw.Draw(image)
+        width, height = image.size
+        print(f"正在为图片划线: {os.path.basename(original_image_path)}, 尺寸: {width}x{height}")
 
-    # 获取图片尺寸
-    width, height = image.size
+        # 绘制每条垂直线
+        for x_pos in x_positions:
+            try:
+                # 无论数值大小，全视为绝对像素坐标
+                x_pixel = int(float(x_pos))
+                
+                # 确保x坐标在有效范围内
+                x_pixel = max(0, min(width - 1, x_pixel))
+                
+                # 绘制黑色垂直线，宽度为2
+                draw.line([(x_pixel, 0), (x_pixel, height)], fill="black", width=2)
+            except ValueError:
+                print(f"  警告: 无效的坐标值 '{x_pos}'")
 
-    # 绘制每条垂直线
-    for x_pos in x_positions:
-        # 如果是百分比（0-1之间的浮点数），转换为像素值
-        if isinstance(x_pos, float) and 0 < x_pos < 1:
-            x_pixel = int(width * x_pos)
-        else:
-            x_pixel = int(x_pos)
+        # 保存图片
+        image.save(marked_image_path)
+        print(f"已保存标记图片: {marked_image_path}")
         
-        # 确保x坐标在有效范围内
-        x_pixel = max(0, min(width - 1, x_pixel))
-        
-        # 绘制垂直线 (从顶部到底部)
-        draw.line([(x_pixel, 0), (x_pixel, height)], fill="black", width=1)
-        print(f"  在 x={x_pixel} 位置添加垂直线")
-
-    # 保存图片
-    image.save(marked_image_path)
-    
-    print(f"已保存标记图片: {marked_image_path}")
-
+    except Exception as e:
+        print(f"处理图片时出错: {e}")
 
 # 向后兼容：保留旧函数名
 def add_vertical_line_to_image(original_image_path, marked_image_path, x_position):
@@ -286,7 +287,6 @@ def detect_bank_from_filename(filename: str) -> str:
     
     for bank_name, template_id in keywords.items():
         if bank_name in filename:
-            print(f"从文件名 '{filename}' 识别到银行: {bank_name} -> {template_id}")
             return template_id
     
     return None
@@ -328,7 +328,6 @@ def detect_bank_from_image(image_path: str) -> str:
     
     # 清理响应
     bank_name = response.strip().replace('"', '').replace("'", "")
-    print(f"从图片识别到银行名称: {bank_name}")
     
     # 匹配到模板ID
     registry = load_bank_registry()
@@ -336,12 +335,10 @@ def detect_bank_from_image(image_path: str) -> str:
     
     for keyword, template_id in keywords.items():
         if keyword in bank_name or bank_name in keyword:
-            print(f"匹配到银行模板: {template_id}")
             return template_id
     
     # 未匹配，返回默认
     default_template = registry.get("default", "shandong_local")
-    print(f"未匹配到银行，使用默认模板: {default_template}")
     return default_template
 
 
@@ -423,7 +420,6 @@ def read_data(file_path, schema_name: str = "bank_transaction"):
                           show_request=False,
                           file_base=file_path,
                           model=MODEL_LOCAL)
-    print(rest)
 
     return rest
 
@@ -553,8 +549,6 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
                           show_request=False,
                           file_base=file_path,
                           model=MODEL_LOCAL)
-    print(rest)
-
     return rest
 
 
@@ -689,7 +683,6 @@ def read_summary_data_with_schema(file_path, schema: dict, bank_type: str):
                           show_request=False,
                           file_base=file_path,
                           model=MODEL_LOCAL)
-    print(f"汇总数据提取结果: {rest}")
 
     return rest
 
@@ -833,7 +826,7 @@ def process_txt_files_to_excel(input_folder, output_file):
 
 def process_pdf_to_excel(pdf_path, max_workers=4):
     """
-    完整处理流程：PDF -> 图片 -> 银行识别 -> 压缩图片 -> AI识别 -> 合并结果 -> Excel
+    完整处理流程：PDF -> 图片 -> 类型识别 -> 压缩图片 -> AI识别 -> 合并结果 -> Excel
     
     Args:
         pdf_path (str): PDF文件路径
@@ -872,7 +865,6 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     # 2.2 识别银行类型（新增步骤）
     print("步骤2.2: 识别银行类型...")
     bank_type = detect_bank_type(pdf_filename, first_page_image)
-    print(f"识别到银行类型: {bank_type}\n")
     
     # 加载对应的银行模板
     bank_template = load_bank_template(bank_type)
@@ -912,10 +904,18 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     # 读取垂直线配置
     line_config = bank_template.get("vertical_line_config", {})
     line_enabled = line_config.get("enabled", False)
-    line_positions = [l.get("x_percent", 0.5) for l in line_config.get("lines", [])]
+    # 优先读取 x_position (绝对值)，否则读取 x_percent (百分比)
+    line_positions = []
+    for l in line_config.get("lines", []):
+        if "x_position" in l:
+            line_positions.append(l["x_position"])
+        elif "x_percent" in l:
+            line_positions.append(l["x_percent"])
+        else:
+            line_positions.append(0.5) # 默认值
+    
     
     if line_enabled and line_positions:
-        print(f"  银行类型: {bank_type}, 启用辅助线, 位置: {line_positions}")
         import shutil
         for filename in os.listdir(compressed_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
@@ -963,7 +963,6 @@ def process_single_image_label(args):
     try:
         # 固定在x=700位置添加垂直线标记
         x_position = 700
-        print(f"图片 {os.path.basename(compressed_image_path)} 固定在x={x_position}位置添加辅助线")
         
         # 在原始图片上添加垂直线标记
         add_vertical_line_to_image(compressed_image_path, labeled_image_path, x_position)
@@ -1083,7 +1082,6 @@ def read_summary_data(file_path, schema_name: str = "bank_summary"):
                           show_request=False,
                           file_base=file_path,
                           model=MODEL_LOCAL)
-    print(f"汇总数据提取结果: {rest}")
 
     return rest
 

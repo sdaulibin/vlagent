@@ -62,14 +62,14 @@ def request_stream(question="", file_base="", model=MODEL_QWEN_VLMAX,
                         })
     if question is not None and len(question) > 0:
         content.append({"type": "text", "text": question})
-    if show_request:
-        print(content)
+    # if show_request:
+    #     print(content)
     encode_content(content)
     message.append({
         "role": "user",
         "content": content,
     })
-    print(f"start {file_base}")
+    # print(f"start {file_base}")
     completion = client.chat.completions.create(
         temperature=0.01,
         model=model,
@@ -110,7 +110,7 @@ def request_stream(question="", file_base="", model=MODEL_QWEN_VLMAX,
                     usage = chunk.usage
     else:
         resp = completion.choices[0].message.content
-    print(f"end {file_base}")
+    # print(f"end {file_base}")
     if show_cost:
         total_cost = time.time() - t1
         print(f"first cost: {first_cost}")
@@ -209,4 +209,4 @@ if __name__ == '__main__':
     rest = request_stream(question=prompt,
                           show_request=False,
                           model=MODEL_QWEN3_VLPLUS)
-    print(rest)
+    # print(rest)

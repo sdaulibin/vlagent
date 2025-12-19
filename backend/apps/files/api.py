@@ -111,7 +111,6 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
             
             # 记录原始数据量
             raw_transactions = result.get("transactions", [])
-            print(f"[识别结果] 银行类型: {bank_type}, 原始交易数据: {len(raw_transactions)} 条")
             
             # 根据银行类型创建对应的记录
             transactions = []
@@ -129,10 +128,6 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
                 # 山东地方银行（默认）
                 transactions = create_shandong_transaction_records(db_file.id, raw_transactions)
                 summary = create_shandong_summary_record(db_file.id, result.get("summary"))
-            
-            print(f"[创建记录] 创建交易记录: {len(transactions)} 条")
-            if len(transactions) != len(raw_transactions):
-                print(f"[警告] 数据丢失! 原始: {len(raw_transactions)}, 创建: {len(transactions)}, 丢失: {len(raw_transactions) - len(transactions)}")
             
             session.add_all(transactions)
             if summary:

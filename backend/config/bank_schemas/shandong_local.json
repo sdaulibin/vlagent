@@ -9,8 +9,8 @@
         "enabled": true,
         "lines": [
             {
-                "x_percent": 0.83,
-                "description": "摘要备注左侧"
+                "x_position": 1175,
+                "description": "摘要备注"
             }
         ]
     },

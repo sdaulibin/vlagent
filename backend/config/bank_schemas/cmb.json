@@ -7,19 +7,19 @@
         "enabled": true,
         "lines": [
             {
-                "x_percent": 0.17,
+                "x_position": 366,
                 "description": "贷方(入账)左侧"
             },
             {
-                "x_percent": 0.25,
+                "x_position": 509,
                 "description": "余额左侧"
             },
             {
-                "x_percent": 0.82,
+                "x_position": 1446,
                 "description": "公司一卡通号左侧"
             },
             {
-                "x_percent": 0.90,
+                "x_position": 1510,
                 "description": "打印实例号左侧"
             }
         ]
