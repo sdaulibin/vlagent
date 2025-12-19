@@ -5,6 +5,15 @@
         "莱商银行",
         "齐鲁银行"
     ],
+    "vertical_line_config": {
+        "enabled": true,
+        "lines": [
+            {
+                "x_percent": 0.83,
+                "description": "摘要备注左侧"
+            }
+        ]
+    },
     "summary_schema": {
         "账户名称": "",
         "账(卡)号": "",

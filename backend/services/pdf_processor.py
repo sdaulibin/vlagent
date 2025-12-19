@@ -181,14 +181,14 @@ def get_real_x_coordinate(file_path, image_path):
     return real_x
 
 
-def add_vertical_line_to_image(original_image_path, marked_image_path, x_position):
+def add_vertical_lines_to_image(original_image_path, marked_image_path, x_positions):
     """
-    在图片的指定x位置添加一条宽度为1的黑色垂直线，并保存到新路径
+    在图片的指定x位置添加多条宽度为1的黑色垂直线，并保存到新路径
     
     Args:
         original_image_path (str): 原始图片路径
         marked_image_path (str): 标记后图片保存路径
-        x_position (int): 垂直线的x坐标位置
+        x_positions (list): 垂直线的x坐标位置列表（可以是像素值或百分比）
     """
     # 打开图片
     image = Image.open(original_image_path)
@@ -199,16 +199,31 @@ def add_vertical_line_to_image(original_image_path, marked_image_path, x_positio
     # 获取图片尺寸
     width, height = image.size
 
-    # 确保x坐标在有效范围内
-    x_position = max(0, min(width - 1, x_position))
-
-    # 绘制垂直线 (从顶部到底部)
-    draw.line([(x_position, 0), (x_position, height)], fill="black", width=1)
+    # 绘制每条垂直线
+    for x_pos in x_positions:
+        # 如果是百分比（0-1之间的浮点数），转换为像素值
+        if isinstance(x_pos, float) and 0 < x_pos < 1:
+            x_pixel = int(width * x_pos)
+        else:
+            x_pixel = int(x_pos)
+        
+        # 确保x坐标在有效范围内
+        x_pixel = max(0, min(width - 1, x_pixel))
+        
+        # 绘制垂直线 (从顶部到底部)
+        draw.line([(x_pixel, 0), (x_pixel, height)], fill="black", width=1)
+        print(f"  在 x={x_pixel} 位置添加垂直线")
 
     # 保存图片
     image.save(marked_image_path)
     
     print(f"已保存标记图片: {marked_image_path}")
+
+
+# 向后兼容：保留旧函数名
+def add_vertical_line_to_image(original_image_path, marked_image_path, x_position):
+    """向后兼容的单线版本"""
+    add_vertical_lines_to_image(original_image_path, marked_image_path, [x_position])
 
 
 # ============================================================
@@ -889,21 +904,31 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
         print("未找到第1页图片，跳过汇总数据提取\n")
 
     # 3. 在压缩图片基础上创建标记图片
-    print("步骤3: 标记摘要备注列位置...")
+    print("步骤3: 根据银行模板配置添加辅助线...")
     labeled_dir = os.path.join(task_dir, "labeled")
     if not os.path.exists(labeled_dir):
         os.makedirs(labeled_dir)
     
-    # 招行特殊处理：不添加标记线，直接使用原始压缩图片
-    if bank_type == "cmb":
-        print("招商银行跳过标记线步骤，直接使用压缩图片")
+    # 读取垂直线配置
+    line_config = bank_template.get("vertical_line_config", {})
+    line_enabled = line_config.get("enabled", False)
+    line_positions = [l.get("x_percent", 0.5) for l in line_config.get("lines", [])]
+    
+    if line_enabled and line_positions:
+        print(f"  银行类型: {bank_type}, 启用辅助线, 位置: {line_positions}")
+        import shutil
+        for filename in os.listdir(compressed_dir):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                src_path = os.path.join(compressed_dir, filename)
+                dst_path = os.path.join(labeled_dir, filename)
+                add_vertical_lines_to_image(src_path, dst_path, line_positions)
+    else:
+        # 不需要划线，直接复制原始压缩图片
+        print(f"  银行类型: {bank_type}, 跳过辅助线步骤")
         import shutil
         for filename in os.listdir(compressed_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                 shutil.copy2(os.path.join(compressed_dir, filename), os.path.join(labeled_dir, filename))
-    else:
-        # 使用并发处理标记图片
-        batch_process_images_label_multithread(compressed_dir, labeled_dir, max_workers=max_workers)
     
     print("已完成图片标记\n")
 

@@ -4,6 +4,10 @@
         "光大银行",
         "中国光大银行"
     ],
+    "vertical_line_config": {
+        "enabled": false,
+        "lines": []
+    },
     "summary_schema": {
         "账户名称": "",
         "账号": "",

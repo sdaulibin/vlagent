@@ -225,3 +225,72 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{file_id}/export")
+async def export_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """导出文件交易数据为 Excel"""
+    from fastapi.responses import StreamingResponse
+    from io import BytesIO
+    from urllib.parse import quote
+    from openpyxl import Workbook
+    
+    # 获取文件信息
+    file_stmt = select(FileRecord).where(FileRecord.id == file_id)
+    file_result = await session.execute(file_stmt)
+    file_record = file_result.scalar_one_or_none()
+    
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    bank_type = file_record.bank_type or "shandong_local"
+    
+    # 根据银行类型获取交易记录
+    if bank_type == "everbright":
+        tx_stmt = select(EverbrightTransaction).where(EverbrightTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        transactions = tx_result.scalars().all()
+        headers = ["序号", "交易日期", "时间", "借/贷", "交易金额", "账户余额", "对方账号", "对方名称", "凭证号", "摘要", "流水号"]
+        def row_data(tx):
+            return [tx.sequence, tx.transaction_date, tx.transaction_time, tx.debit_credit, tx.amount, tx.balance, tx.counterparty_account, tx.counterparty_name, tx.voucher_no, tx.description, tx.serial_no]
+    elif bank_type == "cmb":
+        tx_stmt = select(CmbTransaction).where(CmbTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        transactions = tx_result.scalars().all()
+        headers = ["交易流水号", "交易日期", "借方出账", "贷方入账", "余额", "收付方名称", "收付方账号", "摘要", "交易类型", "公司一卡通号", "打印实例号"]
+        def row_data(tx):
+            return [tx.serial_no, tx.transaction_date, tx.debit_amount, tx.credit_amount, tx.balance, tx.counterparty_name, tx.counterparty_account, tx.description, tx.transaction_type, tx.card_no, tx.print_instance_no]
+    else:
+        tx_stmt = select(ShandongLocalTransaction).where(ShandongLocalTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        transactions = tx_result.scalars().all()
+        headers = ["序号", "交易时间", "交易渠道", "收入", "支出", "账户余额", "币种", "对方账号", "对方户名", "摘要备注"]
+        def row_data(tx):
+            return [tx.sequence, tx.transaction_time, tx.channel, tx.income, tx.expense, tx.balance, tx.currency, tx.counterparty_account, tx.counterparty_name, tx.description]
+    
+    # 创建 Excel 工作簿
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "交易明细"
+    
+    # 添加表头
+    ws.append(headers)
+    
+    # 添加交易数据
+    for tx in transactions:
+        ws.append(row_data(tx))
+    
+    # 保存到内存
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # 生成文件名
+    filename = os.path.splitext(file_record.filename)[0] + ".xlsx"
+    encoded_filename = quote(filename)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
+    )
