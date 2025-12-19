@@ -59,8 +59,8 @@ def draw_black_vertical_lines(image_path, x_values):
         print(f"处理图片时出错: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print(__doc__)
     else:
-        # 第一个参数是图片路径，后续所有参数视为坐标
+        # 第一个参数是图片路径，后续所有参数视为坐标（可选）
         draw_black_vertical_lines(sys.argv[1], sys.argv[2:])

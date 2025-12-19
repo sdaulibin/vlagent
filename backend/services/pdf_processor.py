@@ -525,16 +525,31 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
         交易流水号 | 交易日期 | 借方(出账) | 贷方(入账) | 余额 | 收(付)方名称 | 收(付)方账号 | 摘要 | 交易类型 | 公司一卡通号 | 打印实例号
         
         【重要！提取规范】
-        1. **最后两列处理**：
-           - **公司一卡通号** (倒数第二列)：在大多数情况下此列内容为空。
-           - **打印实例号** (最右列)：这是最关键的一点！该列内容通常跨 3-4 行纵向显示。**必须**将该列所有行内容合并为一个完整的字符串。
-           - **严禁错位**：绝不要将“打印实例号”的上半部分（如 536B）误填入“公司一卡通号”。请根据垂直对齐位置判断，凡是位于最右侧的文字都属于“打印实例号”。
-        2. **逐行完整提取**：从表头下方的第一行记录开始，按视觉顺序逐行生成 JSON，严禁遗漏首行。
-        3. **停止机制**：识别到页尾背景或重复记录后立即停止。
-        4. **跨行合并**：收付方名称和账号等跨多行显示的文本也需合并。
+        1. **判定合法交易行（核心规则）**：
+           - **必须包含日期**：每一行合法记录的“交易日期”必须包含有效的日期格式（如 yyyy-MM-dd）。
+           - **严禁提取噪声**：如果某一行看似文本（如 URL 链接 `http://...` 或 `www.cmbchina.com`），即使它位于第一列区域，也**必须忽略**，严禁将其作为“交易流水号”提取。
+           - **黑名单字符**：如果内容包含 ".com"、"http"、"Enquiry"、"aspx" 等关键字，直接丢弃该行。
+        2. **利用黑色辅助线判定（图中有 10 条垂直线 L1-L10，严禁错位）**：
+           请严格按照黑色辅助线定义的“车道”进行列内容归位：
+           - **L1 左侧**：交易流水号 & 交易日期（yyyy-MM-dd HH:mm:ss，需多行合并）。
+           - **L1 与 L2 之间**：借方(出账)。
+           - **L2 与 L3 之间**：贷方(入账)。**若此区间无字则必须为空 ""**，严禁抓取右侧余额。
+           - **L3 与 L4 之间**：余额。
+           - **L4 与 L5 之间**：收(付)方名称（需合并多行）。
+           - **L5 与 L6 之间**：收(付)方账号。
+           - **L6 与 L7 之间**：摘要。
+           - **L7 与 L8 之间**：交易类型。
+           - **L8 与 L9 之间**：(此区间通常为空，请勿填入右侧区域内容)。
+           - **L9 与 L10 之间**：公司一卡通号。**若此区间无字则必须为空 ""**，严禁抓取右侧打印号。
+           - **L10 右侧区域**：打印实例号（须多行合并）。
+        3. **过滤背景噪声**：
+           - **URL 噪声**：强制忽略页面顶部和底部的 URL 字符串。
+           - **页脚噪声**：严禁提取页码、温馨提示等。
+        4. **多行合并**：收付方名称、流水号、打印实例号等多行文本必须纵向合并为一个字符串。
+        5. **停止机制**：根据表格结束线或识别到非法行内容立即停止。
         
         【输出要求】
-        只输出合法的 JSON 列表。严禁任何解释性文字。
+        只输出合法的 JSON 列表。严禁任何解释性文字。所见即所得，确保数据完整性。
         
         请根据以下 schema 提取数据：
         {result_schema}
@@ -760,14 +775,37 @@ def process_txt_files_to_excel(input_folder, output_file):
             # 解析JSON数据
             data = json.loads(fixed_content)
 
-            # 如果data是列表，则扩展到all_data中
+            # 数据过滤逻辑：移除噪声（如 URL 链接）
+            def is_valid_record(record):
+                if not isinstance(record, dict):
+                    return False
+                
+                # 1. 过滤 URL 噪声
+                serial_no = str(record.get("交易流水号", "")).lower()
+                if "http" in serial_no or ".com" in serial_no or "aspx" in serial_no:
+                    return False
+                
+                # 2. 验证日期格式 (招商银行强制校验)
+                date_str = str(record.get("交易日期", ""))
+                # 如果没有数字，通常是表头或文字噪声
+                import re
+                if not re.search(r'\d', date_str):
+                    return False
+                
+                return True
+
+            # 如果data是列表，则过滤后扩展到all_data中
             if isinstance(data, list):
-                record_count = len(data)
-                all_data.extend(data)
+                valid_records = [r for r in data if is_valid_record(r)]
+                record_count = len(valid_records)
+                all_data.extend(valid_records)
             else:
-                # 如果是单个对象，直接添加
-                record_count = 1
-                all_data.append(data)
+                # 如果是单个对象，检查后添加
+                if is_valid_record(data):
+                    record_count = 1
+                    all_data.append(data)
+                else:
+                    record_count = 0
 
             success_count += 1
             total_records += record_count

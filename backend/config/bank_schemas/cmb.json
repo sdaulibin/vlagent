@@ -7,20 +7,44 @@
         "enabled": true,
         "lines": [
             {
-                "x_position": 366,
-                "description": "贷方(入账)左侧"
+                "x_position": 122,
+                "description": "交易日期"
             },
             {
-                "x_position": 509,
-                "description": "余额左侧"
+                "x_position": 190,
+                "description": "借方(出账)"
             },
             {
-                "x_position": 1446,
-                "description": "公司一卡通号左侧"
+                "x_position": 310,
+                "description": "贷方(入账)"
             },
             {
-                "x_position": 1510,
-                "description": "打印实例号左侧"
+                "x_position": 430,
+                "description": "余额"
+            },
+            {
+                "x_position": 553,
+                "description": "收(付)方名称"
+            },
+            {
+                "x_position": 774,
+                "description": "收(付)方账号"
+            },
+            {
+                "x_position": 872,
+                "description": "摘要"
+            },
+            {
+                "x_position": 1125,
+                "description": "交易类型"
+            },
+            {
+                "x_position": 1238,
+                "description": "公司一卡通号"
+            },
+            {
+                "x_position": 1290,
+                "description": "打印实例号"
             }
         ]
     },
