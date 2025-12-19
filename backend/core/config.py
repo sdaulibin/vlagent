@@ -21,3 +21,4 @@ MODEL_QWEN_8B = "qwen3-8b"
 MODEL_QWEN_FLASH = "qwen-flash"
 
 RES_DIR = "res"
+RECOGNITION_TIMEOUT = 300  # 自动停止识别任务的超时时间（秒），默认5分钟

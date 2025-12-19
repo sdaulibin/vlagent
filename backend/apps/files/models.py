@@ -17,6 +17,7 @@ class FileRecord(SQLModel, table=True):
     status: str = "pending"
     bank_type: Optional[str] = None  # 银行模板类型: shandong_local, everbright, cmb
     created_at: datetime = Field(default_factory=datetime.now)
+    recognition_duration: Optional[float] = None  # 识别耗时（毫秒）
     error_msg: Optional[str] = None
     
     # 山东地方银行关联（保持向后兼容）

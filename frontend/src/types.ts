@@ -74,6 +74,7 @@ export interface FileItem {
     name: string;
     size: string;
     status: 'pending' | 'uploading' | 'done' | 'error';
+    recognition_duration?: number;
     bank_type?: BankType;
 }
 

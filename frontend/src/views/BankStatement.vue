@@ -16,6 +16,7 @@ const isProcessing = ref(false);
 const isRecognizing = ref(false);  // 专门追踪识别过程
 const selectedFileId = ref<number | null>(null);
 const selectedFileName = ref('');
+const lastSelectionId = ref<number | null>(null); // 追踪最后一次发起的选择请求
 
 // 检查是否有待处理的文件
 const hasPendingFiles = computed(() => {
@@ -30,6 +31,7 @@ const loadFiles = async () => {
             name: f.filename,
             size: '',
             status: f.status === 'done' ? 'done' : f.status === 'processing' ? 'uploading' : f.status === 'pending' ? 'pending' : 'error',
+            recognition_duration: f.recognition_duration
         }));
         
         // 自动选择第一个已完成的文件
@@ -105,18 +107,33 @@ const handleSelectFile = async (id: number) => {
     try {
         isProcessing.value = true;
         selectedFileId.value = id;
+        lastSelectionId.value = id; // 记录当前选择的 ID
+        
         const file = files.value.find(f => f.id === id);
         selectedFileName.value = file?.name || '';
+        
+        // 切换时立即清除旧的识别结果和汇总信息，触发加载状态
+        results.value = [];
+        summary.value = null;
+        
         const [txs, summaryData] = await Promise.all([
             getFileTransactions(id),
             getFileSummary(id)
         ]);
+        
+        // 如果在请求期间用户又切换了文件，则不更新结果
+        if (lastSelectionId.value !== id) return;
+        
         results.value = txs;
         summary.value = summaryData;
     } catch (e) {
-        console.error("Failed to load file data", e);
+        if (lastSelectionId.value === id) {
+            console.error("Failed to load file data", e);
+        }
     } finally {
-        isProcessing.value = false;
+        if (lastSelectionId.value === id) {
+            isProcessing.value = false;
+        }
     }
 };
 

@@ -72,7 +72,12 @@ const getStatusText = (status: string) => {
                     </div>
                     <div class="flex flex-col min-w-0">
                         <span class="text-sm font-medium text-gray-700 truncate w-32 md:w-40">{{ file.name }}</span>
-                        <span :class="['text-xs', getStatusIconClass(file.status)]">{{ getStatusText(file.status) }}</span>
+                        <div class="flex items-center gap-2">
+                            <span :class="['text-xs', getStatusIconClass(file.status)]">{{ getStatusText(file.status) }}</span>
+                            <span v-if="file.status === 'done' && file.recognition_duration" class="text-[10px] text-gray-400">
+                                (耗时: {{ file.recognition_duration }}ms)
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <button 

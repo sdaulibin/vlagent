@@ -101,9 +101,34 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
         db_file.status = "processing"
         await session.commit()
 
+        import time
+        import asyncio
+        from core.config import RECOGNITION_TIMEOUT
+        start_time = time.time()
+        
         try:
             # 提取文件内容（包含银行类型识别）
-            result = pdf_processor.process_pdf_to_excel(db_file.file_path, max_workers=4)
+            # 使用 run_in_threadpool 避免阻塞主事件循环
+            from fastapi.concurrency import run_in_threadpool
+            
+            # 使用 asyncio.wait_for 增加超时控制
+            try:
+                result = await asyncio.wait_for(
+                    run_in_threadpool(pdf_processor.process_pdf_to_excel, db_file.file_path, max_workers=4),
+                    timeout=RECOGNITION_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                # 超时处理
+                end_time = time.time()
+                db_file.status = "error"
+                db_file.error_msg = f"识别超时（超过 {RECOGNITION_TIMEOUT} 秒），任务已自动停止"
+                db_file.recognition_duration = round((end_time - start_time) * 1000, 2)
+                await session.commit()
+                return {
+                    "status": "error",
+                    "message": db_file.error_msg,
+                    "recognition_duration_ms": db_file.recognition_duration
+                }
             
             # 获取银行类型
             bank_type = result.get("bank_type", "shandong_local")
@@ -133,6 +158,10 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
             if summary:
                 session.add(summary)
             
+            # 计算并保存识别耗时（毫秒）
+            end_time = time.time()
+            db_file.recognition_duration = round((end_time - start_time) * 1000, 2)
+            
             # 更新文件状态
             db_file.status = "done"
             await session.commit()
@@ -142,7 +171,8 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
                 "file_id": db_file.id,
                 "bank_type": bank_type,
                 "transactions_count": len(transactions),
-                "has_summary": summary is not None
+                "has_summary": summary is not None,
+                "recognition_duration_ms": db_file.recognition_duration
             }
 
         except Exception as e_process:
