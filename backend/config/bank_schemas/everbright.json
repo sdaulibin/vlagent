@@ -5,8 +5,29 @@
         "中国光大银行"
     ],
     "vertical_line_config": {
-        "enabled": false,
-        "lines": []
+        "enabled": true,
+        "lines": [
+            {
+                "x_position": 750,
+                "description": "对方账号"
+            },
+            {
+                "x_position": 880,
+                "description": "对方名称"
+            },
+            {
+                "x_position": 1000,
+                "description": "凭证号"
+            },
+            {
+                "x_position": 1130,
+                "description": "摘要"
+            },
+            {
+                "x_position": 1300,
+                "description": "流水号"
+            }
+        ]
     },
     "summary_schema": {
         "账户名称": "",

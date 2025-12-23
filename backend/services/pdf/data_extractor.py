@@ -63,7 +63,46 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
     
     if bank_type == "everbright":
         prompt = f"""
-        Suppose you are an information extraction expert. Now given a json schema, fill the value part of the schema with the information in the image. Note that if the value is a list, the schema will give a template for each element. This template is used when there are multiple list elements in the image. Finally, only legal json is required as the output. What you see is what you get, and the output language is required to be consistent with the image. No explanation is required. The input json schema content is as follows: {result_schema}。
+        你是银行流水OCR专家，请从光大银行对公账户对账单中提取交易明细数据。
+        
+        【列顺序 - 从左到右，共11列】
+        序号 | 交易日期 | 时间 | 借/贷 | 交易金额 | 账户余额 | 对方账号 | 对方名称 | 凭证号 | 摘要 | 流水号
+        
+        【关键！各列内容特征】
+        1. **凭证号**（第9列）：
+           - 这一列**大部分情况下为空**
+           - 只有银行系统填写的凭证编号才属于此列
+           - 如果该区域没有内容，必须填空字符串 ""
+        
+        2. **摘要**（第10列）：
+           - 这一列包含**交易描述信息**
+           - 典型内容例如："转账"、"一般贷款21002 xxxxxxx"、"转账一备注: xxx"、"货款"等
+           - **任何描述性文字都应归入摘要列，而非凭证号列**
+        
+        3. **流水号**（第11列，最右侧）：
+           - 纯数字编号，如 "901008003834"
+        
+        【重要！利用图中的黑色辅助线判定列边界】
+        图中有多条垂直辅助线，请严格按照辅助线位置进行列归位：
+        - 从左到右第1条线后：对方账号
+        - 第2条线后：对方名称
+        - 第3条线后：凭证号（通常为空！）
+        - 第4条线后：摘要（包含"转账"、"贷款"等描述文字）
+        - 第5条线后：流水号
+
+        【常见错误 - 必须避免】
+        ❌ 错误：把"转账"、"一般贷款xxx"等内容放入凭证号
+        ✓ 正确：凭证号为空 ""，摘要填"转账"或"一般贷款xxx"
+        
+        【多行合并规则】
+        - 对方账号、对方名称、摘要、流水号 等字段若跨多行，必须纵向合并
+        - 合并时去除换行产生的多余空格
+        
+        【输出要求】
+        只输出合法的 JSON 列表。严禁任何解释性文字。
+        
+        请根据以下 schema 提取数据：
+        {result_schema}
         """
     elif bank_type == "cmb":
         prompt = f"""

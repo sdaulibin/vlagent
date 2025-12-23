@@ -188,7 +188,7 @@ async def get_transactions(file_id: int, session: AsyncSession = Depends(get_ses
                 "id": r.id,
                 "sequence": r.sequence,
                 "transaction_date": r.transaction_date,
-                "transaction_time": r.transaction_time,
+                "time": r.transaction_time,
                 "debit_credit": r.debit_credit,
                 "amount": r.amount,
                 "balance": r.balance,
