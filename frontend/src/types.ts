@@ -22,12 +22,14 @@ export interface Transaction {
 
     // 光大银行字段
     transaction_date?: string;
+    time?: string;          // 时间
     debit_credit?: string;  // 借/贷
     amount?: string;
     voucher_no?: string;
     serial_no?: string;
 
     // 招商银行字段
+    transaction_serial_no?: string;  // 交易流水号
     debit_amount?: string;   // 借方出账
     credit_amount?: string;  // 贷方入账
     transaction_type?: string;

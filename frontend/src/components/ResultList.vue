@@ -136,7 +136,7 @@ const prevPage = () => {
                         </div>
                         
                         <!-- 基本信息 - 山东地方银行 -->
-                        <div v-if="bankType === 'shandong_local'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div v-if="bankType === 'shandong_local'" class="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账户名称</p>
                                 <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
@@ -152,6 +152,10 @@ const prevPage = () => {
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">起止日期</p>
                                 <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">盖章类型</p>
+                                <p class="font-medium text-gray-700">{{ summary.stamp_type || '-' }}</p>
                             </div>
                         </div>
                         
@@ -232,7 +236,7 @@ const prevPage = () => {
                         </div>
                         
                         <!-- 招商银行汇总 -->
-                        <div v-else-if="bankType === 'cmb'" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                        <div v-else-if="bankType === 'cmb'" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">入账总笔数</p>
                                 <p class="font-bold text-red-500">{{ summary.credit_count || '0' }}</p>
@@ -248,6 +252,10 @@ const prevPage = () => {
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">出账总金额</p>
                                 <p class="font-bold text-green-600">{{ summary.debit_total || '0' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-500">笔数</p>
+                                <p class="font-bold text-gray-700">{{ summary.total_count || '0' }}</p>
                             </div>
                         </div>
                     </div>
@@ -275,6 +283,11 @@ const prevPage = () => {
                                         <div v-else>
                                             <p class="text-xs text-gray-400">交易日期</p>
                                             <p class="font-medium text-gray-700">{{ getDateDisplay(item) }}</p>
+                                        </div>
+                                        <!-- 光大银行时间字段 -->
+                                        <div v-if="bankType === 'everbright'">
+                                            <p class="text-xs text-gray-400">时间</p>
+                                            <p class="font-medium text-gray-700">{{ item.time || '-' }}</p>
                                         </div>
                                         <div v-if="bankType === 'shandong_local'">
                                             <p class="text-xs text-gray-400">交易渠道</p>
@@ -312,8 +325,13 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">流水号</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.serial_no">{{ item.serial_no || '-' }}</p>
                                         </div>
+                                        <!-- 招商银行交易流水号 -->
+                                        <div v-else-if="bankType === 'cmb'">
+                                            <p class="text-xs text-gray-400">交易流水号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_serial_no">{{ item.transaction_serial_no || '-' }}</p>
+                                        </div>
                                     </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <!-- 山东银行/光大银行: 对方户名/对方名称 -->
                                         <div v-if="bankType === 'shandong_local'">
                                             <p class="text-xs text-gray-400">对方户名</p>
@@ -324,13 +342,13 @@ const prevPage = () => {
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>
                                         <div v-else-if="bankType === 'cmb'">
-                                            <p class="text-xs text-gray-400">收付方名称</p>
+                                            <p class="text-xs text-gray-400">收(付)方名称</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>
                                         
                                         <!-- 对方账号/收付方账号 -->
                                         <div v-if="bankType === 'cmb'">
-                                            <p class="text-xs text-gray-400">收付方账号</p>
+                                            <p class="text-xs text-gray-400">收(付)方账号</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_account">{{ item.counterparty_account || '-' }}</p>
                                         </div>
                                         <div v-else>
@@ -346,6 +364,25 @@ const prevPage = () => {
                                         <div v-else>
                                             <p class="text-xs text-gray-400">摘要</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.description">{{ item.description || '-' }}</p>
+                                        </div>
+                                        
+                                        <!-- 光大银行凭证号 -->
+                                        <div v-if="bankType === 'everbright'">
+                                            <p class="text-xs text-gray-400">凭证号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.voucher_no">{{ item.voucher_no || '-' }}</p>
+                                        </div>
+                                        
+                                        <!-- 招商银行额外字段 -->
+                                        <div v-if="bankType === 'cmb'">
+                                            <p class="text-xs text-gray-400">公司一卡通号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.card_no">{{ item.card_no || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <!-- 招商银行打印实例号单独一行 -->
+                                    <div v-if="bankType === 'cmb'" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">打印实例号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.print_instance_no">{{ item.print_instance_no || '-' }}</p>
                                         </div>
                                     </div>
                                 </div>
