@@ -5,7 +5,7 @@ import time
 from openai import OpenAI
 from openai.types.chat import ChatCompletionStreamOptionsParam
 
-from services.core.config import *
+from src.config import *
 
 
 def encode_image(image_path):

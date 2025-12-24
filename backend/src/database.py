@@ -2,16 +2,20 @@ from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# Default fallback to local postgres
-DATABASE_URL = "postgresql+asyncpg://postgres:123456@localhost/vl_flow"
+from src.config import settings
 
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
 
 
 async def init_db():
     # Import models to register them with SQLModel
-    from apps.files.models import FileRecord, TransactionRecord, SummaryRecord
-    from apps.contracts.models import CompareTask, DiffRecord
+    from src.files.models import FileRecord
+    from src.transactions.models import (
+        ShandongLocalSummary, ShandongLocalTransaction,
+        EverbrightSummary, EverbrightTransaction,
+        CmbSummary, CmbTransaction
+    )
+    from src.contracts.models import CompareTask, DiffRecord
     
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)

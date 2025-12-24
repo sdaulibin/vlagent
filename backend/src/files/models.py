@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from apps.transactions.models import (
+    from src.transactions.models import (
         ShandongLocalSummary, ShandongLocalTransaction,
         EverbrightSummary, EverbrightTransaction,
         CmbSummary, CmbTransaction,
@@ -34,7 +34,7 @@ class FileRecord(SQLModel, table=True):
 
 
 # 从 transactions 模块导入模型（向后兼容）
-from apps.transactions.models import (
+from src.transactions.models import (
     ShandongLocalSummary, ShandongLocalTransaction,
     EverbrightSummary, EverbrightTransaction,
     CmbSummary, CmbTransaction,

@@ -7,8 +7,8 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
-from core.database import get_session
-from apps.contracts.models import CompareTask, DiffRecord
+from src.database import get_session
+from src.contracts.models import CompareTask, DiffRecord
 from services import contract_processor
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])

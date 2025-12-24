@@ -6,9 +6,9 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
-from core.database import get_session
-from apps.files.models import (
-    FileRecord, 
+from src.database import get_session
+from src.files.models import FileRecord
+from src.transactions.models import (
     # 山东地方银行
     ShandongLocalSummary, ShandongLocalTransaction,
     # 光大银行
@@ -16,7 +16,7 @@ from apps.files.models import (
     # 招商银行
     CmbSummary, CmbTransaction,
 )
-from apps.transactions.api import (
+from src.transactions.router import (
     create_shandong_transaction_records,
     create_shandong_summary_record,
     create_everbright_transaction_records,
@@ -103,7 +103,7 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
 
         import time
         import asyncio
-        from core.config import RECOGNITION_TIMEOUT
+        from src.config import RECOGNITION_TIMEOUT
         start_time = time.time()
         
         try:

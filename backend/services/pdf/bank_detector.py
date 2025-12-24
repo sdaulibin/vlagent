@@ -1,7 +1,7 @@
 import os
 import json
-from core.config import MODEL_LOCAL
-from core.request_ai import request_stream
+from src.config import MODEL_LOCAL
+from services.core.request_ai import request_stream
 
 # 多银行 Schema 目录
 BANK_SCHEMAS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "bank_schemas")
