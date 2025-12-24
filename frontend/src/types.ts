@@ -1,5 +1,5 @@
 // 银行类型
-export type BankType = 'shandong_local' | 'everbright' | 'cmb' | 'jining';
+export type BankType = 'shandong_local' | 'everbright' | 'cmb' | 'jining' | 'cgb';
 
 // 统一交易记录接口（包含所有银行的字段）
 export interface Transaction {
@@ -38,6 +38,13 @@ export interface Transaction {
 
     // 济宁银行字段
     counterparty_info?: string;  // 交易对手信息
+
+    // 广发银行字段
+    transaction_branch?: string;      // 交易行所
+    counterparty_bank_code?: string;  // 对方开户行联行号
+    counterparty_bank?: string;       // 对方开户行
+    remark?: string;                  // 备注
+    postscript?: string;              // 附言
 }
 
 // 统一汇总接口（包含所有银行的字段）
@@ -75,6 +82,11 @@ export interface Summary {
 
     // 济宁银行字段
     currency?: string;       // 币种
+
+    // 广发银行字段
+    unit?: string;           // 单位
+    current_balance?: string;  // 账户当前余额
+    record_count?: string;     // 记录数
 }
 
 export interface FileItem {
@@ -91,6 +103,7 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
     'shandong_local': '山东地方银行',
     'everbright': '光大银行',
     'cmb': '招商银行',
-    'jining': '济宁银行'
+    'jining': '济宁银行',
+    'cgb': '广发银行'
 };
 

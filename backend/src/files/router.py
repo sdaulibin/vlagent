@@ -17,6 +17,8 @@ from src.transactions.models import (
     CmbSummary, CmbTransaction,
     # 济宁银行
     JiningSummary, JiningTransaction,
+    # 广发银行
+    CgbSummary, CgbTransaction,
 )
 from src.transactions.service import (
     create_shandong_transaction_records,
@@ -27,6 +29,8 @@ from src.transactions.service import (
     create_cmb_summary_record,
     create_jining_transaction_records,
     create_jining_summary_record,
+    create_cgb_transaction_records,
+    create_cgb_summary_record,
 )
 from services import pdf_processor
 
@@ -157,6 +161,10 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
                 # 济宁银行
                 transactions = create_jining_transaction_records(db_file.id, raw_transactions)
                 summary = create_jining_summary_record(db_file.id, result.get("summary"))
+            elif bank_type == "cgb":
+                # 广发银行
+                transactions = create_cgb_transaction_records(db_file.id, raw_transactions)
+                summary = create_cgb_summary_record(db_file.id, result.get("summary"))
             else:
                 # 山东地方银行（默认）
                 transactions = create_shandong_transaction_records(db_file.id, raw_transactions)
@@ -353,6 +361,33 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
         tx_result = await session.execute(tx_stmt)
         for tx in tx_result.scalars().all():
             ws.append([tx.sequence, tx.transaction_date, tx.channel, tx.income, tx.expense, tx.balance, tx.description, tx.counterparty_info])
+    
+    elif bank_type == "cgb":
+        # 广发银行 - 汇总信息
+        summary_stmt = select(CgbSummary).where(CgbSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["户名", summary.account_name])
+            ws.append(["账号", summary.account_number])
+            ws.append(["起止日期", summary.date_range])
+            ws.append(["币种", summary.currency])
+            ws.append(["单位", summary.unit])
+            ws.append(["支出总金额", summary.expense_total])
+            ws.append(["支出总笔数", summary.expense_count])
+            ws.append(["收入总金额", summary.income_total])
+            ws.append(["收入总笔数", summary.income_count])
+            ws.append(["账户当前余额", summary.current_balance])
+            ws.append(["记录数", summary.record_count])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["流水号", "交易时间", "收入", "支出", "余额", "币种", "对方账号", "对方户名", "交易行所", "对方开户行联行号", "对方开户行", "凭证号", "摘要", "备注", "附言"]
+        ws.append(headers)
+        tx_stmt = select(CgbTransaction).where(CgbTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.serial_no, tx.transaction_time, tx.income, tx.expense, tx.balance, tx.currency, tx.counterparty_account, tx.counterparty_name, tx.transaction_branch, tx.counterparty_bank_code, tx.counterparty_bank, tx.voucher_no, tx.description, tx.remark, tx.postscript])
     
     else:
         # 山东地方银行 - 汇总信息

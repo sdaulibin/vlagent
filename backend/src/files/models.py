@@ -8,6 +8,7 @@ if TYPE_CHECKING:
         EverbrightSummary, EverbrightTransaction,
         CmbSummary, CmbTransaction,
         JiningSummary, JiningTransaction,
+        CgbSummary, CgbTransaction,
     )
 
 
@@ -36,6 +37,10 @@ class FileRecord(SQLModel, table=True):
     # 济宁银行关联
     jining_transactions: List["JiningTransaction"] = Relationship(back_populates="file_record")
     jining_summary: Optional["JiningSummary"] = Relationship(back_populates="file_record")
+    
+    # 广发银行关联
+    cgb_transactions: List["CgbTransaction"] = Relationship(back_populates="file_record")
+    cgb_summary: Optional["CgbSummary"] = Relationship(back_populates="file_record")
 
 
 # 从 transactions 模块导入模型（向后兼容）
@@ -44,6 +49,7 @@ from src.transactions.models import (
     EverbrightSummary, EverbrightTransaction,
     CmbSummary, CmbTransaction,
     JiningSummary, JiningTransaction,
+    CgbSummary, CgbTransaction,
     SummaryRecord, TransactionRecord,
 )
 
@@ -53,5 +59,6 @@ __all__ = [
     "EverbrightSummary", "EverbrightTransaction",
     "CmbSummary", "CmbTransaction",
     "JiningSummary", "JiningTransaction",
+    "CgbSummary", "CgbTransaction",
     "SummaryRecord", "TransactionRecord",
 ]

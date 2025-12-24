@@ -20,6 +20,8 @@ from src.transactions.models import (
     CmbSummary, CmbTransaction,
     # 济宁银行
     JiningSummary, JiningTransaction,
+    # 广发银行
+    CgbSummary, CgbTransaction,
     # 向后兼容别名
     SummaryRecord, TransactionRecord
 )
@@ -32,6 +34,8 @@ from src.transactions.service import (
     create_cmb_summary_record,
     create_jining_transaction_records,
     create_jining_summary_record,
+    create_cgb_transaction_records,
+    create_cgb_summary_record,
     # 向后兼容别名
     create_transaction_records,
     create_summary_record,
@@ -122,6 +126,32 @@ async def get_transactions(file_id: int, session: AsyncSession = Depends(get_ses
             }
             for r in records
         ]
+    elif bank_type == "cgb":
+        statement = select(CgbTransaction).where(CgbTransaction.file_id == file_id)
+        result = await session.execute(statement)
+        records = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "serial_no": r.serial_no,
+                "transaction_time": r.transaction_time,
+                "income": r.income,
+                "expense": r.expense,
+                "balance": r.balance,
+                "currency": r.currency,
+                "counterparty_account": r.counterparty_account,
+                "counterparty_name": r.counterparty_name,
+                "transaction_branch": r.transaction_branch,
+                "counterparty_bank_code": r.counterparty_bank_code,
+                "counterparty_bank": r.counterparty_bank,
+                "voucher_no": r.voucher_no,
+                "description": r.description,
+                "remark": r.remark,
+                "postscript": r.postscript,
+                "bank_type": "cgb"
+            }
+            for r in records
+        ]
     else:
         # 默认：山东地方银行
         statement = select(ShandongLocalTransaction).where(ShandongLocalTransaction.file_id == file_id)
@@ -208,6 +238,26 @@ async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)
                 "expense_total": summary.expense_total,
                 "bank_name": summary.bank_name,
                 "bank_type": "jining"
+            }
+    elif bank_type == "cgb":
+        statement = select(CgbSummary).where(CgbSummary.file_id == file_id)
+        result = await session.execute(statement)
+        summary = result.scalar_one_or_none()
+        if summary:
+            return {
+                "account_name": summary.account_name,
+                "account_number": summary.account_number,
+                "date_range": summary.date_range,
+                "currency": summary.currency,
+                "unit": summary.unit,
+                "expense_total": summary.expense_total,
+                "expense_count": summary.expense_count,
+                "income_total": summary.income_total,
+                "income_count": summary.income_count,
+                "current_balance": summary.current_balance,
+                "record_count": summary.record_count,
+                "bank_name": summary.bank_name,
+                "bank_type": "cgb"
             }
     else:
         # 默认：山东地方银行

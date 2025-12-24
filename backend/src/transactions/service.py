@@ -12,6 +12,8 @@ from src.transactions.models import (
     CmbSummary, CmbTransaction,
     # 济宁银行
     JiningSummary, JiningTransaction,
+    # 广发银行
+    CgbSummary, CgbTransaction,
 )
 
 
@@ -181,6 +183,56 @@ def create_jining_summary_record(file_id: int, summary_data: dict) -> Optional[J
         income_total=summary_data.get("收入金额合计", ""),
         expense_total=summary_data.get("支出金额合计", ""),
         bank_name=summary_data.get("开户机构", "")
+    )
+
+
+# ============================================================
+# 广发银行记录创建
+# ============================================================
+
+def create_cgb_transaction_records(file_id: int, raw_transactions: list) -> List[CgbTransaction]:
+    """将原始交易数据转换为广发银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = CgbTransaction(
+            file_id=file_id,
+            serial_no=item.get("流水号", ""),
+            transaction_time=item.get("交易时间", ""),
+            income=item.get("收入", ""),
+            expense=item.get("支出", ""),
+            balance=item.get("余额", ""),
+            currency=item.get("币种", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_name=item.get("对方户名", ""),
+            transaction_branch=item.get("交易行所", ""),
+            counterparty_bank_code=item.get("对方开户行联行号", ""),
+            counterparty_bank=item.get("对方开户行", ""),
+            voucher_no=item.get("凭证号", ""),
+            description=item.get("摘要", ""),
+            remark=item.get("备注", ""),
+            postscript=item.get("附言", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_cgb_summary_record(file_id: int, summary_data: dict) -> Optional[CgbSummary]:
+    """创建广发银行汇总记录"""
+    if not summary_data:
+        return None
+    return CgbSummary(
+        file_id=file_id,
+        account_name=summary_data.get("户名", ""),
+        account_number=summary_data.get("账号", ""),
+        date_range=summary_data.get("起止日期", ""),
+        currency=summary_data.get("币种", ""),
+        unit=summary_data.get("单位", ""),
+        expense_total=summary_data.get("支出总金额", ""),
+        expense_count=summary_data.get("支出总笔数", ""),
+        income_total=summary_data.get("收入总金额", ""),
+        income_count=summary_data.get("收入总笔数", ""),
+        current_balance=summary_data.get("账户当前余额", ""),
+        record_count=summary_data.get("记录数", "")
     )
 
 
