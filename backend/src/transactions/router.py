@@ -18,6 +18,8 @@ from src.transactions.models import (
     EverbrightSummary, EverbrightTransaction,
     # 招商银行
     CmbSummary, CmbTransaction,
+    # 济宁银行
+    JiningSummary, JiningTransaction,
     # 向后兼容别名
     SummaryRecord, TransactionRecord
 )
@@ -28,6 +30,8 @@ from src.transactions.service import (
     create_everbright_summary_record,
     create_cmb_transaction_records,
     create_cmb_summary_record,
+    create_jining_transaction_records,
+    create_jining_summary_record,
     # 向后兼容别名
     create_transaction_records,
     create_summary_record,
@@ -96,6 +100,25 @@ async def get_transactions(file_id: int, session: AsyncSession = Depends(get_ses
                 "card_no": r.card_no,
                 "print_instance_no": r.print_instance_no,
                 "bank_type": "cmb"
+            }
+            for r in records
+        ]
+    elif bank_type == "jining":
+        statement = select(JiningTransaction).where(JiningTransaction.file_id == file_id)
+        result = await session.execute(statement)
+        records = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "sequence": r.sequence,
+                "transaction_date": r.transaction_date,
+                "channel": r.channel,
+                "income": r.income,
+                "expense": r.expense,
+                "balance": r.balance,
+                "description": r.description,
+                "counterparty_info": r.counterparty_info,
+                "bank_type": "jining"
             }
             for r in records
         ]
@@ -170,6 +193,21 @@ async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)
                 "total_count": summary.total_count,
                 "bank_name": summary.bank_name,
                 "bank_type": "cmb"
+            }
+    elif bank_type == "jining":
+        statement = select(JiningSummary).where(JiningSummary.file_id == file_id)
+        result = await session.execute(statement)
+        summary = result.scalar_one_or_none()
+        if summary:
+            return {
+                "account_name": summary.account_name,
+                "account_number": summary.account_number,
+                "date_range": summary.date_range,
+                "currency": summary.currency,
+                "income_total": summary.income_total,
+                "expense_total": summary.expense_total,
+                "bank_name": summary.bank_name,
+                "bank_type": "jining"
             }
     else:
         # 默认：山东地方银行

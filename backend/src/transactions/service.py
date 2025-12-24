@@ -10,6 +10,8 @@ from src.transactions.models import (
     EverbrightSummary, EverbrightTransaction,
     # 招商银行
     CmbSummary, CmbTransaction,
+    # 济宁银行
+    JiningSummary, JiningTransaction,
 )
 
 
@@ -143,6 +145,46 @@ def create_cmb_summary_record(file_id: int, summary_data: dict) -> Optional[CmbS
     )
 
 
+# ============================================================
+# 济宁银行记录创建
+# ============================================================
+
+def create_jining_transaction_records(file_id: int, raw_transactions: list) -> List[JiningTransaction]:
+    """将原始交易数据转换为济宁银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = JiningTransaction(
+            file_id=file_id,
+            sequence=str(item.get("序号", idx + 1)),
+            transaction_date=item.get("记账日期", ""),
+            channel=item.get("交易渠道", ""),
+            income=item.get("收入", ""),
+            expense=item.get("支出", ""),
+            balance=item.get("账户余额", ""),
+            description=item.get("摘要备注", ""),
+            counterparty_info=item.get("交易对手信息", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_jining_summary_record(file_id: int, summary_data: dict) -> Optional[JiningSummary]:
+    """创建济宁银行汇总记录"""
+    if not summary_data:
+        return None
+    return JiningSummary(
+        file_id=file_id,
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("账户名称", ""),
+        date_range=summary_data.get("起止日期", ""),
+        currency=summary_data.get("币种", ""),
+        income_total=summary_data.get("收入金额合计", ""),
+        expense_total=summary_data.get("支出金额合计", ""),
+        bank_name=summary_data.get("开户机构", "")
+    )
+
+
 # 向后兼容的别名
 create_transaction_records = create_shandong_transaction_records
 create_summary_record = create_shandong_summary_record
+

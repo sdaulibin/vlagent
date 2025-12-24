@@ -47,7 +47,8 @@ const bankTypeColor = computed(() => {
     const colors: Record<BankType, string> = {
         'shandong_local': 'bg-blue-100 text-blue-700',
         'everbright': 'bg-purple-100 text-purple-700',
-        'cmb': 'bg-red-100 text-red-700'
+        'cmb': 'bg-red-100 text-red-700',
+        'jining': 'bg-teal-100 text-teal-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -68,6 +69,12 @@ const getAmountDisplay = (item: Transaction) => {
             return { text: item.credit_amount, isIncome: true, prefix: '+' };
         }
         return { text: item.debit_amount || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'jining') {
+        // 济宁银行：收入/支出
+        if (item.income && parseFloat(item.income) > 0) {
+            return { text: item.income, isIncome: true, prefix: '+' };
+        }
+        return { text: item.expense || '0', isIncome: false, prefix: '-' };
     } else {
         // 山东地方银行
         if (item.income && parseFloat(item.income) > 0) {
@@ -258,6 +265,42 @@ const prevPage = () => {
                                 <p class="font-bold text-gray-700">{{ summary.total_count || '0' }}</p>
                             </div>
                         </div>
+                        
+                        <!-- 济宁银行基本信息 -->
+                        <div v-else-if="bankType === 'jining'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账户名称</p>
+                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账号</p>
+                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">起止日期</p>
+                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">开户机构</p>
+                                <p class="font-medium text-gray-700 break-all">{{ summary.bank_name || '-' }}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 济宁银行汇总 -->
+                        <div v-if="bankType === 'jining'" class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                            <div class="summary-item income-box">
+                                <p class="text-xs text-gray-500">收入金额合计</p>
+                                <p class="font-bold text-red-500">{{ summary.income_total || '0' }}</p>
+                            </div>
+                            <div class="summary-item expense-box">
+                                <p class="text-xs text-gray-500">支出金额合计</p>
+                                <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-500">币种</p>
+                                <p class="font-bold text-gray-700">{{ summary.currency || '人民币' }}</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 明细列表分隔线 -->
@@ -305,6 +348,12 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">交易类型</p>
                                             <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
                                                 {{ item.transaction_type || '-' }}
+                                            </span>
+                                        </div>
+                                        <div v-else-if="bankType === 'jining'">
+                                            <p class="text-xs text-gray-400">交易渠道</p>
+                                            <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                                {{ item.channel || '-' }}
                                             </span>
                                         </div>
                                         <div>
@@ -383,6 +432,13 @@ const prevPage = () => {
                                         <div>
                                             <p class="text-xs text-gray-400">打印实例号</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.print_instance_no">{{ item.print_instance_no || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <!-- 济宁银行交易对手信息单独一行 -->
+                                    <div v-if="bankType === 'jining'" class="grid grid-cols-1 gap-4 mt-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易对手信息</p>
+                                            <p class="text-sm text-gray-600" :title="item.counterparty_info">{{ item.counterparty_info || '-' }}</p>
                                         </div>
                                     </div>
                                 </div>

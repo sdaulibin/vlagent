@@ -15,6 +15,8 @@ from src.transactions.models import (
     EverbrightSummary, EverbrightTransaction,
     # 招商银行
     CmbSummary, CmbTransaction,
+    # 济宁银行
+    JiningSummary, JiningTransaction,
 )
 from src.transactions.service import (
     create_shandong_transaction_records,
@@ -23,6 +25,8 @@ from src.transactions.service import (
     create_everbright_summary_record,
     create_cmb_transaction_records,
     create_cmb_summary_record,
+    create_jining_transaction_records,
+    create_jining_summary_record,
 )
 from services import pdf_processor
 
@@ -149,6 +153,10 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
                 # 招商银行
                 transactions = create_cmb_transaction_records(db_file.id, raw_transactions)
                 summary = create_cmb_summary_record(db_file.id, result.get("summary"))
+            elif bank_type == "jining":
+                # 济宁银行
+                transactions = create_jining_transaction_records(db_file.id, raw_transactions)
+                summary = create_jining_summary_record(db_file.id, result.get("summary"))
             else:
                 # 山东地方银行（默认）
                 transactions = create_shandong_transaction_records(db_file.id, raw_transactions)
@@ -322,6 +330,29 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
         tx_result = await session.execute(tx_stmt)
         for tx in tx_result.scalars().all():
             ws.append([tx.serial_no, tx.transaction_date, tx.debit_amount, tx.credit_amount, tx.balance, tx.counterparty_name, tx.counterparty_account, tx.description, tx.transaction_type, tx.card_no, tx.print_instance_no])
+    
+    elif bank_type == "jining":
+        # 济宁银行 - 汇总信息
+        summary_stmt = select(JiningSummary).where(JiningSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["账号", summary.account_number])
+            ws.append(["账户名称", summary.account_name])
+            ws.append(["起止日期", summary.date_range])
+            ws.append(["币种", summary.currency])
+            ws.append(["收入金额合计", summary.income_total])
+            ws.append(["支出金额合计", summary.expense_total])
+            ws.append(["开户机构", summary.bank_name])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["序号", "记账日期", "交易渠道", "收入", "支出", "账户余额", "摘要备注", "交易对手信息"]
+        ws.append(headers)
+        tx_stmt = select(JiningTransaction).where(JiningTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.sequence, tx.transaction_date, tx.channel, tx.income, tx.expense, tx.balance, tx.description, tx.counterparty_info])
     
     else:
         # 山东地方银行 - 汇总信息

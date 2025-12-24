@@ -68,9 +68,10 @@ def detect_bank_from_image(image_path: str):
     候选清单：
     - 招商银行 (CHINA MERCHANTS BANK) -> 返回: cmb
     - 光大银行 (CHINA EVERBRIGHT BANK) -> 返回: everbright
-    - 山东农信 (山东省农村信用社/齐鲁银行/泰安银行等) -> 返回: shandong_local
+    - 济宁银行 (济宁银行股份有限公司) -> 返回: jining
+    - 山东农信 (山东省农村信用社/齐鲁银行/泰安银行/潍坊银行/莱商银行等) -> 返回: shandong_local
     
-    只需返回模板ID（如 cmb, everbright, shandong_local）。严禁输出其他文字。
+    只需返回模板ID（如 cmb, everbright, jining, shandong_local）。严禁输出其他文字。
     """
     
     response = request_stream(question=prompt, 
@@ -80,6 +81,7 @@ def detect_bank_from_image(image_path: str):
     # 清理AI返回的可能含有的markdown或额外空格
     if "cmb" in response: return "cmb"
     if "everbright" in response: return "everbright"
+    if "jining" in response: return "jining"
     if "shandong_local" in response: return "shandong_local"
     
     return "shandong_local"  # 默认兜底
