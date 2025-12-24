@@ -254,7 +254,7 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
 
 @router.get("/{file_id}/export")
 async def export_file(file_id: int, session: AsyncSession = Depends(get_session)):
-    """导出文件交易数据为 Excel"""
+    """导出文件交易数据为 Excel（包含汇总信息）"""
     from fastapi.responses import StreamingResponse
     from io import BytesIO
     from urllib.parse import quote
@@ -270,40 +270,82 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
     
     bank_type = file_record.bank_type or "shandong_local"
     
-    # 根据银行类型获取交易记录
-    if bank_type == "everbright":
-        tx_stmt = select(EverbrightTransaction).where(EverbrightTransaction.file_id == file_id)
-        tx_result = await session.execute(tx_stmt)
-        transactions = tx_result.scalars().all()
-        headers = ["序号", "交易日期", "时间", "借/贷", "交易金额", "账户余额", "对方账号", "对方名称", "凭证号", "摘要", "流水号"]
-        def row_data(tx):
-            return [tx.sequence, tx.transaction_date, tx.transaction_time, tx.debit_credit, tx.amount, tx.balance, tx.counterparty_account, tx.counterparty_name, tx.voucher_no, tx.description, tx.serial_no]
-    elif bank_type == "cmb":
-        tx_stmt = select(CmbTransaction).where(CmbTransaction.file_id == file_id)
-        tx_result = await session.execute(tx_stmt)
-        transactions = tx_result.scalars().all()
-        headers = ["交易流水号", "交易日期", "借方出账", "贷方入账", "余额", "收付方名称", "收付方账号", "摘要", "交易类型", "公司一卡通号", "打印实例号"]
-        def row_data(tx):
-            return [tx.serial_no, tx.transaction_date, tx.debit_amount, tx.credit_amount, tx.balance, tx.counterparty_name, tx.counterparty_account, tx.description, tx.transaction_type, tx.card_no, tx.print_instance_no]
-    else:
-        tx_stmt = select(ShandongLocalTransaction).where(ShandongLocalTransaction.file_id == file_id)
-        tx_result = await session.execute(tx_stmt)
-        transactions = tx_result.scalars().all()
-        headers = ["序号", "交易时间", "交易渠道", "收入", "支出", "账户余额", "币种", "对方账号", "对方户名", "摘要备注"]
-        def row_data(tx):
-            return [tx.sequence, tx.transaction_time, tx.channel, tx.income, tx.expense, tx.balance, tx.currency, tx.counterparty_account, tx.counterparty_name, tx.description]
-    
     # 创建 Excel 工作簿
     wb = Workbook()
     ws = wb.active
     ws.title = "交易明细"
     
-    # 添加表头
-    ws.append(headers)
+    # 根据银行类型导出
+    if bank_type == "everbright":
+        # 光大银行 - 汇总信息
+        summary_stmt = select(EverbrightSummary).where(EverbrightSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["账户名称", summary.account_name])
+            ws.append(["账号", summary.account_number])
+            ws.append(["交易日期", summary.date_range])
+            ws.append(["借方发生额", summary.debit_amount])
+            ws.append(["贷方发生额", summary.credit_amount])
+            ws.append(["借方笔数", summary.debit_count])
+            ws.append(["贷方笔数", summary.credit_count])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["序号", "交易日期", "时间", "借/贷", "交易金额", "账户余额", "对方账号", "对方名称", "凭证号", "摘要", "流水号"]
+        ws.append(headers)
+        tx_stmt = select(EverbrightTransaction).where(EverbrightTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.sequence, tx.transaction_date, tx.transaction_time, tx.debit_credit, tx.amount, tx.balance, tx.counterparty_account, tx.counterparty_name, tx.voucher_no, tx.description, tx.serial_no])
     
-    # 添加交易数据
-    for tx in transactions:
-        ws.append(row_data(tx))
+    elif bank_type == "cmb":
+        # 招商银行 - 汇总信息
+        summary_stmt = select(CmbSummary).where(CmbSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["账号", summary.account_number])
+            ws.append(["账号名", summary.account_name])
+            ws.append(["开始日期", summary.start_date])
+            ws.append(["结束日期", summary.end_date])
+            ws.append(["出账总笔数", summary.debit_count])
+            ws.append(["入账总笔数", summary.credit_count])
+            ws.append(["出账总金额", summary.debit_total])
+            ws.append(["入账总金额", summary.credit_total])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["交易流水号", "交易日期", "借方出账", "贷方入账", "余额", "收付方名称", "收付方账号", "摘要", "交易类型", "公司一卡通号", "打印实例号"]
+        ws.append(headers)
+        tx_stmt = select(CmbTransaction).where(CmbTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.serial_no, tx.transaction_date, tx.debit_amount, tx.credit_amount, tx.balance, tx.counterparty_name, tx.counterparty_account, tx.description, tx.transaction_type, tx.card_no, tx.print_instance_no])
+    
+    else:
+        # 山东地方银行 - 汇总信息
+        summary_stmt = select(ShandongLocalSummary).where(ShandongLocalSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["账户名称", summary.account_name])
+            ws.append(["账(卡)号", summary.account_number])
+            ws.append(["开户行", summary.bank_name])
+            ws.append(["起止日期", summary.date_range])
+            ws.append(["收入笔数", summary.income_count])
+            ws.append(["收入总额", summary.income_total])
+            ws.append(["支出笔数", summary.expense_count])
+            ws.append(["支出总额", summary.expense_total])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["序号", "交易时间", "交易渠道", "收入", "支出", "账户余额", "币种", "对方账号", "对方户名", "摘要备注"]
+        ws.append(headers)
+        tx_stmt = select(ShandongLocalTransaction).where(ShandongLocalTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.sequence, tx.transaction_time, tx.channel, tx.income, tx.expense, tx.balance, tx.currency, tx.counterparty_account, tx.counterparty_name, tx.description])
     
     # 保存到内存
     output = BytesIO()
@@ -319,3 +361,4 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"}
     )
+
