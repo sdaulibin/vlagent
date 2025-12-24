@@ -92,13 +92,12 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
         except Exception as e:
             print(f"  汇总数据提取失败: {e}")
 
-    # 6. 生成标记图片 (添加辅助线)
-    print(f"步骤5: 生成标记图片...")
-    labeled_dir = os.path.join(task_dir, "labeled")
-    os.makedirs(labeled_dir, exist_ok=True)
-    
+    # 6. 生成标记图片 (添加辅助线) - 仅在启用时执行
     line_config = bank_template.get("vertical_line_config", {})
     if line_config.get("enabled"):
+        print(f"步骤5: 生成标记图片...")
+        labeled_dir = os.path.join(task_dir, "labeled")
+        os.makedirs(labeled_dir, exist_ok=True)
         line_positions = [l.get("x_position") or l.get("x_percent") for l in line_config.get("lines", [])]
         for filename in os.listdir(compressed_dir):
             if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
@@ -107,17 +106,19 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
                     os.path.join(labeled_dir, filename), 
                     line_positions
                 )
+        # 使用标记后的图片目录进行识别
+        recognition_dir = labeled_dir
     else:
-        # 无需标记，直接复制
-        for filename in os.listdir(compressed_dir):
-            shutil.copy2(os.path.join(compressed_dir, filename), os.path.join(labeled_dir, filename))
+        # 无需标记，直接使用压缩后的图片目录进行识别
+        print(f"步骤5: 跳过标记(vertical_line_config未启用)，直接使用原图...")
+        recognition_dir = compressed_dir
 
     # 7. 批量提取交易数据
     print(f"步骤6: 批量提取数据 (模式: {bank_type})...")
     results_dir = os.path.join(task_dir, "results")
     transaction_schema = bank_template.get("transaction_schema", [])
     batch_process_images_multithread_with_schema(
-        labeled_dir, results_dir, 
+        recognition_dir, results_dir, 
         transaction_schema, bank_type, 
         max_workers=max_workers
     )
