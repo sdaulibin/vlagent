@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # App Configuration
     RES_DIR: str = "res"
-    RECOGNITION_TIMEOUT: int = 300  # 自动停止识别任务的超时时间（秒）
+    RECOGNITION_TIMEOUT: int = 1800  # 自动停止识别任务的超时时间（秒）30分钟
     
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:123456@localhost/vl_flow"

@@ -297,9 +297,11 @@ def process_single_image_with_schema(args):
         # 保存结果
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(rest)
+        
+        print(f"  ✓ 页面 {filename} 识别完成")
         return True
     except Exception as e:
-        print(f"处理图片 {os.path.basename(image_path)} 时出错: {e}")
+        print(f"  ✗ 处理图片 {os.path.basename(image_path)} 时出错: {e}")
         return False
 
 def batch_process_images_multithread_with_schema(input_folder, output_folder, schema, bank_type="shandong_local", max_workers=4):

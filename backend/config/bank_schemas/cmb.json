@@ -3,6 +3,7 @@
     "bank_names": [
         "招商银行"
     ],
+    "_line_positions_reference": "70 153 232 350 465 580 741 863 1138 1210 1278",
     "vertical_line_config": {
         "enabled": true,
         "lines": [

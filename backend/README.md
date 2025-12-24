@@ -58,9 +58,15 @@ backend/
 │       ├── bank_registry.json   # 银行注册表
 │       ├── shandong_local.json  # 山东地方银行
 │       ├── everbright.json      # 光大银行
-│       └── cmb.json             # 招商银行
+│       ├── cmb.json             # 招商银行
+│       ├── jining.json          # 济宁银行
+│       └── cgb.json             # 广发银行
 └── services/               # 通用服务
     ├── pdf_processor.py        # PDF 解析 & 银行识别
+    ├── pdf/                    # PDF 处理子模块
+    │   ├── bank_detector.py    # 银行类型检测
+    │   ├── data_extractor.py   # AI 数据提取
+    │   └── excel_exporter.py   # Excel 导出 (广发跨页合并)
     └── contract_processor.py   # 合同比对
 ```
 
@@ -121,5 +127,9 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 | 山东地方银行 | `ShandongLocalSummary` | `ShandongLocalTransaction` |
 | 光大银行 | `EverbrightSummary` | `EverbrightTransaction` |
 | 招商银行 | `CmbSummary` | `CmbTransaction` |
+| 济宁银行 | `JiningSummary` | `JiningTransaction` |
+| 广发银行 | `CgbSummary` | `CgbTransaction` |
 
 每种银行的表结构与其 Schema 字段对应，确保数据完整性。
+
+> 🆕 广发银行 `CgbTransaction` 支持 `summary_id` 外键，用于多汇总场景
