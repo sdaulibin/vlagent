@@ -49,8 +49,8 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 # ============================================================
 
 @router.get("/{file_id}")
-async def get_transactions(file_id: int, session: AsyncSession = Depends(get_session)) -> List[dict]:
-    """获取指定文件的交易记录（根据银行类型从对应表查询）"""
+async def get_transactions(file_id: int, summary_id: int = None, session: AsyncSession = Depends(get_session)) -> List[dict]:
+    """获取指定文件的交易记录（根据银行类型从对应表查询，CGB 支持按 summary_id 过滤）"""
     # 先获取文件记录以确定银行类型
     file_stmt = select(FileRecord).where(FileRecord.id == file_id)
     file_result = await session.execute(file_stmt)
@@ -127,12 +127,20 @@ async def get_transactions(file_id: int, session: AsyncSession = Depends(get_ses
             for r in records
         ]
     elif bank_type == "cgb":
-        statement = select(CgbTransaction).where(CgbTransaction.file_id == file_id)
+        # 广发银行：支持按 summary_id 过滤
+        if summary_id:
+            statement = select(CgbTransaction).where(
+                CgbTransaction.file_id == file_id,
+                CgbTransaction.summary_id == summary_id
+            )
+        else:
+            statement = select(CgbTransaction).where(CgbTransaction.file_id == file_id)
         result = await session.execute(statement)
         records = result.scalars().all()
         return [
             {
                 "id": r.id,
+                "summary_id": r.summary_id,
                 "serial_no": r.serial_no,
                 "transaction_time": r.transaction_time,
                 "income": r.income,
@@ -177,7 +185,7 @@ async def get_transactions(file_id: int, session: AsyncSession = Depends(get_ses
 
 
 @router.get("/{file_id}/summary")
-async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)) -> Optional[dict]:
+async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)) -> Optional[dict | List[dict]]:
     """获取文件的汇总信息（根据银行类型从对应表查询）"""
     # 先获取文件记录以确定银行类型
     file_stmt = select(FileRecord).where(FileRecord.id == file_id)
@@ -240,25 +248,30 @@ async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)
                 "bank_type": "jining"
             }
     elif bank_type == "cgb":
+        # 广发银行：返回汇总列表（支持多汇总场景）
         statement = select(CgbSummary).where(CgbSummary.file_id == file_id)
         result = await session.execute(statement)
-        summary = result.scalar_one_or_none()
-        if summary:
-            return {
-                "account_name": summary.account_name,
-                "account_number": summary.account_number,
-                "date_range": summary.date_range,
-                "currency": summary.currency,
-                "unit": summary.unit,
-                "expense_total": summary.expense_total,
-                "expense_count": summary.expense_count,
-                "income_total": summary.income_total,
-                "income_count": summary.income_count,
-                "current_balance": summary.current_balance,
-                "record_count": summary.record_count,
-                "bank_name": summary.bank_name,
-                "bank_type": "cgb"
-            }
+        summaries = result.scalars().all()
+        if summaries:
+            return [
+                {
+                    "id": summary.id,
+                    "account_name": summary.account_name,
+                    "account_number": summary.account_number,
+                    "date_range": summary.date_range,
+                    "currency": summary.currency,
+                    "unit": summary.unit,
+                    "expense_total": summary.expense_total,
+                    "expense_count": summary.expense_count,
+                    "income_total": summary.income_total,
+                    "income_count": summary.income_count,
+                    "current_balance": summary.current_balance,
+                    "record_count": summary.record_count,
+                    "bank_name": summary.bank_name,
+                    "bank_type": "cgb"
+                }
+                for summary in summaries
+            ]
     else:
         # 默认：山东地方银行
         statement = select(ShandongLocalSummary).where(ShandongLocalSummary.file_id == file_id)

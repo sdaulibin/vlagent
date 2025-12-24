@@ -38,9 +38,9 @@ class FileRecord(SQLModel, table=True):
     jining_transactions: List["JiningTransaction"] = Relationship(back_populates="file_record")
     jining_summary: Optional["JiningSummary"] = Relationship(back_populates="file_record")
     
-    # 广发银行关联
+    # 广发银行关联（一对多：一个文件可以有多个汇总）
     cgb_transactions: List["CgbTransaction"] = Relationship(back_populates="file_record")
-    cgb_summary: Optional["CgbSummary"] = Relationship(back_populates="file_record")
+    cgb_summary: List["CgbSummary"] = Relationship(back_populates="file_record")
 
 
 # 从 transactions 模块导入模型（向后兼容）

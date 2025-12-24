@@ -18,6 +18,105 @@ def deduplicate_records(records: list, unique_key: str = "交易流水号"):
             unique_records.append(record)
     return unique_records
 
+
+def merge_cgb_cross_page_records(records: list) -> list:
+    """
+    合并广发银行跨页记录
+    支持两种模式：
+    1. 通过 _incomplete 字段识别需要合并的记录
+    2. 自动检测：流水号格式不完整（应为8位+4位）或缺少日期的记录
+    """
+    if not records:
+        return records
+    
+    def is_incomplete_tail(record):
+        """判断是否为页面底部不完整记录（tail）"""
+        # 有 _incomplete 标记
+        if record.get("_incomplete") == "tail":
+            return True
+        # 有日期但流水号可能只有前半部分（8位）
+        serial = str(record.get("流水号", "")).replace(" ", "")
+        time_str = str(record.get("交易时间", ""))
+        # 如果有日期（YYYY-MM-DD格式）但流水号只有前8位数字
+        if re.match(r'\d{4}-\d{2}-\d{2}', time_str):
+            if re.match(r'^\d{8}$', serial):  # 只有8位，缺少后4位
+                return True
+        return False
+    
+    def is_incomplete_head(record):
+        """判断是否为页面顶部延续记录（head）"""
+        # 有 _incomplete 标记
+        if record.get("_incomplete") == "head":
+            return True
+        # 没有完整日期，只有时间（如 17:26:28）
+        time_str = str(record.get("交易时间", ""))
+        serial = str(record.get("流水号", "")).replace(" ", "")
+        # 只有时间没有日期
+        if re.match(r'^\d{2}:\d{2}:\d{2}$', time_str):
+            return True
+        # 流水号只有后4位
+        if re.match(r'^\d{4}$', serial):
+            return True
+        return False
+    
+    merged = []
+    i = 0
+    
+    while i < len(records):
+        current = records[i]
+        
+        # 检测是否需要合并
+        should_merge = False
+        if is_incomplete_tail(current) and i + 1 < len(records):
+            next_record = records[i + 1]
+            if is_incomplete_head(next_record):
+                should_merge = True
+        
+        if should_merge:
+            next_record = records[i + 1]
+            # 合并记录：以 tail 为基础，用 head 的非空字段补充
+            merged_record = current.copy()
+            
+            # 拼接流水号（前8位 + 后4位）
+            tail_serial = str(merged_record.get("流水号", "")).replace(" ", "")
+            head_serial = str(next_record.get("流水号", "")).replace(" ", "")
+            if tail_serial and head_serial and len(tail_serial) == 8 and len(head_serial) == 4:
+                merged_record["流水号"] = f"{tail_serial} {head_serial}"
+            
+            # 拼接交易时间（日期 + 时间）
+            tail_time = str(merged_record.get("交易时间", ""))
+            head_time = str(next_record.get("交易时间", ""))
+            if tail_time and head_time:
+                # 如果 tail 有日期，head 有时间
+                if re.match(r'\d{4}-\d{2}-\d{2}$', tail_time) and re.match(r'^\d{2}:\d{2}:\d{2}$', head_time):
+                    merged_record["交易时间"] = f"{tail_time} {head_time}"
+            
+            # 用 head 的非空字段补充其他字段
+            for key, value in next_record.items():
+                if key in ["_incomplete", "流水号", "交易时间"]:
+                    continue
+                # 如果 tail 中该字段为空，用 head 的值
+                if not merged_record.get(key) and value:
+                    merged_record[key] = value
+                # 如果都有值且需要拼接
+                elif merged_record.get(key) and value and key in ["对方户名", "对方开户行", "对方账号"]:
+                    if value not in merged_record[key]:
+                        merged_record[key] = merged_record[key] + value
+            
+            # 移除 _incomplete 标记
+            merged_record.pop("_incomplete", None)
+            merged.append(merged_record)
+            i += 2  # 跳过 head 记录
+            continue
+        
+        # 移除临时标记
+        current_copy = current.copy()
+        current_copy.pop("_incomplete", None)
+        merged.append(current_copy)
+        i += 1
+    
+    return merged
+
 def process_txt_files_to_excel(input_folder, output_file, bank_type: str = "shandong_local"):
     """
     遍历文件夹中的所有txt文件，读取其中的JSON数据，
@@ -64,6 +163,17 @@ def process_txt_files_to_excel(input_folder, output_file, bank_type: str = "shan
     
     for filename in txt_files:
         file_path = os.path.join(input_folder, filename)
+        
+        # 从文件名提取页码（如 page_001.txt -> 0）
+        page_num = None
+        page_match = re.search(r'page_(\d+)', filename)
+        if page_match:
+            page_num = int(page_match.group(1)) - 1  # 转为 0-indexed
+        else:
+            # 尝试其他格式
+            num_match = re.search(r'(\d+)', filename)
+            if num_match:
+                page_num = int(num_match.group(1)) - 1
 
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -75,10 +185,16 @@ def process_txt_files_to_excel(input_folder, output_file, bank_type: str = "shan
             # 过滤并添加
             if isinstance(data, list):
                 valid_records = [r for r in data if is_valid_record(r)]
+                # 为每条记录添加页码信息
+                for r in valid_records:
+                    if page_num is not None:
+                        r["_page"] = page_num
                 record_count = len(valid_records)
                 all_data.extend(valid_records)
             else:
                 if is_valid_record(data):
+                    if page_num is not None:
+                        data["_page"] = page_num
                     record_count = 1
                     all_data.append(data)
                 else:
@@ -89,6 +205,10 @@ def process_txt_files_to_excel(input_folder, output_file, bank_type: str = "shan
 
         except Exception as e:
             failed_files.append((filename, str(e)))
+
+    # 广发银行跨页记录合并处理
+    if bank_type == "cgb" and all_data:
+        all_data = merge_cgb_cross_page_records(all_data)
 
     # 排序
     if all_data:

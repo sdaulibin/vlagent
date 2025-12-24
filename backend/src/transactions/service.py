@@ -190,12 +190,13 @@ def create_jining_summary_record(file_id: int, summary_data: dict) -> Optional[J
 # 广发银行记录创建
 # ============================================================
 
-def create_cgb_transaction_records(file_id: int, raw_transactions: list) -> List[CgbTransaction]:
+def create_cgb_transaction_records(file_id: int, raw_transactions: list, summary_id: int = None) -> List[CgbTransaction]:
     """将原始交易数据转换为广发银行交易记录"""
     records = []
     for idx, item in enumerate(raw_transactions):
         t = CgbTransaction(
             file_id=file_id,
+            summary_id=summary_id,  # 关联汇总
             serial_no=item.get("流水号", ""),
             transaction_time=item.get("交易时间", ""),
             income=item.get("收入", ""),
@@ -217,7 +218,7 @@ def create_cgb_transaction_records(file_id: int, raw_transactions: list) -> List
 
 
 def create_cgb_summary_record(file_id: int, summary_data: dict) -> Optional[CgbSummary]:
-    """创建广发银行汇总记录"""
+    """创建单个广发银行汇总记录"""
     if not summary_data:
         return None
     return CgbSummary(
@@ -234,6 +235,17 @@ def create_cgb_summary_record(file_id: int, summary_data: dict) -> Optional[CgbS
         current_balance=summary_data.get("账户当前余额", ""),
         record_count=summary_data.get("记录数", "")
     )
+
+
+def create_cgb_summary_records(file_id: int, summaries_data: list) -> List[CgbSummary]:
+    """创建多个广发银行汇总记录（用于多汇总场景）"""
+    records = []
+    for summary_data in summaries_data:
+        if summary_data:
+            summary = create_cgb_summary_record(file_id, summary_data)
+            if summary:
+                records.append(summary)
+    return records
 
 
 # 向后兼容的别名

@@ -11,7 +11,7 @@ import type { FileItem, Transaction, Summary } from '../types';
 const router = useRouter();
 const files = ref<FileItem[]>([]);
 const results = ref<Transaction[]>([]);
-const summary = ref<Summary | null>(null);
+const summary = ref<Summary | Summary[] | null>(null);  // 广发银行返回数组
 const isProcessing = ref(false);
 const isRecognizing = ref(false);  // 专门追踪识别过程
 const selectedFileId = ref<number | null>(null);
@@ -125,6 +125,7 @@ const handleSelectFile = async (id: number) => {
         if (lastSelectionId.value !== id) return;
         
         results.value = txs;
+        // 处理汇总数据：广发银行返回数组，其他银行返回对象
         summary.value = summaryData;
     } catch (e) {
         if (lastSelectionId.value === id) {

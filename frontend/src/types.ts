@@ -45,6 +45,7 @@ export interface Transaction {
     counterparty_bank?: string;       // 对方开户行
     remark?: string;                  // 备注
     postscript?: string;              // 附言
+    summary_id?: number;              // 关联汇总ID（广发银行多汇总场景）
 }
 
 // 统一汇总接口（包含所有银行的字段）

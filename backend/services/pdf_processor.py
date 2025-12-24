@@ -81,16 +81,67 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     # 5. 汇总数据提取
     print(f"步骤4: 提取汇总数据...")
     summary_data = None
-    if first_page_image:
-        try:
-            summary_schema = bank_template.get("summary_schema", {})
-            summary_response = read_summary_data_with_schema(first_page_image, summary_schema, bank_type)
-            summary_data = json.loads(fix_json(summary_response))
-            # 保存到任务目录
-            with open(os.path.join(task_dir, "summary.json"), 'w', encoding='utf-8') as f:
-                json.dump(summary_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"  汇总数据提取失败: {e}")
+    
+    if bank_type == "cgb":
+        # 广发银行：扫描所有页面提取多个汇总（记录页码用于后续交易分配）
+        summary_data = []
+        summary_schema = bank_template.get("summary_schema", {})
+        
+        # 获取所有页面图片并按名称排序
+        compressed_images = sorted([
+            f for f in os.listdir(compressed_dir) 
+            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+        ])
+        
+        for page_idx, img_file in enumerate(compressed_images):
+            img_path = os.path.join(compressed_dir, img_file)
+            try:
+                summary_response = read_summary_data_with_schema(img_path, summary_schema, bank_type)
+                page_summary = json.loads(fix_json(summary_response))
+                
+                # 严格验证：必须同时包含多个关键字段才认为是有效汇总
+                # 要求：账号 + 户名 + 起止日期 + (收入总金额 或 支出总金额) + 记录数
+                is_valid_summary = (
+                    page_summary and 
+                    page_summary.get("账号") and 
+                    page_summary.get("户名") and
+                    page_summary.get("起止日期") and
+                    (page_summary.get("收入总金额") or page_summary.get("支出总金额")) and
+                    page_summary.get("记录数")
+                )
+                
+                if is_valid_summary:
+                    # 检查是否已存在相同起止日期的汇总（去重）
+                    date_range = page_summary.get("起止日期", "")
+                    existing = any(s.get("起止日期") == date_range for s in summary_data)
+                    if not existing:
+                        # 记录该汇总首次出现的页码（用于后续交易分配）
+                        page_summary["_start_page"] = page_idx
+                        print(f"  发现汇总: {page_summary.get('起止日期', '未知日期')} (页{page_idx+1})")
+                        summary_data.append(page_summary)
+            except Exception as e:
+                # 该页面可能不包含汇总信息，跳过
+                pass
+        
+        # 如果没有找到任何汇总，设为 None
+        if not summary_data:
+            summary_data = None
+        elif len(summary_data) == 1:
+            summary_data = summary_data[0]  # 单个汇总返回对象而非数组
+    else:
+        # 其他银行：只从第一页提取
+        if first_page_image:
+            try:
+                summary_schema = bank_template.get("summary_schema", {})
+                summary_response = read_summary_data_with_schema(first_page_image, summary_schema, bank_type)
+                summary_data = json.loads(fix_json(summary_response))
+            except Exception as e:
+                print(f"  汇总数据提取失败: {e}")
+    
+    # 保存汇总数据
+    if summary_data:
+        with open(os.path.join(task_dir, "summary.json"), 'w', encoding='utf-8') as f:
+            json.dump(summary_data, f, ensure_ascii=False, indent=2)
 
     # 6. 生成标记图片 (添加辅助线) - 仅在启用时执行
     line_config = bank_template.get("vertical_line_config", {})

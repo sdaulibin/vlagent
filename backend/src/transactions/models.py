@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.files.models import FileRecord
@@ -191,12 +191,15 @@ class CgbSummary(SQLModel, table=True):
     bank_name: str = "广发银行"              # 开户行
     
     file_record: Optional["FileRecord"] = Relationship(back_populates="cgb_summary")
+    # 一对多关系：一个汇总对应多条交易明细
+    transactions: List["CgbTransaction"] = Relationship(back_populates="summary")
 
 
 class CgbTransaction(SQLModel, table=True):
     """广发银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
+    summary_id: Optional[int] = Field(default=None, foreign_key="cgbsummary.id")  # 关联汇总
     
     serial_no: Optional[str] = None              # 流水号
     transaction_time: Optional[str] = None       # 交易时间
@@ -215,6 +218,7 @@ class CgbTransaction(SQLModel, table=True):
     postscript: Optional[str] = None             # 附言
     
     file_record: Optional["FileRecord"] = Relationship(back_populates="cgb_transactions")
+    summary: Optional["CgbSummary"] = Relationship(back_populates="transactions")
 
 
 # 向后兼容的别名

@@ -6,7 +6,7 @@ import { BANK_TYPE_NAMES } from '../types';
 
 const props = defineProps<{
     results: Transaction[];
-    summary: Summary | null;
+    summary: Summary | Summary[] | null;  // 支持汇总数组（广发银行多汇总）
     isProcessing: boolean;
     selectedFileId: number | null;
     selectedFileName: string;
@@ -18,23 +18,57 @@ const emit = defineEmits<{
 
 const currentPage = ref(1);
 const itemsPerPage = 10;
+const activeSummaryTab = ref(0);  // 当前选中的汇总 Tab 索引
 
-// 监听选中的文件变化，重置页码
+// 监听选中的文件变化，重置页码和 Tab
 watch(() => props.selectedFileId, () => {
     currentPage.value = 1;
+    activeSummaryTab.value = 0;
 });
 
-const totalPages = computed(() => Math.ceil(props.results.length / itemsPerPage));
+// 判断是否为多汇总模式
+const isMultiSummary = computed(() => {
+    return Array.isArray(props.summary) && props.summary.length > 1;
+});
+
+// 汇总列表（统一为数组）
+const summaryList = computed<Summary[]>(() => {
+    if (!props.summary) return [];
+    return Array.isArray(props.summary) ? props.summary : [props.summary];
+});
+
+// 当前选中的汇总
+const currentSummary = computed<Summary | null>(() => {
+    if (summaryList.value.length === 0) return null;
+    return summaryList.value[activeSummaryTab.value] ?? summaryList.value[0] ?? null;
+});
+
+// 获取当前 Tab 对应的交易明细
+const currentResults = computed(() => {
+    // 如果是广发银行多汇总模式，按 summary_id 过滤
+    if (isMultiSummary.value && currentSummary.value?.id) {
+        return props.results.filter(r => r.summary_id === currentSummary.value?.id);
+    }
+    return props.results;
+});
+
+const totalPages = computed(() => Math.ceil(currentResults.value.length / itemsPerPage));
 
 const paginatedResults = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage;
     const end = start + itemsPerPage;
-    return props.results.slice(start, end);
+    return currentResults.value.slice(start, end);
 });
+
+// 切换 Tab 时重置页码
+const switchTab = (index: number) => {
+    activeSummaryTab.value = index;
+    currentPage.value = 1;
+};
 
 // 获取当前银行类型
 const bankType = computed<BankType>(() => {
-    return props.summary?.bank_type || props.results[0]?.bank_type || 'shandong_local';
+    return currentSummary.value?.bank_type || props.results[0]?.bank_type || 'shandong_local';
 });
 
 // 银行类型显示名称
@@ -116,7 +150,7 @@ const prevPage = () => {
                 <CheckCircle class="w-6 h-6 text-green-500" />
                 识别结果
                 <!-- 银行类型标签 -->
-                <span v-if="summary" :class="['text-xs font-medium px-2 py-1 rounded-full', bankTypeColor]">
+                <span v-if="currentSummary" :class="['text-xs font-medium px-2 py-1 rounded-full', bankTypeColor]">
                     {{ bankTypeName }}
                 </span>
             </span>
@@ -142,8 +176,27 @@ const prevPage = () => {
             </div>
             <div v-else class="flex flex-col h-full">
                 <div class="flex-1 overflow-auto custom-scrollbar p-4">
+                    <!-- 多汇总 Tab 导航 -->
+                    <div v-if="isMultiSummary" class="mb-4 border-b border-gray-200">
+                        <nav class="flex gap-1 -mb-px overflow-x-auto">
+                            <button
+                                v-for="(item, index) in summaryList"
+                                :key="index"
+                                @click="switchTab(index)"
+                                :class="[
+                                    'px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                                    activeSummaryTab === index
+                                        ? 'border-orange-500 text-orange-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ]"
+                            >
+                                {{ item.date_range || `汇总${index + 1}` }}
+                            </button>
+                        </nav>
+                    </div>
+                    
                     <!-- 汇总信息区域 -->
-                    <div v-if="summary" class="summary-section mb-6">
+                    <div v-if="currentSummary" class="summary-section mb-6">
                         <div class="flex items-center gap-2 mb-4">
                             <FileText class="w-5 h-5 text-blue-500" />
                             <h3 class="font-semibold text-gray-700">汇总信息</h3>
@@ -153,23 +206,23 @@ const prevPage = () => {
                         <div v-if="bankType === 'shandong_local'" class="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账户名称</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账(卡)号</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">开户行</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.bank_name || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.bank_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">起止日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.date_range || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">盖章类型</p>
-                                <p class="font-medium text-gray-700">{{ summary.stamp_type || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.stamp_type || '-' }}</p>
                             </div>
                         </div>
                         
@@ -177,15 +230,15 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'everbright'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账户名称</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账号</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">交易日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.date_range || '-' }}</p>
                             </div>
                         </div>
                         
@@ -193,19 +246,19 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'cmb'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账号名</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账号</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">开始日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.start_date || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.start_date || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">结束日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.end_date || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.end_date || '-' }}</p>
                             </div>
                         </div>
                         
@@ -213,19 +266,19 @@ const prevPage = () => {
                         <div v-if="bankType === 'shandong_local'" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">收入总笔数</p>
-                                <p class="font-bold text-red-500">{{ summary.income_count || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_count || '0' }}</p>
                             </div>
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">收入总金额</p>
-                                <p class="font-bold text-red-500">{{ summary.income_total || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_total || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">支出总笔数</p>
-                                <p class="font-bold text-green-600">{{ summary.expense_count || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_count || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">支出总金额</p>
-                                <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_total || '0' }}</p>
                             </div>
                         </div>
                         
@@ -233,19 +286,19 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'everbright'" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">贷方笔数</p>
-                                <p class="font-bold text-red-500">{{ summary.credit_count || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.credit_count || '0' }}</p>
                             </div>
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">贷方发生额</p>
-                                <p class="font-bold text-red-500">{{ summary.credit_amount || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.credit_amount || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">借方笔数</p>
-                                <p class="font-bold text-green-600">{{ summary.debit_count || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.debit_count || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">借方发生额</p>
-                                <p class="font-bold text-green-600">{{ summary.debit_amount || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.debit_amount || '0' }}</p>
                             </div>
                         </div>
                         
@@ -253,23 +306,23 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'cmb'" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">入账总笔数</p>
-                                <p class="font-bold text-red-500">{{ summary.credit_count || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.credit_count || '0' }}</p>
                             </div>
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">入账总金额</p>
-                                <p class="font-bold text-red-500">{{ summary.credit_total || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.credit_total || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">出账总笔数</p>
-                                <p class="font-bold text-green-600">{{ summary.debit_count || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.debit_count || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">出账总金额</p>
-                                <p class="font-bold text-green-600">{{ summary.debit_total || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.debit_total || '0' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-500">笔数</p>
-                                <p class="font-bold text-gray-700">{{ summary.total_count || '0' }}</p>
+                                <p class="font-bold text-gray-700">{{ currentSummary.total_count || '0' }}</p>
                             </div>
                         </div>
                         
@@ -277,19 +330,19 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'jining'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账户名称</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账号</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">起止日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.date_range || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">开户机构</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.bank_name || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.bank_name || '-' }}</p>
                             </div>
                         </div>
                         
@@ -297,15 +350,15 @@ const prevPage = () => {
                         <div v-if="bankType === 'jining'" class="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">收入金额合计</p>
-                                <p class="font-bold text-red-500">{{ summary.income_total || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_total || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">支出金额合计</p>
-                                <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_total || '0' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-500">币种</p>
-                                <p class="font-bold text-gray-700">{{ summary.currency || '人民币' }}</p>
+                                <p class="font-bold text-gray-700">{{ currentSummary.currency || '人民币' }}</p>
                             </div>
                         </div>
                         
@@ -313,19 +366,19 @@ const prevPage = () => {
                         <div v-else-if="bankType === 'cgb'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">户名</p>
-                                <p class="font-medium text-gray-700">{{ summary.account_name || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账号</p>
-                                <p class="font-medium text-gray-700 break-all">{{ summary.account_number || '-' }}</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">起止日期</p>
-                                <p class="font-medium text-gray-700">{{ summary.date_range || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.date_range || '-' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-400">账户当前余额</p>
-                                <p class="font-medium text-gray-700">{{ summary.current_balance || '-' }}</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.current_balance || '-' }}</p>
                             </div>
                         </div>
                         
@@ -333,29 +386,29 @@ const prevPage = () => {
                         <div v-if="bankType === 'cgb'" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">收入总笔数</p>
-                                <p class="font-bold text-red-500">{{ summary.income_count || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_count || '0' }}</p>
                             </div>
                             <div class="summary-item income-box">
                                 <p class="text-xs text-gray-500">收入总金额</p>
-                                <p class="font-bold text-red-500">{{ summary.income_total || '0' }}</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_total || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">支出总笔数</p>
-                                <p class="font-bold text-green-600">{{ summary.expense_count || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_count || '0' }}</p>
                             </div>
                             <div class="summary-item expense-box">
                                 <p class="text-xs text-gray-500">支出总金额</p>
-                                <p class="font-bold text-green-600">{{ summary.expense_total || '0' }}</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_total || '0' }}</p>
                             </div>
                             <div class="summary-item">
                                 <p class="text-xs text-gray-500">记录数</p>
-                                <p class="font-bold text-gray-700">{{ summary.record_count || '0' }}</p>
+                                <p class="font-bold text-gray-700">{{ currentSummary.record_count || '0' }}</p>
                             </div>
                         </div>
                     </div>
                     
                     <!-- 明细列表分隔线 -->
-                    <div v-if="summary && results.length > 0" class="flex items-center gap-2 mb-4">
+                    <div v-if="currentSummary && currentResults.length > 0" class="flex items-center gap-2 mb-4">
                         <div class="flex-1 border-t border-gray-200"></div>
                         <span class="text-xs text-gray-400">交易明细</span>
                         <div class="flex-1 border-t border-gray-200"></div>
