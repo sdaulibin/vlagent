@@ -83,7 +83,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     summary_data = None
     
     if bank_type == "cgb":
-        # 广发银行：扫描所有页面提取多个汇总（记录页码用于后续交易分配）
+        # 广发银行：扫描所有页面，但只从"第1页"提取汇总（记录页码用于后续交易分配）
         summary_data = []
         summary_schema = bank_template.get("summary_schema", {})
         
@@ -96,6 +96,31 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
         for page_idx, img_file in enumerate(compressed_images):
             img_path = os.path.join(compressed_dir, img_file)
             try:
+                # 先检查页脚是否包含"第1页"或"第 1 页"
+                # 使用简单的提示词检测页码
+                from .pdf.data_extractor import request_stream
+                from src.config import MODEL_LOCAL
+                
+                page_check_prompt = """
+                Check if this page's footer contains "第1页" or "第 1 页" (meaning "Page 1").
+                Look at the bottom of the page for page number indicators like "第X页,共X页" or "第X页/共X页".
+                
+                Return JSON only:
+                - If footer shows "第1页" or "第 1 页": {"is_first_page": true}
+                - Otherwise: {"is_first_page": false}
+                
+                No explanation, only JSON.
+                """
+                
+                page_check_response = request_stream(question=page_check_prompt, file_base=img_path, model=MODEL_LOCAL).strip()
+                page_info = json.loads(fix_json(page_check_response))
+                
+                is_first_page = page_info.get("is_first_page", False)
+                
+                # 只从"第1页"提取汇总信息
+                if not is_first_page:
+                    continue
+                
                 summary_response = read_summary_data_with_schema(img_path, summary_schema, bank_type)
                 page_summary = json.loads(fix_json(summary_response))
                 
@@ -117,7 +142,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
                     if not existing:
                         # 记录该汇总首次出现的页码（用于后续交易分配）
                         page_summary["_start_page"] = page_idx
-                        print(f"  发现汇总: {page_summary.get('起止日期', '未知日期')} (页{page_idx+1})")
+                        print(f"  发现汇总: {page_summary.get('起止日期', '未知日期')} (页{page_idx+1}, 第1页标记)")
                         summary_data.append(page_summary)
             except Exception as e:
                 # 该页面可能不包含汇总信息，跳过

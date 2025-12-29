@@ -580,9 +580,9 @@ const prevPage = () => {
                 </div>
                 
                 <!-- Pagination Controls -->
-                <div v-if="results.length > 0" class="bg-white border-t border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
+                <div v-if="currentResults.length > 0" class="bg-white border-t border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
                     <span class="text-sm text-gray-500">
-                        显示 {{ (currentPage - 1) * itemsPerPage + 1 }} 到 {{ Math.min(currentPage * itemsPerPage, results.length) }} 条，共 {{ results.length }} 条
+                        显示 {{ (currentPage - 1) * itemsPerPage + 1 }} 到 {{ Math.min(currentPage * itemsPerPage, currentResults.length) }} 条，共 {{ currentResults.length }} 条
                     </span>
                     <div class="flex items-center gap-2">
                         <button 
