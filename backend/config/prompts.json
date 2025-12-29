@@ -4,9 +4,17 @@
       "role": "Bank statement OCR expert",
       "task": "Extract transaction data from China Everbright Bank corporate account statement",
       "column_order": [
-        "seq", "transaction_date", "time", "debit_credit", "amount", 
-        "balance", "counterparty_account", "counterparty_name", 
-        "voucher_number", "memo", "serial_number"
+        "seq",
+        "transaction_date",
+        "time",
+        "debit_credit",
+        "amount",
+        "balance",
+        "counterparty_account",
+        "counterparty_name",
+        "voucher_number",
+        "memo",
+        "serial_number"
       ],
       "column_descriptions": {
         "voucher_number": "Column 9 - Usually EMPTY. Only bank system voucher numbers belong here. If no content, must be empty string",
@@ -17,7 +25,7 @@
         "description": "Use the black vertical guide lines in the image to determine column boundaries",
         "line_positions": [
           "After line 1: counterparty_account",
-          "After line 2: counterparty_name", 
+          "After line 2: counterparty_name",
           "After line 3: voucher_number (usually empty!)",
           "After line 4: memo (contains 'Transfer', 'Loan' descriptions)",
           "After line 5: serial_number"
@@ -41,11 +49,49 @@
       "role": "Bank statement OCR expert",
       "task": "Extract transaction data from China Merchants Bank transaction statement",
       "column_order": [
-        "transaction_id", "transaction_date", "debit", "credit", "balance",
-        "payee_name", "payee_account", "memo", "transaction_type",
-        "card_number", "print_instance_id"
+        "transaction_id",
+        "transaction_date",
+        "debit",
+        "credit",
+        "balance",
+        "payee_name",
+        "payee_account",
+        "memo",
+        "transaction_type",
+        "card_number",
+        "print_instance_id"
       ],
+      "column_descriptions": {
+        "debit": "借方(出账) - Outgoing amount. May be EMPTY if transaction is incoming. Located BEFORE credit column.",
+        "credit": "贷方(入账) - Incoming amount. May be EMPTY if transaction is outgoing. Located BETWEEN debit and balance.",
+        "balance": "余额 - Account balance AFTER this transaction. ALWAYS has a value, NEVER empty. Located AFTER credit column. This is the RIGHTMOST of the 3 amount columns.",
+        "card_number": "公司一卡通号 - Company card number. Usually EMPTY or contains short code. Located BEFORE print_instance_id.",
+        "print_instance_id": "打印实例号 - Print instance ID. Contains long alphanumeric code like '536B10xxxxx'. This is the RIGHTMOST column in the entire table."
+      },
       "extraction_rules": [
+        {
+          "rule": "CRITICAL: Debit/Credit/Balance disambiguation (columns 3,4,5)",
+          "details": [
+            "These are 3 consecutive amount columns from left to right: Debit → Credit → Balance",
+            "Balance (余额, column 5) ALWAYS has a value - it shows account balance after transaction",
+            "Debit (借方, column 3) and Credit (贷方, column 4) are MUTUALLY EXCLUSIVE - only ONE has value, the other MUST be empty string",
+            "COMMON ERROR: When only 2 values appear (e.g., outgoing transaction), the rightmost value is Balance, NOT Credit",
+            "Example: If you see values [empty, empty, 6,265,706.93] → debit='', credit='', balance='6,265,706.93'",
+            "Example: If you see values [800,052.87, empty, 6,265,706.93] → debit='800,052.87', credit='', balance='6,265,706.93'",
+            "Example: If you see values [empty, 800,052.87, 7,065,759.80] → debit='', credit='800,052.87', balance='7,065,759.80'"
+          ]
+        },
+        {
+          "rule": "CRITICAL: card_number vs print_instance_id disambiguation (columns 10,11)",
+          "details": [
+            "These are the last 2 columns at the RIGHT edge of the table",
+            "card_number (公司一卡通号, column 10) - Usually EMPTY or contains very short value. Located BEFORE print_instance_id.",
+            "print_instance_id (打印实例号, column 11) - Contains long alphanumeric codes like '536B10436199', '536B20349777'. This is the RIGHTMOST column.",
+            "COMMON ERROR: Putting print_instance_id value into card_number field - AVOID THIS",
+            "Rule: If you see a long code like '536Bxxxxxxxx' at the right edge, it belongs to print_instance_id, NOT card_number",
+            "If only one value appears in the last 2 columns, check the column position carefully before assignment"
+          ]
+        },
         {
           "rule": "Valid transaction row identification",
           "details": [
@@ -59,15 +105,15 @@
           "details": [
             "Left of L1: transaction_id",
             "Between L1-L2: transaction_date (yyyy-MM-dd HH:mm:ss, merge multi-line)",
-            "Between L2-L3: debit (outgoing)",
-            "Between L3-L4: credit (incoming) - If no content in this area, MUST be empty '', do NOT grab balance from right",
-            "Between L4-L5: balance",
+            "Between L2-L3: debit (借方/出账) - may be EMPTY",
+            "Between L3-L4: credit (贷方/入账) - may be EMPTY, do NOT grab balance from right",
+            "Between L4-L5: balance (余额) - ALWAYS has a value, never empty",
             "Between L5-L6: payee_name (merge multi-line)",
             "Between L6-L7: payee_account",
             "Between L7-L8: memo",
             "Between L8-L9: transaction_type",
-            "Between L9-L10: card_number - If no content, MUST be empty '', do NOT grab print_id from right",
-            "Right of L10: print_instance_id (spans 3-4 lines, must merge)"
+            "Between L9-L10: card_number (公司一卡通号) - Usually EMPTY, do NOT grab print_instance_id from right",
+            "Right of L10: print_instance_id (打印实例号) - Long codes like 536Bxxxxxxxx"
           ]
         }
       ],
@@ -89,7 +135,7 @@
       ]
     },
     "jining": {
-      "role": "Bank statement OCR expert",  
+      "role": "Bank statement OCR expert",
       "task": "Extract transaction data from Jining Bank corporate current account transaction details",
       "special_format": {
         "description": "Jining Bank unique format - each transaction spans TWO rows",
@@ -97,8 +143,14 @@
         "row2": "Counterparty info (starts with 'Counterparty Info:' containing account and name)"
       },
       "column_order": [
-        "seq", "transaction_date", "channel", "income", "expense", 
-        "balance", "memo", "counterparty_info"
+        "seq",
+        "transaction_date",
+        "channel",
+        "income",
+        "expense",
+        "balance",
+        "memo",
+        "counterparty_info"
       ],
       "column_descriptions": {
         "seq": "Transaction sequence number like 1, 2, 3...",
@@ -128,10 +180,21 @@
       "role": "Bank statement OCR expert",
       "task": "Extract transaction data from China Guangfa Bank account transaction details",
       "column_order": [
-        "serial_number", "transaction_time", "income", "expense", "balance",
-        "currency", "counterparty_account", "counterparty_name", "branch_code",
-        "counterparty_bank_code", "counterparty_bank", "voucher_number",
-        "memo", "remark", "postscript"
+        "serial_number",
+        "transaction_time",
+        "income",
+        "expense",
+        "balance",
+        "currency",
+        "counterparty_account",
+        "counterparty_name",
+        "branch_code",
+        "counterparty_bank_code",
+        "counterparty_bank",
+        "voucher_number",
+        "memo",
+        "remark",
+        "postscript"
       ],
       "column_descriptions": {
         "serial_number": "Transaction serial number in 8+4 digit format like '76054955 7635'",
@@ -195,8 +258,15 @@
       "role": "Bank document analysis expert",
       "task": "Extract summary information from China Merchants Bank statement first page header area",
       "target_fields": [
-        "account_number", "account_name", "currency", "start_date", "end_date",
-        "total_debit_count", "total_credit_count", "total_debit_amount", "total_credit_amount"
+        "account_number",
+        "account_name",
+        "currency",
+        "start_date",
+        "end_date",
+        "total_debit_count",
+        "total_credit_count",
+        "total_debit_amount",
+        "total_credit_amount"
       ],
       "extraction_rules": [
         "Only extract from text description area at top of first page",
