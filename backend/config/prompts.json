@@ -1,0 +1,292 @@
+{
+  "transaction_extraction": {
+    "everbright": {
+      "role": "Bank statement OCR expert",
+      "task": "Extract transaction data from China Everbright Bank corporate account statement",
+      "column_order": [
+        "seq", "transaction_date", "time", "debit_credit", "amount", 
+        "balance", "counterparty_account", "counterparty_name", 
+        "voucher_number", "memo", "serial_number"
+      ],
+      "column_descriptions": {
+        "voucher_number": "Column 9 - Usually EMPTY. Only bank system voucher numbers belong here. If no content, must be empty string",
+        "memo": "Column 10 - Contains transaction descriptions like 'Transfer', 'Loan 21002 xxxxxxx', 'Transfer-Note: xxx', 'Payment' etc. Any descriptive text should go here, NOT in voucher_number column",
+        "serial_number": "Column 11 (rightmost) - Pure numeric code like '901008003834'"
+      },
+      "visual_guidelines": {
+        "description": "Use the black vertical guide lines in the image to determine column boundaries",
+        "line_positions": [
+          "After line 1: counterparty_account",
+          "After line 2: counterparty_name", 
+          "After line 3: voucher_number (usually empty!)",
+          "After line 4: memo (contains 'Transfer', 'Loan' descriptions)",
+          "After line 5: serial_number"
+        ]
+      },
+      "extraction_rules": [
+        "WRONG: Putting 'Transfer' or 'Loan xxx' into voucher_number",
+        "CORRECT: voucher_number is empty '', memo contains 'Transfer' or 'Loan xxx'"
+      ],
+      "merge_rules": [
+        "counterparty_account, counterparty_name, memo, serial_number may span multiple lines - must merge vertically",
+        "Remove extra spaces caused by line breaks when merging"
+      ],
+      "output_constraints": [
+        "Output only valid JSON array",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "cmb": {
+      "role": "Bank statement OCR expert",
+      "task": "Extract transaction data from China Merchants Bank transaction statement",
+      "column_order": [
+        "transaction_id", "transaction_date", "debit", "credit", "balance",
+        "payee_name", "payee_account", "memo", "transaction_type",
+        "card_number", "print_instance_id"
+      ],
+      "extraction_rules": [
+        {
+          "rule": "Valid transaction row identification",
+          "details": [
+            "Each valid record MUST contain a date in yyyy-MM-dd format in 'transaction_date' field",
+            "If a row looks like text (URL like 'http://...' or 'www.cmbchina.com'), even if in first column area, MUST IGNORE - never extract as transaction_id",
+            "Blacklist keywords: if content contains '.com', 'http', 'Enquiry', 'aspx', discard the entire row"
+          ]
+        },
+        {
+          "rule": "Column boundary detection using black guide lines (L1-L10)",
+          "details": [
+            "Left of L1: transaction_id",
+            "Between L1-L2: transaction_date (yyyy-MM-dd HH:mm:ss, merge multi-line)",
+            "Between L2-L3: debit (outgoing)",
+            "Between L3-L4: credit (incoming) - If no content in this area, MUST be empty '', do NOT grab balance from right",
+            "Between L4-L5: balance",
+            "Between L5-L6: payee_name (merge multi-line)",
+            "Between L6-L7: payee_account",
+            "Between L7-L8: memo",
+            "Between L8-L9: transaction_type",
+            "Between L9-L10: card_number - If no content, MUST be empty '', do NOT grab print_id from right",
+            "Right of L10: print_instance_id (spans 3-4 lines, must merge)"
+          ]
+        }
+      ],
+      "noise_filters": [
+        "URL noise: Force ignore URL strings at top and bottom of page",
+        "Footer noise: Never extract page numbers, tips, etc."
+      ],
+      "merge_rules": [
+        "payee_name, transaction_id, print_instance_id spanning multiple lines must be merged vertically"
+      ],
+      "stop_conditions": [
+        "Stop when table end line is detected or invalid row content is encountered"
+      ],
+      "output_constraints": [
+        "Output only valid JSON array",
+        "No explanation text allowed",
+        "What you see is what you get - ensure data completeness",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "jining": {
+      "role": "Bank statement OCR expert",  
+      "task": "Extract transaction data from Jining Bank corporate current account transaction details",
+      "special_format": {
+        "description": "Jining Bank unique format - each transaction spans TWO rows",
+        "row1": "seq | transaction_date | channel | income | expense | balance | memo",
+        "row2": "Counterparty info (starts with 'Counterparty Info:' containing account and name)"
+      },
+      "column_order": [
+        "seq", "transaction_date", "channel", "income", "expense", 
+        "balance", "memo", "counterparty_info"
+      ],
+      "column_descriptions": {
+        "seq": "Transaction sequence number like 1, 2, 3...",
+        "transaction_date": "Format like 2024-06-30",
+        "channel": "Like 'Online Interbank', 'PBOC', 'Online Banking' etc.",
+        "income": "Amount, empty or 0.00 if no data",
+        "expense": "Amount, empty or 0.00 if no data",
+        "balance": "Current account balance",
+        "memo": "Like 'Remittance', 'Online Transfer|Loan', 'Payment|Loan' etc.",
+        "counterparty_info": "Full content from row 2 (remove 'Counterparty Info:' prefix)"
+      },
+      "extraction_rules": [
+        "Header row identification: Skip rows containing 'seq', 'transaction_date', 'channel' text",
+        "Valid record identification: Must contain both date format (like 2024-06-30) AND amount data",
+        "Merge rule: Each record spans 2 rows, row 2's counterparty info MUST be merged with corresponding row 1 record"
+      ],
+      "noise_filters": [
+        "Ignore page numbers, headers, footers, URLs and other non-transaction data"
+      ],
+      "output_constraints": [
+        "Output only valid JSON array",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "cgb": {
+      "role": "Bank statement OCR expert",
+      "task": "Extract transaction data from China Guangfa Bank account transaction details",
+      "column_order": [
+        "serial_number", "transaction_time", "income", "expense", "balance",
+        "currency", "counterparty_account", "counterparty_name", "branch_code",
+        "counterparty_bank_code", "counterparty_bank", "voucher_number",
+        "memo", "remark", "postscript"
+      ],
+      "column_descriptions": {
+        "serial_number": "Transaction serial number in 8+4 digit format like '76054955 7635'",
+        "transaction_time": "Date and time like '2024-01-21 00:56:45'",
+        "income": "Income amount, empty or '-' if no data",
+        "expense": "Expense amount, empty or '-' if no data",
+        "balance": "Balance after transaction",
+        "currency": "Like 'RMB'",
+        "counterparty_account": "Counterparty account number (may span multiple lines)",
+        "counterparty_name": "Counterparty name (may span multiple lines) like 'Shandong Laiwei New Materials Co., Ltd'",
+        "branch_code": "Branch/office code",
+        "counterparty_bank_code": "Counterparty bank interbank code",
+        "counterparty_bank": "Counterparty bank name (may span multiple lines)",
+        "voucher_number": "Voucher number (may be empty)",
+        "memo": "Transaction summary like 'Loan Repayment', 'Online Payment', 'General Remittance'",
+        "remark": "Remark info (may be empty)",
+        "postscript": "Postscript info like 'Transaction Payment'"
+      },
+      "cross_page_handling": {
+        "description": "CGB statements may have records split across pages",
+        "incomplete_tail": "If bottom row lacks complete serial number (8+4 digit format like '80335487 2412') or datetime (like '2024-05-31 17:39:42'), mark as '_incomplete': 'tail'",
+        "incomplete_head": "If first row at top lacks serial number or date, only has time (like '17:39:42') or partial fields, mark as '_incomplete': 'head'",
+        "complete_record": "Complete records do not need '_incomplete' field"
+      },
+      "merge_rules": [
+        "serial_number, counterparty_account, counterparty_name, counterparty_bank may span multiple lines - must merge vertically",
+        "Remove extra spaces caused by line breaks"
+      ],
+      "extraction_rules": [
+        "Skip header rows (containing 'serial_number', 'transaction_time' text)",
+        "Ignore footer info (like 'Page X of X')",
+        "Each transaction record may span multiple lines due to field content",
+        "Keep original amount format",
+        "IMPORTANT: Ignore electronic seal content - do not extract text from stamps like 'CGB Electronic Receipt Seal'"
+      ],
+      "output_constraints": [
+        "Output only valid JSON array",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "default": {
+      "role": "Information extraction expert",
+      "task": "Extract structured data from image based on given JSON schema",
+      "instructions": [
+        "Fill the value part of the schema with information from the image",
+        "If value is a list, use the schema template for each element when multiple items exist",
+        "Output only valid JSON",
+        "What you see is what you get",
+        "Output language must be consistent with the image",
+        "No explanation required"
+      ],
+      "output_constraints": [
+        "Output only valid JSON",
+        "Keep original language from image for values"
+      ]
+    }
+  },
+  "summary_extraction": {
+    "cmb": {
+      "role": "Bank document analysis expert",
+      "task": "Extract summary information from China Merchants Bank statement first page header area",
+      "target_fields": [
+        "account_number", "account_name", "currency", "start_date", "end_date",
+        "total_debit_count", "total_credit_count", "total_debit_amount", "total_credit_amount"
+      ],
+      "extraction_rules": [
+        "Only extract from text description area at top of first page",
+        "Do NOT extract from transaction detail table below",
+        "Unify date format (yyyyMMdd or yyyy-MM-dd)",
+        "Keep original amount string values"
+      ],
+      "output_constraints": [
+        "Output only valid JSON",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "jining": {
+      "role": "Bank document analysis expert",
+      "task": "Extract summary information from Jining Bank corporate account transaction details first page",
+      "location": "Summary info is in the upper left area of the page",
+      "target_fields": {
+        "account_number": "Like 81501220142103084",
+        "account_name": "Like Shandong Taiyue Spring Co., Ltd",
+        "date_range": "Like 2024/01/01-2024/06/30",
+        "currency": "Like RMB",
+        "total_income": "Like 142,161,044.41",
+        "total_expense": "Like 138,088,971.61",
+        "opening_branch": "Content after 'Opening Branch:'"
+      },
+      "extraction_rules": [
+        "Only extract from top area of first page, NOT from transaction detail table",
+        "Keep original string format for amounts (with comma separators)",
+        "Keep date format as-is"
+      ],
+      "output_constraints": [
+        "Output only valid JSON",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "cgb": {
+      "role": "Bank document analysis expert",
+      "task": "Extract summary information from China Guangfa Bank account transaction details first page",
+      "location": "Summary info is in the top area of the page",
+      "target_fields": {
+        "account_name": "Like Shandong Laiwei New Materials Co., Ltd",
+        "account_number": "Like 955088023736990012",
+        "date_range": "Like 20240120-20240630",
+        "currency": "Like RMB",
+        "unit": "Like Yuan",
+        "total_expense": "Like 6,545,010.42",
+        "total_expense_count": "Like 5",
+        "total_income": "Like 6,512,058.90",
+        "total_income_count": "Like 8",
+        "current_balance": "Like 2,342.22",
+        "record_count": "Like 13"
+      },
+      "extraction_rules": [
+        "Only extract from top area of first page, NOT from transaction detail table",
+        "Keep original string format for amounts (with comma separators)",
+        "Keep date format as-is (like yyyyMMdd-yyyyMMdd)"
+      ],
+      "output_constraints": [
+        "Output only valid JSON",
+        "No explanation text allowed",
+        "Keep original language (Chinese) for extracted values"
+      ]
+    },
+    "default": {
+      "role": "Information extraction expert",
+      "task": "Extract structured data from image based on given JSON schema",
+      "instructions": [
+        "Fill the value part of the schema with information from the image",
+        "Output only valid JSON",
+        "What you see is what you get",
+        "Output language must be consistent with the image",
+        "No explanation required"
+      ],
+      "output_constraints": [
+        "Output only valid JSON",
+        "Keep original language from image for values"
+      ]
+    }
+  },
+  "utility": {
+    "summary_column_x": {
+      "role": "OCR expert",
+      "task": "Identify x-coordinate of 'Memo' or 'Remark' column header center point in transaction detail table",
+      "instructions": [
+        "If you see 'Memo' or 'Remark' text, return its horizontal center coordinate (0-1000 range)",
+        "Return only JSON format: {\"x\": \"coordinate_value\"}",
+        "No other text allowed"
+      ]
+    }
+  }
+}
