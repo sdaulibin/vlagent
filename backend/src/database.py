@@ -13,7 +13,9 @@ async def init_db():
     from src.transactions.models import (
         ShandongLocalSummary, ShandongLocalTransaction,
         EverbrightSummary, EverbrightTransaction,
-        CmbSummary, CmbTransaction
+        CmbSummary, CmbTransaction,
+        JiningSummary, JiningTransaction,
+        CgbSummary, CgbTransaction,
     )
     from src.contracts.models import CompareTask, DiffRecord
     
