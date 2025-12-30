@@ -43,31 +43,39 @@ API 文档: http://localhost:8000/docs
 backend/
 ├── main.py                 # 应用入口
 ├── api.py                  # 路由注册
-├── core/                   # 核心基础设施
-│   ├── config.py           # 环境变量配置
-│   ├── database.py         # 数据库连接
-│   └── request_ai.py       # AI 模型调用接口
-├── apps/                   # 业务模块
+├── src/                    # 业务模块
+│   ├── config.py           # 环境变量配置 (pydantic-settings)
+│   ├── database.py         # 数据库连接 (SQLModel + asyncpg)
+│   ├── exceptions.py       # 自定义异常
+│   ├── json_repir.py       # JSON 修复工具
 │   ├── files/              # 文件上传与银行识别
-│   │   ├── api.py          # 上传/识别 API
+│   │   ├── api.py          # 上传/识别/导出 API
 │   │   └── models.py       # 数据模型 (多银行表)
 │   ├── transactions/       # 交易明细查询
+│   │   ├── api.py          # 交易查询 API
+│   │   └── models.py       # 交易数据模型
 │   └── contracts/          # 合同比对
+│       ├── api.py          # 比对任务 API
+│       └── models.py       # 合同数据模型
 ├── config/
-│   └── bank_schemas/       # 🆕 银行模板配置
-│       ├── bank_registry.json   # 银行注册表
-│       ├── shandong_local.json  # 山东地方银行
-│       ├── everbright.json      # 光大银行
-│       ├── cmb.json             # 招商银行
-│       ├── jining.json          # 济宁银行
-│       └── cgb.json             # 广发银行
+│   ├── bank_schemas/       # 🆕 银行模板配置
+│   │   ├── bank_registry.json   # 银行注册表
+│   │   ├── shandong_local.json  # 山东地方银行
+│   │   ├── everbright.json      # 光大银行
+│   │   ├── cmb.json             # 招商银行
+│   │   ├── jining.json          # 济宁银行
+│   │   └── cgb.json             # 广发银行
+│   └── prompts.json        # AI 提示词配置
 └── services/               # 通用服务
-    ├── pdf_processor.py        # PDF 解析 & 银行识别
+    ├── pdf_processor.py        # PDF 解析 & 银行识别入口
     ├── pdf/                    # PDF 处理子模块
-    │   ├── bank_detector.py    # 银行类型检测
+    │   ├── bank_detector.py    # 银行类型检测 (文件名/印章/Logo)
     │   ├── data_extractor.py   # AI 数据提取
-    │   └── excel_exporter.py   # Excel 导出 (广发跨页合并)
-    └── contract_processor.py   # 合同比对
+    │   ├── excel_exporter.py   # Excel 导出 (广发跨页合并)
+    │   ├── image_marker.py     # 图像标注处理
+    │   └── pdf_utils.py        # PDF 工具函数
+    ├── core/                   # 核心工具
+    └── contract_processor.py   # 合同比对处理
 ```
 
 ## 🏦 多银行识别架构
@@ -96,8 +104,8 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 ```
 
 2. 在 `bank_registry.json` 中注册
-3. 在 `models.py` 添加对应的数据表
-4. 在 `api.py` 添加记录创建函数
+3. 在 `src/files/models.py` 添加对应的数据表
+4. 在 `src/files/api.py` 添加记录创建函数
 
 ## 📡 API 接口
 
@@ -108,6 +116,7 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 | `GET` | `/api/files` | 获取文件列表 |
 | `POST` | `/api/files/upload` | 上传文件 |
 | `POST` | `/api/files/{id}/recognize` | 触发识别 |
+| `GET` | `/api/files/{id}/export` | 导出 Excel |
 | `GET` | `/api/transactions/{id}` | 获取交易明细与汇总 |
 
 ### 📋 合同比对
@@ -117,6 +126,19 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 | `POST` | `/api/contracts/compare` | 创建比对任务 |
 | `GET` | `/api/contracts/{id}` | 查询任务状态 |
 | `GET` | `/api/contracts/{id}/diffs` | 获取差异列表 |
+
+## 📦 主要依赖
+
+| 包名 | 版本 | 用途 |
+| :--- | :--- | :--- |
+| `fastapi` | ≥0.124.2 | Web 框架 |
+| `sqlmodel` | ≥0.0.27 | ORM |
+| `openai` | ≥2.9.0 | LLM API 调用 |
+| `pdf2image` | ≥1.17.0 | PDF 转图片 |
+| `openpyxl` | ≥3.1.5 | Excel 导出 |
+| `pandas` | ≥2.3.3 | 数据处理 |
+| `pillow` | ≥12.0.0 | 图像处理 |
+| `asyncpg` | ≥0.31.0 | PostgreSQL 异步驱动 |
 
 ## 🗄️ 数据模型
 

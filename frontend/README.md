@@ -1,6 +1,6 @@
 # Frontend Application
 
-基于 **Vue 3** + **TypeScript** + **Tailwind CSS** 构建的现代化前端应用。
+基于 **Vue 3.5** + **TypeScript 5.9** + **Tailwind CSS 4** 构建的现代化前端应用。
 
 ## 🚀 开发指南
 
@@ -32,6 +32,8 @@ src/
 │   ├── FileUpload.vue      # 文件上传
 │   ├── FileList.vue        # 文件列表
 │   ├── ResultList.vue      # 🆕 多银行识别结果展示
+│   ├── ContractUpload.vue  # 合同上传
+│   ├── ContractHistory.vue # 合同历史记录
 │   ├── ContractResultView.vue # 合同比对结果
 │   └── TiptapViewer.vue    # 富文本查看器
 ├── api/                    # API 请求封装
@@ -80,6 +82,26 @@ interface Transaction {
 | `/bank-statement` | `BankStatement.vue` | 银行流水识别 |
 | `/contract-compare` | `ContractCompare.vue` | 合同智能比对 |
 
+## 📦 主要依赖
+
+| 包名 | 版本 | 用途 |
+| :--- | :--- | :--- |
+| `vue` | ^3.5.24 | 前端框架 |
+| `vue-router` | ^4.6.4 | 路由管理 |
+| `axios` | ^1.13.2 | HTTP 客户端 |
+| `tailwindcss` | ^4.1.17 | 原子化 CSS |
+| `@tiptap/vue-3` | ^3.13.0 | 富文本编辑器 |
+| `lucide-vue-next` | ^0.556.0 | 图标库 |
+
+### Tiptap 扩展
+
+*   `@tiptap/starter-kit` - 基础功能包
+*   `@tiptap/extension-highlight` - 高亮标记
+*   `@tiptap/extension-table` - 表格支持
+*   `@tiptap/extension-table-cell` - 表格单元格
+*   `@tiptap/extension-table-header` - 表格表头
+*   `@tiptap/extension-table-row` - 表格行
+
 ## 🧩 核心组件
 
 ### `ResultList.vue`
@@ -90,7 +112,23 @@ interface Transaction {
 *   **多汇总Tab页**: 🆕 广发银行支持多个汇总切换显示
 *   **条件明细列表**: 展示银行特有的交易字段
 *   **分页浏览**: 支持大量交易记录分页
+*   **Excel 导出**: 一键导出识别结果
 
-### `TiptapViewer` & `ContractResultView`
+### `TiptapViewer.vue` & `ContractResultView.vue`
 
-合同比对相关组件，支持双栏对比、差异高亮和同步滚动。
+合同比对相关组件，支持：
+*   双栏对比视图
+*   差异高亮显示 (新增/删除/修改)
+*   同步滚动
+*   导出差异报告
+
+## 🎨 样式说明
+
+项目使用 Tailwind CSS 4 + PostCSS 进行样式处理：
+
+```
+postcss.config.js       # PostCSS 配置
+tailwind.config.js      # Tailwind 配置
+src/style.css           # 全局样式
+src/assets/             # 自定义样式资源
+```

@@ -26,10 +26,11 @@
 
 ## 🛠️ 技术栈
 
-*   **前端**: Vue 3 + TypeScript + Tailwind CSS + Tiptap
-*   **后端**: FastAPI + SQLModel + Python 3.11
-*   **数据库**: PostgreSQL
+*   **前端**: Vue 3.5 + TypeScript 5.9 + Tailwind CSS 4 + Tiptap 3
+*   **后端**: FastAPI 0.124 + SQLModel 0.0.27 + Python 3.11
+*   **数据库**: PostgreSQL / SQLite (开发环境)
 *   **AI 模型**: Qwen-VL (本地部署) / 通义千问 VL
+*   **包管理**: uv (后端) + npm (前端)
 
 ## 🚀 快速开始
 
@@ -38,16 +39,26 @@
 *   Python 3.11+
 *   Node.js 18+
 *   Poppler (PDF 处理依赖)
+    *   macOS: `brew install poppler`
+    *   Ubuntu: `sudo apt-get install poppler-utils`
 
-### 1. 启动后端服务
+### 1. 配置环境变量
+
+```bash
+cd backend
+cp .env.example .env
+# 编辑 .env 配置本地 LLM 地址
+```
+
+### 2. 启动后端服务
 
 ```bash
 cd backend
 uv sync
-uv run uvicorn main:app --reload
+uv run uvicorn main:app --reload --port 8000
 ```
 
-### 2. 启动前端服务
+### 3. 启动前端服务
 
 ```bash
 cd frontend
@@ -62,20 +73,31 @@ npm run dev
 ```
 vl_flow/
 ├── frontend/                # Vue 3 前端应用
-│   ├── src/views/           # 页面视图
-│   ├── src/components/      # 组件 (FileList, ResultList, TiptapViewer)
+│   ├── src/views/           # 页面视图 (Home, BankStatement, ContractCompare)
+│   ├── src/components/      # 组件 (FileList, ResultList, TiptapViewer 等)
+│   ├── src/api/             # API 请求封装
 │   └── src/types.ts         # TypeScript 类型定义
 ├── backend/                 # FastAPI 后端服务
-│   ├── apps/                # 业务模块
+│   ├── main.py              # 应用入口
+│   ├── api.py               # 路由注册
+│   ├── src/                 # 业务模块
 │   │   ├── files/           # 文件上传与处理
 │   │   ├── transactions/    # 交易明细查询
-│   │   └── contracts/       # 合同比对逻辑
+│   │   ├── contracts/       # 合同比对逻辑
+│   │   ├── config.py        # 环境变量配置
+│   │   └── database.py      # 数据库连接
 │   ├── config/
-│   │   └── bank_schemas/    # 银行模板配置 (JSON)
-│   ├── core/                # 核心配置 (DB, Config, AI)
+│   │   ├── bank_schemas/    # 银行模板配置 (JSON)
+│   │   └── prompts.json     # AI 提示词配置
 │   └── services/            # 通用服务
 │       ├── pdf_processor.py     # PDF 解析与银行识别
-│       └── contract_processor.py # 合同比对
+│       ├── pdf/                 # PDF 处理子模块
+│       │   ├── bank_detector.py     # 银行类型检测
+│       │   ├── data_extractor.py    # AI 数据提取
+│       │   ├── excel_exporter.py    # Excel 导出
+│       │   ├── image_marker.py      # 图像标注
+│       │   └── pdf_utils.py         # PDF 工具函数
+│       └── contract_processor.py    # 合同比对
 └── docker-compose.yml       # 基础设施编排
 ```
 
@@ -87,11 +109,31 @@ vl_flow/
 *   `GET /api/files` - 获取已上传文件列表
 *   `POST /api/files/upload` - 上传银行流水文件
 *   `POST /api/files/{id}/recognize` - 触发识别
+*   `GET /api/files/{id}/export` - 导出 Excel
 *   `GET /api/transactions/{id}` - 获取交易明细与汇总
 
 ### 📋 合同比对
 *   `POST /api/contracts/compare` - 上传文档进行比对
+*   `GET /api/contracts/{id}` - 查询任务状态
 *   `GET /api/contracts/{id}/diffs` - 获取差异数据
+
+## 🧩 核心特性
+
+### 银行识别流程
+
+```
+PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入对应表
+          ↓
+    1. 文件名匹配
+    2. 印章识别
+    3. Logo识别
+```
+
+### 合同比对
+
+*   支持 PDF/Word 文档上传
+*   Tiptap 富文本编辑器展示差异
+*   双栏对比、差异高亮、同步滚动
 
 ## 📄 License
 
