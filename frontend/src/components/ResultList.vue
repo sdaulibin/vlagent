@@ -424,6 +424,22 @@ const prevPage = () => {
                                 <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
+                                <p class="text-xs text-gray-400">币种</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.currency || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账户余额</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.balance || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">记录数</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.record_count || '0' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">开户网点</p>
+                                <p class="font-medium text-gray-700 truncate" :title="currentSummary.branch_name">{{ currentSummary.branch_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
                                 <p class="text-xs text-gray-400">起始日期</p>
                                 <p class="font-medium text-gray-700">{{ currentSummary.start_date || '-' }}</p>
                             </div>
@@ -538,7 +554,15 @@ const prevPage = () => {
                                         <!-- 邮储银行流水号 -->
                                         <div v-else-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">交易流水号</p>
-                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_serial_no">{{ item.transaction_serial_no || '-' }}</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.serial_no">{{ item.serial_no || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">全局路由号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.global_route_no">{{ item.global_route_no || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">记账日期</p>
+                                            <p class="text-sm text-gray-600">{{ item.transaction_date || '-' }}</p>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -562,6 +586,10 @@ const prevPage = () => {
                                         <div v-else-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">对方户名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">对方行名</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_bank">{{ item.counterparty_bank || '-' }}</p>
                                         </div>
                                         
                                         <!-- 对方账号/收付方账号 -->
@@ -590,10 +618,17 @@ const prevPage = () => {
                                             <p class="text-sm text-gray-600 truncate" :title="item.voucher_no">{{ item.voucher_no || '-' }}</p>
                                         </div>
                                         
-                                        <!-- 招商银行额外字段 -->
                                         <div v-if="bankType === 'cmb'">
                                             <p class="text-xs text-gray-400">公司一卡通号</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.card_no">{{ item.card_no || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">用途</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.purpose">{{ item.purpose || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">附言</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.postscript">{{ item.postscript || '-' }}</p>
                                         </div>
                                     </div>
                                     <!-- 招商银行打印实例号单独一行 -->

@@ -238,6 +238,10 @@ class PsbcSummary(SQLModel, table=True):
     expense_count: Optional[str] = None      # 支出总笔数
     start_date: Optional[str] = None         # 起始日期
     end_date: Optional[str] = None           # 结束日期
+    currency: Optional[str] = None           # 币种
+    balance: Optional[str] = None            # 账户余额
+    record_count: Optional[str] = None       # 记录数
+    branch_name: Optional[str] = None       # 开户网点
     bank_name: str = "邮储银行"              # 开户行
     
     file_record: Optional["FileRecord"] = Relationship(back_populates="psbc_summary")

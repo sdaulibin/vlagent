@@ -46,6 +46,8 @@ export interface Transaction {
     remark?: string;                  // 备注
     postscript?: string;              // 附言
     summary_id?: number;              // 关联汇总ID（广发银行多汇总场景）
+    global_route_no?: string;         // 全局路由号
+    purpose?: string;                 // 用途
 }
 
 // 统一汇总接口（包含所有银行的字段）
@@ -88,6 +90,8 @@ export interface Summary {
     unit?: string;           // 单位
     current_balance?: string;  // 账户当前余额
     record_count?: string;     // 记录数
+    balance?: string;          // 余额
+    branch_name?: string;      // 开户网点
 }
 
 export interface FileItem {

@@ -514,6 +514,10 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
         if summary:
             ws.append(["户名", summary.account_name])
             ws.append(["账号", summary.account_number])
+            ws.append(["币种", summary.currency])
+            ws.append(["账户余额", summary.balance])
+            ws.append(["记录数", summary.record_count])
+            ws.append(["开户网点", summary.branch_name])
             ws.append(["起始日期", summary.start_date])
             ws.append(["结束日期", summary.end_date])
             ws.append(["收入总金额", summary.income_total])
@@ -523,12 +527,16 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
             ws.append([])
         
         # 交易明细
-        headers = ["交易流水号", "全局路由号", "交易时间", "记账日期", "收入金额", "支出金额", "余额", "对方账号", "对方户名", "对方行名", "用途", "附言", "摘要"]
+        headers = ["交易时间", "记账日期", "支出金额", "收入金额", "余额", "对方账号", "对方户名", "对方行名", "用途", "附言", "摘要", "交易流水号", "全局路由号"]
         ws.append(headers)
         tx_stmt = select(PsbcTransaction).where(PsbcTransaction.file_id == file_id)
         tx_result = await session.execute(tx_stmt)
         for tx in tx_result.scalars().all():
-            ws.append([tx.serial_no, tx.global_route_no, tx.transaction_time, tx.transaction_date, tx.income, tx.expense, tx.balance, tx.counterparty_account, tx.counterparty_name, tx.counterparty_bank, tx.purpose, tx.postscript, tx.description])
+            ws.append([
+                tx.transaction_time, tx.transaction_date, tx.expense, tx.income, tx.balance, 
+                tx.counterparty_account, tx.counterparty_name, tx.counterparty_bank, 
+                tx.purpose, tx.postscript, tx.description, tx.serial_no, tx.global_route_no
+            ])
     
     else:
         # 山东地方银行 - 汇总信息

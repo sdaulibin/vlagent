@@ -314,6 +314,10 @@ async def get_summary(file_id: int, session: AsyncSession = Depends(get_session)
                 "expense_total": summary.expense_total,
                 "income_count": summary.income_count,
                 "expense_count": summary.expense_count,
+                "currency": summary.currency,
+                "balance": summary.balance,
+                "record_count": summary.record_count,
+                "branch_name": summary.branch_name,
                 "bank_name": summary.bank_name,
                 "bank_type": "psbc"
             }
