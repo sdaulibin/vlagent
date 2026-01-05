@@ -10,6 +10,9 @@
         "enabled": false,
         "lines": []
     },
+    "summary_config": {
+        "first_page_only": true
+    },
     "summary_schema": {
         "账号": "",
         "户名": "",
