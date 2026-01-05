@@ -19,6 +19,8 @@ from src.transactions.models import (
     JiningSummary, JiningTransaction,
     # 广发银行
     CgbSummary, CgbTransaction,
+    # 邮储银行
+    PsbcSummary, PsbcTransaction,
 )
 from src.transactions.service import (
     create_shandong_transaction_records,
@@ -31,6 +33,8 @@ from src.transactions.service import (
     create_jining_summary_record,
     create_cgb_transaction_records,
     create_cgb_summary_record,
+    create_psbc_transaction_records,
+    create_psbc_summary_record,
 )
 from services import pdf_processor
 
@@ -223,6 +227,10 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
                         summary_id_for_transactions = summary.id
                         summary = None
                     transactions = create_cgb_transaction_records(db_file.id, raw_transactions, summary_id=summary_id_for_transactions)
+            elif bank_type == "psbc":
+                # 邮储银行
+                transactions = create_psbc_transaction_records(db_file.id, raw_transactions)
+                summary = create_psbc_summary_record(db_file.id, result.get("summary"))
             else:
                 # 山东地方银行（默认）
                 transactions = create_shandong_transaction_records(db_file.id, raw_transactions)
@@ -315,6 +323,14 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
         )
         await session.execute(
             delete(CgbSummary).where(CgbSummary.file_id == file_id)
+        )
+        
+        # 邮储银行
+        await session.execute(
+            delete(PsbcTransaction).where(PsbcTransaction.file_id == file_id)
+        )
+        await session.execute(
+            delete(PsbcSummary).where(PsbcSummary.file_id == file_id)
         )
         
         # 删除上传的原文件
@@ -489,6 +505,30 @@ async def export_file(file_id: int, session: AsyncSession = Depends(get_session)
             tx_result = await session.execute(tx_stmt)
             for tx in tx_result.scalars().all():
                 ws.append([tx.serial_no, tx.transaction_time, tx.income, tx.expense, tx.balance, tx.currency, tx.counterparty_account, tx.counterparty_name, tx.transaction_branch, tx.counterparty_bank_code, tx.counterparty_bank, tx.voucher_no, tx.description, tx.remark, tx.postscript])
+    
+    elif bank_type == "psbc":
+        # 邮储银行 - 汇总信息
+        summary_stmt = select(PsbcSummary).where(PsbcSummary.file_id == file_id)
+        summary_result = await session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+        if summary:
+            ws.append(["户名", summary.account_name])
+            ws.append(["账号", summary.account_number])
+            ws.append(["起始日期", summary.start_date])
+            ws.append(["结束日期", summary.end_date])
+            ws.append(["收入总金额", summary.income_total])
+            ws.append(["支出总金额", summary.expense_total])
+            ws.append(["收入总笔数", summary.income_count])
+            ws.append(["支出总笔数", summary.expense_count])
+            ws.append([])
+        
+        # 交易明细
+        headers = ["交易流水号", "全局路由号", "交易时间", "记账日期", "收入金额", "支出金额", "余额", "对方账号", "对方户名", "对方行名", "用途", "附言", "摘要"]
+        ws.append(headers)
+        tx_stmt = select(PsbcTransaction).where(PsbcTransaction.file_id == file_id)
+        tx_result = await session.execute(tx_stmt)
+        for tx in tx_result.scalars().all():
+            ws.append([tx.serial_no, tx.global_route_no, tx.transaction_time, tx.transaction_date, tx.income, tx.expense, tx.balance, tx.counterparty_account, tx.counterparty_name, tx.counterparty_bank, tx.purpose, tx.postscript, tx.description])
     
     else:
         # 山东地方银行 - 汇总信息

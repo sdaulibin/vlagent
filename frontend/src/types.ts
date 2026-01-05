@@ -1,5 +1,5 @@
 // 银行类型
-export type BankType = 'shandong_local' | 'everbright' | 'cmb' | 'jining' | 'cgb';
+export type BankType = 'shandong_local' | 'everbright' | 'cmb' | 'jining' | 'cgb' | 'psbc';
 
 // 统一交易记录接口（包含所有银行的字段）
 export interface Transaction {
@@ -105,6 +105,7 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
     'everbright': '光大银行',
     'cmb': '招商银行',
     'jining': '济宁银行',
-    'cgb': '广发银行'
+    'cgb': '广发银行',
+    'psbc': '邮储银行'
 };
 

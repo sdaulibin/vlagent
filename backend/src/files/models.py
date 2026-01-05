@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         CmbSummary, CmbTransaction,
         JiningSummary, JiningTransaction,
         CgbSummary, CgbTransaction,
+        PsbcSummary, PsbcTransaction,
     )
 
 
@@ -41,6 +42,10 @@ class FileRecord(SQLModel, table=True):
     # 广发银行关联（一对多：一个文件可以有多个汇总）
     cgb_transactions: List["CgbTransaction"] = Relationship(back_populates="file_record")
     cgb_summary: List["CgbSummary"] = Relationship(back_populates="file_record")
+    
+    # 邮储银行关联
+    psbc_transactions: List["PsbcTransaction"] = Relationship(back_populates="file_record")
+    psbc_summary: Optional["PsbcSummary"] = Relationship(back_populates="file_record")
 
 
 # 从 transactions 模块导入模型（向后兼容）
@@ -50,6 +55,7 @@ from src.transactions.models import (
     CmbSummary, CmbTransaction,
     JiningSummary, JiningTransaction,
     CgbSummary, CgbTransaction,
+    PsbcSummary, PsbcTransaction,
     SummaryRecord, TransactionRecord,
 )
 
@@ -60,5 +66,6 @@ __all__ = [
     "CmbSummary", "CmbTransaction",
     "JiningSummary", "JiningTransaction",
     "CgbSummary", "CgbTransaction",
+    "PsbcSummary", "PsbcTransaction",
     "SummaryRecord", "TransactionRecord",
 ]

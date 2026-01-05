@@ -83,7 +83,8 @@ const bankTypeColor = computed(() => {
         'everbright': 'bg-purple-100 text-purple-700',
         'cmb': 'bg-red-100 text-red-700',
         'jining': 'bg-teal-100 text-teal-700',
-        'cgb': 'bg-orange-100 text-orange-700'
+        'cgb': 'bg-orange-100 text-orange-700',
+        'psbc': 'bg-green-100 text-green-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -112,6 +113,12 @@ const getAmountDisplay = (item: Transaction) => {
         return { text: item.expense || '0', isIncome: false, prefix: '-' };
     } else if (bankType.value === 'cgb') {
         // 广发银行：收入/支出
+        if (item.income && parseFloat(item.income) > 0) {
+            return { text: item.income, isIncome: true, prefix: '+' };
+        }
+        return { text: item.expense || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'psbc') {
+        // 邮储银行：收入/支出
         if (item.income && parseFloat(item.income) > 0) {
             return { text: item.income, isIncome: true, prefix: '+' };
         }
@@ -405,6 +412,46 @@ const prevPage = () => {
                                 <p class="font-bold text-gray-700">{{ currentSummary.record_count || '0' }}</p>
                             </div>
                         </div>
+                        
+                        <!-- 邮储银行基本信息 -->
+                        <div v-else-if="bankType === 'psbc'" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">户名</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账号</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">起始日期</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.start_date || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">结束日期</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.end_date || '-' }}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 邮储银行汇总 -->
+                        <div v-if="bankType === 'psbc'" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                            <div class="summary-item income-box">
+                                <p class="text-xs text-gray-500">收入总笔数</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_count || '0' }}</p>
+                            </div>
+                            <div class="summary-item income-box">
+                                <p class="text-xs text-gray-500">收入总金额</p>
+                                <p class="font-bold text-red-500">{{ currentSummary.income_total || '0' }}</p>
+                            </div>
+                            <div class="summary-item expense-box">
+                                <p class="text-xs text-gray-500">支出总笔数</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_count || '0' }}</p>
+                            </div>
+                            <div class="summary-item expense-box">
+                                <p class="text-xs text-gray-500">支出总金额</p>
+                                <p class="font-bold text-green-600">{{ currentSummary.expense_total || '0' }}</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 明细列表分隔线 -->
@@ -488,6 +535,11 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">流水号</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.serial_no">{{ item.serial_no || '-' }}</p>
                                         </div>
+                                        <!-- 邮储银行流水号 -->
+                                        <div v-else-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">交易流水号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_serial_no">{{ item.transaction_serial_no || '-' }}</p>
+                                        </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <!-- 山东银行/光大银行: 对方户名/对方名称 -->
@@ -504,6 +556,10 @@ const prevPage = () => {
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>
                                         <div v-else-if="bankType === 'cgb'">
+                                            <p class="text-xs text-gray-400">对方户名</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
+                                        </div>
+                                        <div v-else-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">对方户名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>

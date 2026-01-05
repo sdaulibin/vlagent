@@ -84,3 +84,5 @@ description: 添加新银行流水识别模板
 | 光大银行 | everbright | everbright.json |
 | 济宁银行 | jining | jining.json |
 | 山东地方银行 | shandong_local | shandong_local.json |
+| 邮储银行 | psbc | psbc.json |
+

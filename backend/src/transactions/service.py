@@ -14,6 +14,8 @@ from src.transactions.models import (
     JiningSummary, JiningTransaction,
     # 广发银行
     CgbSummary, CgbTransaction,
+    # 邮储银行
+    PsbcSummary, PsbcTransaction,
 )
 
 
@@ -246,6 +248,51 @@ def create_cgb_summary_records(file_id: int, summaries_data: list) -> List[CgbSu
             if summary:
                 records.append(summary)
     return records
+
+
+# ============================================================
+# 邮储银行记录创建
+# ============================================================
+
+def create_psbc_transaction_records(file_id: int, raw_transactions: list) -> List[PsbcTransaction]:
+    """将原始交易数据转换为邮储银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = PsbcTransaction(
+            file_id=file_id,
+            serial_no=item.get("交易流水号", ""),
+            global_route_no=item.get("全局路由号", ""),
+            transaction_time=item.get("交易时间", ""),
+            transaction_date=item.get("记账日期", ""),
+            income=item.get("收入金额", ""),
+            expense=item.get("支出金额", ""),
+            balance=item.get("余额", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_name=item.get("对方户名", ""),
+            counterparty_bank=item.get("对方行名", ""),
+            purpose=item.get("用途", ""),
+            postscript=item.get("附言", ""),
+            description=item.get("摘要", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_psbc_summary_record(file_id: int, summary_data: dict) -> Optional[PsbcSummary]:
+    """创建邮储银行汇总记录"""
+    if not summary_data:
+        return None
+    return PsbcSummary(
+        file_id=file_id,
+        account_name=summary_data.get("户名", ""),
+        account_number=summary_data.get("账号", ""),
+        income_total=summary_data.get("收入总金额", ""),
+        expense_total=summary_data.get("支出总金额", ""),
+        income_count=summary_data.get("收入总笔数", ""),
+        expense_count=summary_data.get("支出总笔数", ""),
+        start_date=summary_data.get("起始日期", ""),
+        end_date=summary_data.get("结束日期", "")
+    )
 
 
 # 向后兼容的别名
