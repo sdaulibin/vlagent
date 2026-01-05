@@ -291,11 +291,7 @@ def create_psbc_summary_record(file_id: int, summary_data: dict) -> Optional[Psb
         income_count=summary_data.get("收入总笔数", ""),
         expense_count=summary_data.get("支出总笔数", ""),
         start_date=summary_data.get("起始日期", ""),
-        end_date=summary_data.get("结束日期", ""),
-        currency=summary_data.get("币种", ""),
-        balance=summary_data.get("账户余额", ""),
-        record_count=summary_data.get("记录数", ""),
-        branch_name=summary_data.get("开户网点", "")
+        end_date=summary_data.get("结束日期", "")
     )
 
 

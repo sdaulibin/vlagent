@@ -16,6 +16,7 @@ async def init_db():
         CmbSummary, CmbTransaction,
         JiningSummary, JiningTransaction,
         CgbSummary, CgbTransaction,
+        PsbcSummary, PsbcTransaction,
     )
     from src.contracts.models import CompareTask, DiffRecord
     

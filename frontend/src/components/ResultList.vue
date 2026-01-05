@@ -424,22 +424,6 @@ const prevPage = () => {
                                 <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
                             </div>
                             <div class="summary-item">
-                                <p class="text-xs text-gray-400">币种</p>
-                                <p class="font-medium text-gray-700">{{ currentSummary.currency || '-' }}</p>
-                            </div>
-                            <div class="summary-item">
-                                <p class="text-xs text-gray-400">账户余额</p>
-                                <p class="font-medium text-gray-700">{{ currentSummary.balance || '-' }}</p>
-                            </div>
-                            <div class="summary-item">
-                                <p class="text-xs text-gray-400">记录数</p>
-                                <p class="font-medium text-gray-700">{{ currentSummary.record_count || '0' }}</p>
-                            </div>
-                            <div class="summary-item">
-                                <p class="text-xs text-gray-400">开户网点</p>
-                                <p class="font-medium text-gray-700 truncate" :title="currentSummary.branch_name">{{ currentSummary.branch_name || '-' }}</p>
-                            </div>
-                            <div class="summary-item">
                                 <p class="text-xs text-gray-400">起始日期</p>
                                 <p class="font-medium text-gray-700">{{ currentSummary.start_date || '-' }}</p>
                             </div>

@@ -90,8 +90,6 @@ export interface Summary {
     unit?: string;           // 单位
     current_balance?: string;  // 账户当前余额
     record_count?: string;     // 记录数
-    balance?: string;          // 余额
-    branch_name?: string;      // 开户网点
 }
 
 export interface FileItem {
