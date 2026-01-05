@@ -126,3 +126,55 @@ class CmbHandler(BankHandler):
         await session.execute(
             delete(CmbSummary).where(CmbSummary.file_id == file_id)
         )
+    
+    # ============================================================
+    # 识别配置相关方法
+    # ============================================================
+    
+    def get_bank_names(self) -> List[str]:
+        return ["招商银行"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {
+            "账号": "",
+            "账号名": "",
+            "开始日期": "",
+            "结束日期": "",
+            "出账总笔数": "",
+            "入账总笔数": "",
+            "出账总金额": "",
+            "入账总金额": "",
+            "笔数": ""
+        }
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return [{
+            "交易流水号": "",
+            "交易日期": "",
+            "借方(出账)": "",
+            "贷方(入账)": "",
+            "余额": "",
+            "收(付)方名称": "",
+            "收(付)方账号": "",
+            "摘要": "",
+            "交易类型": "",
+            "公司一卡通号": "",
+            "打印实例号": ""
+        }]
+    
+    def get_vertical_line_config(self) -> Dict[str, Any]:
+        return {
+            "enabled": True,
+            "lines": [
+                {"x_position": 122, "description": "交易日期"},
+                {"x_position": 190, "description": "借方(出账)"},
+                {"x_position": 310, "description": "贷方(入账)"},
+                {"x_position": 430, "description": "余额"},
+                {"x_position": 553, "description": "收(付)方名称"},
+                {"x_position": 774, "description": "收(付)方账号"},
+                {"x_position": 872, "description": "摘要"},
+                {"x_position": 1125, "description": "交易类型"},
+                {"x_position": 1238, "description": "公司一卡通号"},
+                {"x_position": 1290, "description": "打印实例号"}
+            ]
+        }

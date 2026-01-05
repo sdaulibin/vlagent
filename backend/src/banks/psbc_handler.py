@@ -127,3 +127,39 @@ class PsbcHandler(BankHandler):
         await session.execute(
             delete(PsbcSummary).where(PsbcSummary.file_id == file_id)
         )
+    
+    # ============================================================
+    # 识别配置相关方法
+    # ============================================================
+    
+    def get_bank_names(self) -> List[str]:
+        return ["中国邮政储蓄银行", "邮储银行", "邮政储蓄银行", "PSBC"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {
+            "账号": "",
+            "户名": "",
+            "收入总金额": "",
+            "支出总金额": "",
+            "收入总笔数": "",
+            "支出总笔数": "",
+            "起始日期": "",
+            "结束日期": ""
+        }
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return {
+            "交易时间": "",
+            "记账日期": "",
+            "支出金额": "",
+            "收入金额": "",
+            "余额": "",
+            "对方账号": "",
+            "对方户名": "",
+            "对方行名": "",
+            "用途": "",
+            "附言": "",
+            "摘要": "",
+            "交易流水号": "",
+            "全局路由号": ""
+        }

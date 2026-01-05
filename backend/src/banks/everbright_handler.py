@@ -135,3 +135,48 @@ class EverbrightHandler(BankHandler):
                 EverbrightSummary.file_id == file_id
             )
         )
+    
+    # ============================================================
+    # 识别配置相关方法
+    # ============================================================
+    
+    def get_bank_names(self) -> List[str]:
+        return ["光大银行", "中国光大银行"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {
+            "账户名称": "",
+            "账号": "",
+            "交易日期": "",
+            "借方发生额": "",
+            "贷方发生额": "",
+            "借方笔数": "",
+            "贷方笔数": ""
+        }
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return [{
+            "序号": "",
+            "交易日期": "",
+            "时间": "",
+            "借/贷": "",
+            "交易金额": "",
+            "账户余额": "",
+            "对方账号": "",
+            "对方名称": "",
+            "凭证号": "",
+            "摘要": "",
+            "流水号": ""
+        }]
+    
+    def get_vertical_line_config(self) -> Dict[str, Any]:
+        return {
+            "enabled": True,
+            "lines": [
+                {"x_position": 750, "description": "对方账号"},
+                {"x_position": 880, "description": "对方名称"},
+                {"x_position": 1000, "description": "凭证号"},
+                {"x_position": 1130, "description": "摘要"},
+                {"x_position": 1300, "description": "流水号"}
+            ]
+        }

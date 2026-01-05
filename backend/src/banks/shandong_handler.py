@@ -136,3 +136,45 @@ class ShandongHandler(BankHandler):
                 ShandongLocalSummary.file_id == file_id
             )
         )
+    
+    # ============================================================
+    # 识别配置相关方法
+    # ============================================================
+    
+    def get_bank_names(self) -> List[str]:
+        return ["潍坊银行", "莱商银行", "齐鲁银行"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {
+            "账户名称": "",
+            "账(卡)号": "",
+            "起止日期": "",
+            "收入总笔数": "",
+            "收入总金额": "",
+            "支出总笔数": "",
+            "支出总金额": "",
+            "开户行": "",
+            "盖章类型": ""
+        }
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return [{
+            "序号": "",
+            "交易时间": "",
+            "交易渠道": "",
+            "收入": "",
+            "支出": "",
+            "账户余额": "",
+            "币种": "",
+            "对方账号": "",
+            "对方户名": "",
+            "摘要备注": ""
+        }]
+    
+    def get_vertical_line_config(self) -> Dict[str, Any]:
+        return {
+            "enabled": True,
+            "lines": [
+                {"x_position": 1175, "description": "摘要备注"}
+            ]
+        }

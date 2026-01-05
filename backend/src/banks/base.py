@@ -104,6 +104,58 @@ class BankHandler(ABC):
             file_id: 文件ID
         """
         pass
+    
+    # ============================================================
+    # 识别配置相关方法（用于 PDF 处理）
+    # ============================================================
+    
+    @abstractmethod
+    def get_bank_names(self) -> List[str]:
+        """
+        获取用于匹配的银行名称列表
+        
+        Returns:
+            银行名称列表，用于从文件名或图片内容识别银行类型
+        """
+        pass
+    
+    @abstractmethod
+    def get_summary_schema(self) -> Dict[str, Any]:
+        """
+        获取汇总信息的 Schema
+        
+        Returns:
+            汇总字段 Schema 字典
+        """
+        pass
+    
+    @abstractmethod
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        """
+        获取交易明细的 Schema
+        
+        Returns:
+            交易字段 Schema 字典
+        """
+        pass
+    
+    def get_vertical_line_config(self) -> Dict[str, Any]:
+        """
+        获取垂直辅助线配置（可选覆盖）
+        
+        Returns:
+            辅助线配置字典，默认为禁用
+        """
+        return {"enabled": False, "lines": []}
+    
+    def get_summary_config(self) -> Dict[str, Any]:
+        """
+        获取汇总提取配置（可选覆盖）
+        
+        Returns:
+            汇总配置字典，默认只从第一页提取
+        """
+        return {"first_page_only": True}
 
 
 # 银行处理器注册表

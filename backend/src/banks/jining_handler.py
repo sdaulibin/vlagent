@@ -118,3 +118,33 @@ class JiningHandler(BankHandler):
         await session.execute(
             delete(JiningSummary).where(JiningSummary.file_id == file_id)
         )
+    
+    # ============================================================
+    # 识别配置相关方法
+    # ============================================================
+    
+    def get_bank_names(self) -> List[str]:
+        return ["济宁银行", "济宁银行股份有限公司"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {
+            "账号": "",
+            "账户名称": "",
+            "起止日期": "",
+            "币种": "",
+            "收入金额合计": "",
+            "支出金额合计": "",
+            "开户机构": ""
+        }
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return {
+            "序号": "",
+            "记账日期": "",
+            "交易渠道": "",
+            "收入": "",
+            "支出": "",
+            "账户余额": "",
+            "摘要备注": "",
+            "交易对手信息": ""
+        }
