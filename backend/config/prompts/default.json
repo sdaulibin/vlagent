@@ -1,0 +1,44 @@
+{
+  "transaction_extraction": {
+    "role": "Information extraction expert",
+    "task": "Extract structured data from image based on given JSON schema",
+    "instructions": [
+      "Fill the value part of the schema with information from the image",
+      "If value is a list, use the schema template for each element when multiple items exist",
+      "Output only valid JSON",
+      "What you see is what you get",
+      "Output language must be consistent with the image",
+      "No explanation required"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "Keep original language from image for values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Information extraction expert",
+    "task": "Extract structured data from image based on given JSON schema",
+    "instructions": [
+      "Fill the value part of the schema with information from the image",
+      "Output only valid JSON",
+      "What you see is what you get",
+      "Output language must be consistent with the image",
+      "No explanation required"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "Keep original language from image for values"
+    ]
+  },
+  "utility": {
+    "summary_column_x": {
+      "role": "OCR expert",
+      "task": "Identify x-coordinate of 'Memo' or 'Remark' column header center point in transaction detail table",
+      "instructions": [
+        "If you see 'Memo' or 'Remark' text, return its horizontal center coordinate (0-1000 range)",
+        "Return only JSON format: {\"x\": \"coordinate_value\"}",
+        "No other text allowed"
+      ]
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from China Guangfa Bank account transaction details",
+    "column_order": [
+      "serial_number",
+      "transaction_time",
+      "income",
+      "expense",
+      "balance",
+      "currency",
+      "counterparty_account",
+      "counterparty_name",
+      "branch_code",
+      "counterparty_bank_code",
+      "counterparty_bank",
+      "voucher_number",
+      "memo",
+      "remark",
+      "postscript"
+    ],
+    "column_descriptions": {
+      "serial_number": "Transaction serial number in 8+4 digit format like '76054955 7635'",
+      "transaction_time": "Date and time like '2024-01-21 00:56:45'",
+      "income": "Income amount, empty or '-' if no data",
+      "expense": "Expense amount, empty or '-' if no data",
+      "balance": "Balance after transaction",
+      "currency": "Like 'RMB'",
+      "counterparty_account": "Counterparty account number (may span multiple lines)",
+      "counterparty_name": "Counterparty name (may span multiple lines) like 'Shandong Laiwei New Materials Co., Ltd'",
+      "branch_code": "Branch/office code",
+      "counterparty_bank_code": "Counterparty bank interbank code",
+      "counterparty_bank": "Counterparty bank name (may span multiple lines)",
+      "voucher_number": "Voucher number (may be empty)",
+      "memo": "Transaction summary like 'Loan Repayment', 'Online Payment', 'General Remittance'",
+      "remark": "Remark info (may be empty)",
+      "postscript": "Postscript info like 'Transaction Payment'"
+    },
+    "cross_page_handling": {
+      "description": "CGB statements may have records split across pages",
+      "incomplete_tail": "If bottom row lacks complete serial number (8+4 digit format like '80335487 2412') or datetime (like '2024-05-31 17:39:42'), mark as '_incomplete': 'tail'",
+      "incomplete_head": "If first row at top lacks serial number or date, only has time (like '17:39:42') or partial fields, mark as '_incomplete': 'head'",
+      "complete_record": "Complete records do not need '_incomplete' field"
+    },
+    "merge_rules": [
+      "serial_number, counterparty_account, counterparty_name, counterparty_bank may span multiple lines - must merge vertically",
+      "Remove extra spaces caused by line breaks"
+    ],
+    "extraction_rules": [
+      "Skip header rows (containing 'serial_number', 'transaction_time' text)",
+      "Ignore footer info (like 'Page X of X')",
+      "Each transaction record may span multiple lines due to field content",
+      "Keep original amount format",
+      "IMPORTANT: Ignore electronic seal content - do not extract text from stamps like 'CGB Electronic Receipt Seal'"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from China Guangfa Bank account transaction details first page",
+    "location": "Summary info is in the top area of the page",
+    "target_fields": {
+      "account_name": "Like Shandong Laiwei New Materials Co., Ltd",
+      "account_number": "Like 955088023736990012",
+      "date_range": "Like 20240120-20240630",
+      "currency": "Like RMB",
+      "unit": "Like Yuan",
+      "total_expense": "Like 6,545,010.42",
+      "total_expense_count": "Like 5",
+      "total_income": "Like 6,512,058.90",
+      "total_income_count": "Like 8",
+      "current_balance": "Like 2,342.22",
+      "record_count": "Like 13"
+    },
+    "extraction_rules": [
+      "Only extract from top area of first page, NOT from transaction detail table",
+      "Keep original string format for amounts (with comma separators)",
+      "Keep date format as-is (like yyyyMMdd-yyyyMMdd)"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

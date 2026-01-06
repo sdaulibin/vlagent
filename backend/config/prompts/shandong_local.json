@@ -1,0 +1,28 @@
+{
+  "transaction_extraction": {
+    "role": "Information extraction expert",
+    "task": "Extract structured data from Shandong local bank statement",
+    "instructions": [
+      "Fill the value part of the schema with information from the image",
+      "If value is a list, use the schema template for each element when multiple items exist",
+      "Output only valid JSON",
+      "What you see is what you get",
+      "Output language must be consistent with the image",
+      "No explanation required"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "Keep original language from image for values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Shandong local bank statement first page",
+    "location": "Summary info is in the top area of the page",
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

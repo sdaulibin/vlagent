@@ -1,0 +1,57 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from China Everbright Bank corporate account statement",
+    "column_order": [
+      "seq",
+      "transaction_date",
+      "time",
+      "debit_credit",
+      "amount",
+      "balance",
+      "counterparty_account",
+      "counterparty_name",
+      "voucher_number",
+      "memo",
+      "serial_number"
+    ],
+    "column_descriptions": {
+      "voucher_number": "Column 9 - Usually EMPTY. Only bank system voucher numbers belong here. If no content, must be empty string",
+      "memo": "Column 10 - Contains transaction descriptions like 'Transfer', 'Loan 21002 xxxxxxx', 'Transfer-Note: xxx', 'Payment' etc. Any descriptive text should go here, NOT in voucher_number column",
+      "serial_number": "Column 11 (rightmost) - Pure numeric code like '901008003834'"
+    },
+    "visual_guidelines": {
+      "description": "Use the black vertical guide lines in the image to determine column boundaries",
+      "line_positions": [
+        "After line 1: counterparty_account",
+        "After line 2: counterparty_name",
+        "After line 3: voucher_number (usually empty!)",
+        "After line 4: memo (contains 'Transfer', 'Loan' descriptions)",
+        "After line 5: serial_number"
+      ]
+    },
+    "extraction_rules": [
+      "WRONG: Putting 'Transfer' or 'Loan xxx' into voucher_number",
+      "CORRECT: voucher_number is empty '', memo contains 'Transfer' or 'Loan xxx'"
+    ],
+    "merge_rules": [
+      "counterparty_account, counterparty_name, memo, serial_number may span multiple lines - must merge vertically",
+      "Remove extra spaces caused by line breaks when merging"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from China Everbright Bank statement first page",
+    "location": "Summary info is in the top area of the page",
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

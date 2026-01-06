@@ -7,11 +7,11 @@ from src.json_repir import fix_json
 
 # Schema 配置文件路径
 SCHEMA_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "schemas.json")
-# Prompt 配置文件路径
-PROMPT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "prompts.json")
+# Prompt 配置目录路径（拆分后的提示词文件）
+PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "prompts")
 
-# 缓存已加载的提示词配置
-_prompt_config_cache = None
+# 缓存已加载的提示词配置（按银行类型）
+_prompt_config_cache = {}
 
 def load_schema(schema_name: str):
     """
@@ -29,21 +29,32 @@ def load_schema(schema_name: str):
             return json.dumps(schemas.get(schema_name, {}), ensure_ascii=False)
     return "{}"
 
-def load_prompt_config():
+def load_prompt_config(bank_type: str = "default"):
     """
-    加载提示词配置文件（带缓存）
+    加载指定银行类型的提示词配置（带缓存）
     
+    Args:
+        bank_type: 银行类型，如 "cmb", "everbright", "icbc" 等
+        
     Returns:
         dict: 提示词配置字典
     """
     global _prompt_config_cache
-    if _prompt_config_cache is not None:
-        return _prompt_config_cache
     
-    if os.path.exists(PROMPT_CONFIG_PATH):
-        with open(PROMPT_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            _prompt_config_cache = json.load(f)
-            return _prompt_config_cache
+    if bank_type in _prompt_config_cache:
+        return _prompt_config_cache[bank_type]
+    
+    # 尝试加载银行专属配置
+    prompt_file = os.path.join(PROMPTS_DIR, f"{bank_type}.json")
+    if os.path.exists(prompt_file):
+        with open(prompt_file, 'r', encoding='utf-8') as f:
+            _prompt_config_cache[bank_type] = json.load(f)
+            return _prompt_config_cache[bank_type]
+    
+    # 回退到默认配置
+    if bank_type != "default":
+        return load_prompt_config("default")
+    
     return {}
 
 def build_prompt_from_config(config: dict, schema_str: str = None) -> str:
@@ -156,8 +167,8 @@ def get_summary_column_x(file_path):
     """
     获取图片中"摘要备注"表头所在的x坐标
     """
-    # 从配置加载提示词
-    config = load_prompt_config()
+    # 从默认配置加载提示词
+    config = load_prompt_config("default")
     utility_config = config.get("utility", {}).get("summary_column_x", {})
     
     if utility_config:
@@ -198,12 +209,9 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
     """
     result_schema = json.dumps(schema, ensure_ascii=False)
     
-    # 从配置文件加载提示词
-    config = load_prompt_config()
-    transaction_config = config.get("transaction_extraction", {})
-    
-    # 获取对应银行类型的提示词配置，如果没有则使用 default
-    bank_config = transaction_config.get(bank_type, transaction_config.get("default", {}))
+    # 从银行专属配置文件加载提示词
+    config = load_prompt_config(bank_type)
+    bank_config = config.get("transaction_extraction", {})
     
     if bank_config:
         prompt = build_prompt_from_config(bank_config, result_schema)
@@ -243,9 +251,9 @@ def read_data(file_path, schema_name: str = "bank_transaction"):
     """
     result_schema = load_schema(schema_name)
     
-    # 从配置文件加载提示词
-    config = load_prompt_config()
-    default_config = config.get("transaction_extraction", {}).get("default", {})
+    # 从默认配置文件加载提示词
+    config = load_prompt_config("default")
+    default_config = config.get("transaction_extraction", {})
     
     if default_config:
         prompt = build_prompt_from_config(default_config, result_schema)

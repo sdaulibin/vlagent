@@ -1,0 +1,68 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Jining Bank corporate current account transaction details",
+    "special_format": {
+      "description": "Jining Bank unique format - each transaction spans TWO rows",
+      "row1": "seq | transaction_date | channel | income | expense | balance | memo",
+      "row2": "Counterparty info (starts with 'Counterparty Info:' containing account and name)"
+    },
+    "column_order": [
+      "seq",
+      "transaction_date",
+      "channel",
+      "income",
+      "expense",
+      "balance",
+      "memo",
+      "counterparty_info"
+    ],
+    "column_descriptions": {
+      "seq": "Transaction sequence number like 1, 2, 3...",
+      "transaction_date": "Format like 2024-06-30",
+      "channel": "Like 'Online Interbank', 'PBOC', 'Online Banking' etc.",
+      "income": "Amount, empty or 0.00 if no data",
+      "expense": "Amount, empty or 0.00 if no data",
+      "balance": "Current account balance",
+      "memo": "Like 'Remittance', 'Online Transfer|Loan', 'Payment|Loan' etc.",
+      "counterparty_info": "Full content from row 2 (remove 'Counterparty Info:' prefix)"
+    },
+    "extraction_rules": [
+      "Header row identification: Skip rows containing 'seq', 'transaction_date', 'channel' text",
+      "Valid record identification: Must contain both date format (like 2024-06-30) AND amount data",
+      "Merge rule: Each record spans 2 rows, row 2's counterparty info MUST be merged with corresponding row 1 record"
+    ],
+    "noise_filters": [
+      "Ignore page numbers, headers, footers, URLs and other non-transaction data"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Jining Bank corporate account transaction details first page",
+    "location": "Summary info is in the upper left area of the page",
+    "target_fields": {
+      "account_number": "Like 81501220142103084",
+      "account_name": "Like Shandong Taiyue Spring Co., Ltd",
+      "date_range": "Like 2024/01/01-2024/06/30",
+      "currency": "Like RMB",
+      "total_income": "Like 142,161,044.41",
+      "total_expense": "Like 138,088,971.61",
+      "opening_branch": "Content after 'Opening Branch:'"
+    },
+    "extraction_rules": [
+      "Only extract from top area of first page, NOT from transaction detail table",
+      "Keep original string format for amounts (with comma separators)",
+      "Keep date format as-is"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

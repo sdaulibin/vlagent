@@ -1,0 +1,61 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Postal Savings Bank of China (PSBC) account statement",
+    "column_order": [
+      "transaction_time",
+      "post_date",
+      "expense",
+      "income",
+      "balance",
+      "counterparty_account",
+      "counterparty_name",
+      "counterparty_bank",
+      "purpose",
+      "postscript",
+      "memo",
+      "serial_number",
+      "global_route_no"
+    ],
+    "column_descriptions": {
+      "transaction_time": "Column 1 - '交易时间'. IMPORTANT: May contain ONLY date (e.g., '2024-12-26') or BOTH date and time (e.g., '2024-12-26 02:10:50'). Extract the FULL content accurately as seen.",
+      "post_date": "Column 2 - '记账日期'. Usually a date (e.g., '2024-12-26').",
+      "expense": "Column 3 - '支出金额'. Outgoing amount.",
+      "income": "Column 4 - '收入金额'. Incoming amount.",
+      "balance": "Column 5 - '余额'. Account balance after transaction.",
+      "counterparty_account": "Column 6 - '对方账号'.",
+      "counterparty_name": "Column 7 - '对方户名'.",
+      "counterparty_bank": "Column 8 - '对方行名'.",
+      "purpose": "Column 9 - '用途'.",
+      "postscript": "Column 10 - '附言'.",
+      "memo": "Column 11 - '摘要'.",
+      "serial_number": "Column 12 - '交易流水号'. Alphanumeric or numeric code.",
+      "global_route_no": "Column 13 - '全局路由号'. Alphanumeric or numeric code."
+    },
+    "extraction_rules": [
+      "Extract data row by row from left to right",
+      "For '交易时间', capture the full string (including HH:mm:ss if present)",
+      "If an amount column is empty, use empty string ''",
+      "Maintain the exact format seen in the image for all fields"
+    ],
+    "merge_rules": [
+      "Counterparty name or account may span multiple lines - merge vertically",
+      "Remove artificial spaces from line breaks during merging"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Postal Savings Bank of China (PSBC) statement first page",
+    "location": "Summary info is in the top area of the page",
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

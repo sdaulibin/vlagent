@@ -1,0 +1,110 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from China Merchants Bank transaction statement",
+    "column_order": [
+      "transaction_id",
+      "transaction_date",
+      "debit",
+      "credit",
+      "balance",
+      "payee_name",
+      "payee_account",
+      "memo",
+      "transaction_type",
+      "card_number",
+      "print_instance_id"
+    ],
+    "column_descriptions": {
+      "debit": "借方(出账) - Outgoing amount. May be EMPTY if transaction is incoming. Located BEFORE credit column.",
+      "credit": "贷方(入账) - Incoming amount. May be EMPTY if transaction is outgoing. Located BETWEEN debit and balance.",
+      "balance": "余额 - Account balance AFTER this transaction. ALWAYS has a value, NEVER empty. Located AFTER credit column. This is the RIGHTMOST of the 3 amount columns.",
+      "card_number": "公司一卡通号 - Company card number. Usually EMPTY or contains short code. Located BEFORE print_instance_id.",
+      "print_instance_id": "打印实例号 - Print instance ID. Contains long alphanumeric code like '536B10xxxxx'. This is the RIGHTMOST column in the entire table."
+    },
+    "extraction_rules": [
+      {
+        "rule": "CRITICAL: Debit/Credit/Balance disambiguation (columns 3,4,5)",
+        "details": [
+          "These are 3 consecutive amount columns from left to right: Debit → Credit → Balance",
+          "Balance (余额, column 5) ALWAYS has a value - it shows account balance after transaction",
+          "Debit (借方, column 3) and Credit (贷方, column 4) are MUTUALLY EXCLUSIVE - only ONE has value, the other MUST be empty string",
+          "COMMON ERROR: When only 2 values appear (e.g., outgoing transaction), the rightmost value is Balance, NOT Credit"
+        ]
+      },
+      {
+        "rule": "CRITICAL: card_number vs print_instance_id disambiguation (columns 10,11)",
+        "details": [
+          "These are the last 2 columns at the RIGHT edge of the table",
+          "card_number (公司一卡通号, column 10) - Usually EMPTY or contains very short value. Located BEFORE print_instance_id.",
+          "print_instance_id (打印实例号, column 11) - Contains long alphanumeric codes like '536B10436199', '536B20349777'. This is the RIGHTMOST column."
+        ]
+      },
+      {
+        "rule": "Valid transaction row identification",
+        "details": [
+          "Each valid record MUST contain a date in yyyy-MM-dd format in 'transaction_date' field",
+          "Blacklist keywords: if content contains '.com', 'http', 'Enquiry', 'aspx', discard the entire row"
+        ]
+      },
+      {
+        "rule": "Column boundary detection using black guide lines (L1-L10)",
+        "details": [
+          "Left of L1: transaction_id",
+          "Between L1-L2: transaction_date (yyyy-MM-dd HH:mm:ss, merge multi-line)",
+          "Between L2-L3: debit (借方/出账) - may be EMPTY",
+          "Between L3-L4: credit (贷方/入账) - may be EMPTY, do NOT grab balance from right",
+          "Between L4-L5: balance (余额) - ALWAYS has a value, never empty",
+          "Between L5-L6: payee_name (merge multi-line)",
+          "Between L6-L7: payee_account",
+          "Between L7-L8: memo",
+          "Between L8-L9: transaction_type",
+          "Between L9-L10: card_number (公司一卡通号) - Usually EMPTY, do NOT grab print_instance_id from right",
+          "Right of L10: print_instance_id (打印实例号) - Long codes like 536Bxxxxxxxx"
+        ]
+      }
+    ],
+    "noise_filters": [
+      "URL noise: Force ignore URL strings at top and bottom of page",
+      "Footer noise: Never extract page numbers, tips, etc."
+    ],
+    "merge_rules": [
+      "payee_name, transaction_id, print_instance_id spanning multiple lines must be merged vertically"
+    ],
+    "stop_conditions": [
+      "Stop when table end line is detected or invalid row content is encountered"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "What you see is what you get - ensure data completeness",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from China Merchants Bank statement first page header area",
+    "target_fields": [
+      "account_number",
+      "account_name",
+      "currency",
+      "start_date",
+      "end_date",
+      "total_debit_count",
+      "total_credit_count",
+      "total_debit_amount",
+      "total_credit_amount"
+    ],
+    "extraction_rules": [
+      "Only extract from text description area at top of first page",
+      "Do NOT extract from transaction detail table below",
+      "Unify date format (yyyyMMdd or yyyy-MM-dd)",
+      "Keep original amount string values"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

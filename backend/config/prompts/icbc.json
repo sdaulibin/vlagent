@@ -1,0 +1,57 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Industrial and Commercial Bank of China (ICBC) account statement",
+    "column_order": [
+      "transaction_time",
+      "income",
+      "expense",
+      "counterparty_account",
+      "debit_credit",
+      "counterparty_name",
+      "counterparty_bank_code",
+      "purpose",
+      "memo"
+    ],
+    "column_descriptions": {
+      "transaction_time": "'交易时间'. Format: 'yyyy-MM-dd HH:mm:ss' (e.g., '2024-06-30 17:07:22'). Must include both date AND time.",
+      "income": "'转入金额'. Incoming amount. Format: 'xxx,xxx.xx' with comma separators (e.g., '271,800.00'). Empty if outgoing transaction.",
+      "expense": "'转出金额'. Outgoing amount. Format: 'xxx,xxx.xx' with comma separators (e.g., '4,022.97'). Empty if outgoing transaction.",
+      "counterparty_account": "'对方账号'. Counterparty account number.",
+      "debit_credit": "'借贷标志'. Values: '借' for debit (outgoing), '贷' for credit (incoming).",
+      "counterparty_name": "'对方单位'. Counterparty name/company.",
+      "counterparty_bank_code": "'对方行号'. Counterparty bank code.",
+      "purpose": "'用途'. Transaction purpose (e.g., '5月快递费', '采购款', '转账').",
+      "memo": "'摘要'. Transaction summary/description."
+    },
+    "extraction_rules": [
+      "Transaction time MUST be in 'yyyy-MM-dd HH:mm:ss' format",
+      "Amounts MUST keep original format with comma separators (e.g., '271,800.00')",
+      "income and expense are mutually exclusive - only one has value per transaction",
+      "Skip header rows containing column titles",
+      "Ignore footer/page info"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Industrial and Commercial Bank of China (ICBC) statement first page",
+    "location": "Summary info is in the top area of the page",
+    "target_fields": {
+      "account_number": "账号",
+      "account_name": "本方账号户名",
+      "currency": "币种",
+      "bank_name": "本方账号开户行",
+      "date_range": "财务日期范围"
+    },
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}
