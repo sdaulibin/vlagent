@@ -46,10 +46,11 @@ def detect_bank_from_filename(filename: str):
         str: 银行模板ID，未识别返回 None
     """
     registry = load_bank_registry()
-    lower_filename = filename.lower()
+    keywords = registry.get("keywords", {})
     
-    for bank_name, bank_id in registry.items():
-        if bank_name in lower_filename:
+    for bank_name, bank_id in keywords.items():
+        # 中文关键词直接匹配，英文关键词忽略大小写
+        if bank_name in filename or bank_name.lower() in filename.lower():
             return bank_id
     return None
 
@@ -71,10 +72,11 @@ def detect_bank_from_image(image_path: str):
     - 济宁银行 (济宁银行股份有限公司) -> 返回: jining
     - 广发银行 (广发银行股份有限公司/CGB) -> 返回: cgb
     - 邮储银行 (中国邮政储蓄银行/PSBC) -> 返回: psbc
+    - 工商银行 (中国工商银行/ICBC) -> 返回: icbc
     - 威海银行 (威海市商业银行) -> 返回: shandong_local
     - 山东农信 (山东省农村信用社/齐鲁银行/泰安银行/潍坊银行/莱商银行等) -> 返回: shandong_local
     
-    只需返回模板ID（如 cmb, everbright, jining, cgb, psbc, shandong_local）。严禁输出其他文字。
+    只需返回模板ID（如 cmb, everbright, jining, cgb, psbc, icbc, shandong_local）。严禁输出其他文字。
     """
     
     response = request_stream(question=prompt, 
@@ -82,6 +84,7 @@ def detect_bank_from_image(image_path: str):
                              model=MODEL_LOCAL).strip().lower()
     
     # 清理AI返回的可能含有的markdown或额外空格
+    if "icbc" in response: return "icbc"
     if "cmb" in response: return "cmb"
     if "everbright" in response: return "everbright"
     if "jining" in response: return "jining"
@@ -89,7 +92,7 @@ def detect_bank_from_image(image_path: str):
     if "psbc" in response: return "psbc"
     if "shandong_local" in response: return "shandong_local"
     
-    return "shandong_local"  # 默认兜底
+    return "shandong_local"  # 默认兖底
 
 def detect_bank_type(filename: str, first_page_image: str = None):
     """
