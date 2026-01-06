@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import ShandongLocalSummary, ShandongLocalTransaction
+from src.models.shandong_models import ShandongLocalSummary, ShandongLocalTransaction
 from src.transactions.service import (
     create_shandong_transaction_records,
     create_shandong_summary_record,

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import JiningSummary, JiningTransaction
+from src.models.jining_models import JiningSummary, JiningTransaction
 from src.transactions.service import (
     create_jining_transaction_records,
     create_jining_summary_record,

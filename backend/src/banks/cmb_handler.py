@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import CmbSummary, CmbTransaction
+from src.models.cmb_models import CmbSummary, CmbTransaction
 from src.transactions.service import (
     create_cmb_transaction_records,
     create_cmb_summary_record,

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import EverbrightSummary, EverbrightTransaction
+from src.models.everbright_models import EverbrightSummary, EverbrightTransaction
 from src.transactions.service import (
     create_everbright_transaction_records,
     create_everbright_summary_record,

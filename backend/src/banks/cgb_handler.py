@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import CgbSummary, CgbTransaction
+from src.models.cgb_models import CgbSummary, CgbTransaction
 from src.transactions.service import (
     create_cgb_transaction_records,
     create_cgb_summary_record,

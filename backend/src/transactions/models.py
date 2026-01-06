@@ -1,304 +1,30 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List, TYPE_CHECKING
+"""
+银行流水数据模型统一导出入口
 
-if TYPE_CHECKING:
-    from src.files.models import FileRecord
+各银行模型定义已拆分到 src/models/*_models.py 文件中，
+本文件作为统一导出入口，保持向后兼容。
+"""
 
+# 山东地方银行
+from src.models.shandong_models import ShandongLocalSummary, ShandongLocalTransaction
 
-# ============================================================
-# 山东地方银行（潍坊银行、莱商银行、齐鲁银行）
-# ============================================================
-
-class ShandongLocalSummary(SQLModel, table=True):
-    """山东地方银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_name: Optional[str] = None       # 账户名称
-    account_number: Optional[str] = None     # 账(卡)号
-    date_range: Optional[str] = None         # 起止日期
-    income_count: Optional[str] = None       # 收入总笔数
-    income_total: Optional[str] = None       # 收入总金额
-    expense_count: Optional[str] = None      # 支出总笔数
-    expense_total: Optional[str] = None      # 支出总金额
-    has_stamp: Optional[str] = None          # 是否有盖章
-    bank_name: Optional[str] = None          # 开户行
-    stamp_type: Optional[str] = None         # 盖章类型
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="summary")
-
-
-class ShandongLocalTransaction(SQLModel, table=True):
-    """山东地方银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    sequence: Optional[str] = None           # 序号
-    transaction_time: Optional[str] = None   # 交易时间
-    channel: Optional[str] = None            # 交易渠道
-    income: Optional[str] = None             # 收入
-    expense: Optional[str] = None            # 支出
-    balance: Optional[str] = None            # 账户余额
-    currency: Optional[str] = None           # 币种
-    counterparty_account: Optional[str] = None  # 对方账号
-    counterparty_name: Optional[str] = None     # 对方户名
-    description: Optional[str] = None           # 摘要备注
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="transactions")
-
-
-# ============================================================
 # 光大银行
-# ============================================================
+from src.models.everbright_models import EverbrightSummary, EverbrightTransaction
 
-class EverbrightSummary(SQLModel, table=True):
-    """光大银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_name: Optional[str] = None       # 账户名称
-    account_number: Optional[str] = None     # 账号
-    date_range: Optional[str] = None         # 交易日期
-    debit_amount: Optional[str] = None       # 借方发生额
-    credit_amount: Optional[str] = None      # 贷方发生额
-    debit_count: Optional[str] = None        # 借方笔数
-    credit_count: Optional[str] = None       # 贷方笔数
-    bank_name: str = "光大银行"              # 开户行
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="everbright_summary")
-
-
-class EverbrightTransaction(SQLModel, table=True):
-    """光大银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    sequence: Optional[str] = None           # 序号
-    transaction_date: Optional[str] = None   # 交易日期
-    transaction_time: Optional[str] = None   # 时间
-    debit_credit: Optional[str] = None       # 借/贷
-    amount: Optional[str] = None             # 交易金额
-    balance: Optional[str] = None            # 账户余额
-    counterparty_account: Optional[str] = None  # 对方账号
-    counterparty_name: Optional[str] = None     # 对方名称
-    voucher_no: Optional[str] = None            # 凭证号
-    description: Optional[str] = None           # 摘要
-    serial_no: Optional[str] = None             # 流水号
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="everbright_transactions")
-
-
-# ============================================================
 # 招商银行
-# ============================================================
+from src.models.cmb_models import CmbSummary, CmbTransaction
 
-class CmbSummary(SQLModel, table=True):
-    """招商银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_number: Optional[str] = None     # 账号
-    account_name: Optional[str] = None       # 账号名
-    start_date: Optional[str] = None         # 开始日期
-    end_date: Optional[str] = None           # 结束日期
-    debit_count: Optional[str] = None        # 出账总笔数
-    credit_count: Optional[str] = None       # 入账总笔数
-    debit_total: Optional[str] = None        # 出账总金额
-    credit_total: Optional[str] = None       # 入账总金额
-    total_count: Optional[str] = None        # 笔数
-    bank_name: str = "招商银行"              # 开户行
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="cmb_summary")
-
-
-class CmbTransaction(SQLModel, table=True):
-    """招商银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    serial_no: Optional[str] = None          # 交易流水号
-    transaction_date: Optional[str] = None   # 交易日期
-    debit_amount: Optional[str] = None       # 借方出账
-    credit_amount: Optional[str] = None      # 贷方入账
-    balance: Optional[str] = None            # 余额
-    counterparty_name: Optional[str] = None  # 收付方名称
-    counterparty_account: Optional[str] = None  # 收付方账号
-    description: Optional[str] = None        # 摘要
-    transaction_type: Optional[str] = None   # 交易类型
-    card_no: Optional[str] = None            # 公司一卡通号
-    print_instance_no: Optional[str] = None  # 打印实例号
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="cmb_transactions")
-
-
-# ============================================================
 # 济宁银行
-# ============================================================
+from src.models.jining_models import JiningSummary, JiningTransaction
 
-class JiningSummary(SQLModel, table=True):
-    """济宁银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_number: Optional[str] = None     # 账号
-    account_name: Optional[str] = None       # 账户名称
-    date_range: Optional[str] = None         # 起止日期
-    currency: Optional[str] = None           # 币种
-    income_total: Optional[str] = None       # 收入金额合计
-    expense_total: Optional[str] = None      # 支出金额合计
-    bank_name: Optional[str] = None          # 开户机构
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="jining_summary")
-
-
-class JiningTransaction(SQLModel, table=True):
-    """济宁银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    sequence: Optional[str] = None           # 序号
-    transaction_date: Optional[str] = None   # 记账日期
-    channel: Optional[str] = None            # 交易渠道
-    income: Optional[str] = None             # 收入
-    expense: Optional[str] = None            # 支出
-    balance: Optional[str] = None            # 账户余额
-    description: Optional[str] = None        # 摘要备注
-    counterparty_info: Optional[str] = None  # 交易对手信息
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="jining_transactions")
-
-
-# ============================================================
 # 广发银行
-# ============================================================
+from src.models.cgb_models import CgbSummary, CgbTransaction
 
-class CgbSummary(SQLModel, table=True):
-    """广发银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_name: Optional[str] = None       # 户名
-    account_number: Optional[str] = None     # 账号
-    date_range: Optional[str] = None         # 起止日期
-    currency: Optional[str] = None           # 币种
-    unit: Optional[str] = None               # 单位
-    expense_total: Optional[str] = None      # 支出总金额
-    expense_count: Optional[str] = None      # 支出总笔数
-    income_total: Optional[str] = None       # 收入总金额
-    income_count: Optional[str] = None       # 收入总笔数
-    current_balance: Optional[str] = None    # 账户当前余额
-    record_count: Optional[str] = None       # 记录数
-    bank_name: str = "广发银行"              # 开户行
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="cgb_summary")
-    # 一对多关系：一个汇总对应多条交易明细
-    transactions: List["CgbTransaction"] = Relationship(back_populates="summary")
+# 邮储银行
+from src.models.psbc_models import PsbcSummary, PsbcTransaction
 
-
-class CgbTransaction(SQLModel, table=True):
-    """广发银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    summary_id: Optional[int] = Field(default=None, foreign_key="cgbsummary.id")  # 关联汇总
-    
-    serial_no: Optional[str] = None              # 流水号
-    transaction_time: Optional[str] = None       # 交易时间
-    income: Optional[str] = None                 # 收入
-    expense: Optional[str] = None                # 支出
-    balance: Optional[str] = None                # 余额
-    currency: Optional[str] = None               # 币种
-    counterparty_account: Optional[str] = None   # 对方账号
-    counterparty_name: Optional[str] = None      # 对方户名
-    transaction_branch: Optional[str] = None     # 交易行所
-    counterparty_bank_code: Optional[str] = None # 对方开户行联行号
-    counterparty_bank: Optional[str] = None      # 对方开户行
-    voucher_no: Optional[str] = None             # 凭证号
-    description: Optional[str] = None            # 摘要
-    remark: Optional[str] = None                 # 备注
-    postscript: Optional[str] = None             # 附言
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="cgb_transactions")
-    summary: Optional["CgbSummary"] = Relationship(back_populates="transactions")
-
-
-# ============================================================
-# 邮储银行（中国邮政储蓄银行）
-# ============================================================
-
-class PsbcSummary(SQLModel, table=True):
-    """邮储银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_name: Optional[str] = None       # 户名
-    account_number: Optional[str] = None     # 账号
-    income_total: Optional[str] = None       # 收入总金额
-    expense_total: Optional[str] = None      # 支出总金额
-    income_count: Optional[str] = None       # 收入总笔数
-    expense_count: Optional[str] = None      # 支出总笔数
-    start_date: Optional[str] = None         # 起始日期
-    end_date: Optional[str] = None           # 结束日期
-    bank_name: str = "邮储银行"              # 开户行
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="psbc_summary")
-
-
-class PsbcTransaction(SQLModel, table=True):
-    """邮储银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    serial_no: Optional[str] = None              # 交易流水号
-    global_route_no: Optional[str] = None        # 全局路由号
-    transaction_time: Optional[str] = None       # 交易时间
-    transaction_date: Optional[str] = None       # 记账日期
-    income: Optional[str] = None                 # 收入金额
-    expense: Optional[str] = None                # 支出金额
-    balance: Optional[str] = None                # 余额
-    counterparty_account: Optional[str] = None   # 对方账号
-    counterparty_name: Optional[str] = None      # 对方户名
-    counterparty_bank: Optional[str] = None      # 对方行名
-    purpose: Optional[str] = None                # 用途
-    postscript: Optional[str] = None             # 附言
-    description: Optional[str] = None            # 摘要
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="psbc_transactions")
-
-
-# ============================================================
-# 工商银行（中国工商银行）
-# ============================================================
-
-class IcbcSummary(SQLModel, table=True):
-    """工商银行流水汇总信息"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    account_number: Optional[str] = None      # 账号
-    account_name: Optional[str] = None        # 本方账号户名
-    currency: Optional[str] = None            # 币种
-    bank_name: Optional[str] = None           # 本方账号开户行
-    date_range: Optional[str] = None          # 财务日期范围
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="icbc_summary")
-
-
-class IcbcTransaction(SQLModel, table=True):
-    """工商银行交易明细"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
-    
-    transaction_time: Optional[str] = None       # 交易时间
-    income: Optional[str] = None                 # 转入金额
-    expense: Optional[str] = None                # 转出金额
-    counterparty_account: Optional[str] = None   # 对方账号
-    debit_credit: Optional[str] = None           # 借贷标志
-    counterparty_name: Optional[str] = None      # 对方单位
-    counterparty_bank_code: Optional[str] = None # 对方行号
-    description: Optional[str] = None            # 摘要
-    purpose: Optional[str] = None                # 用途
-    
-    file_record: Optional["FileRecord"] = Relationship(back_populates="icbc_transactions")
+# 工商银行
+from src.models.icbc_models import IcbcSummary, IcbcTransaction
 
 
 # 向后兼容的别名
@@ -306,3 +32,21 @@ SummaryRecord = ShandongLocalSummary
 TransactionRecord = ShandongLocalTransaction
 
 
+__all__ = [
+    # 山东地方银行
+    "ShandongLocalSummary", "ShandongLocalTransaction",
+    # 光大银行
+    "EverbrightSummary", "EverbrightTransaction",
+    # 招商银行
+    "CmbSummary", "CmbTransaction",
+    # 济宁银行
+    "JiningSummary", "JiningTransaction",
+    # 广发银行
+    "CgbSummary", "CgbTransaction",
+    # 邮储银行
+    "PsbcSummary", "PsbcTransaction",
+    # 工商银行
+    "IcbcSummary", "IcbcTransaction",
+    # 向后兼容别名
+    "SummaryRecord", "TransactionRecord",
+]

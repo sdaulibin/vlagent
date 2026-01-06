@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, delete
 
 from src.banks.base import BankHandler, register_bank
-from src.transactions.models import PsbcSummary, PsbcTransaction
+from src.models.psbc_models import PsbcSummary, PsbcTransaction
 from src.transactions.service import (
     create_psbc_transaction_records,
     create_psbc_summary_record,
