@@ -19,9 +19,9 @@
 | **招商银行** | `cmb` | 账号名、出入账汇总 | 交易流水号、收付方信息、公司一卡通号 |
 | **济宁银行** | `jining` | 账户名称、账号、收支汇总 | 交易时间、收付金额、对方信息、开户机构 |
 | **广发银行** | `cgb` | 户名、账号、收支笔数金额 | 流水号、交易时间、对方账户、摘要附言 |
-| **威海银行** | `shandong_local` | 同山东地方银行 | 同山东地方银行 |
+| **邮储银行** | `psbc` | 账号、户名、收支汇总 | 交易时间、收支金额、对方行名、用途附言 |
 
-> 💡 通过 JSON Schema 配置扩展新银行模板，无需修改代码
+> 💡 通过策略模式扩展新银行模板，只需创建 Handler 文件即可
 > 🆕 广发银行支持多汇总识别、跨页记录自动合并
 
 ## 🛠️ 技术栈
@@ -81,6 +81,14 @@ vl_flow/
 │   ├── main.py              # 应用入口
 │   ├── api.py               # 路由注册
 │   ├── src/                 # 业务模块
+│   │   ├── banks/           # 🆕 银行处理器模块 (策略模式)
+│   │   │   ├── base.py          # 基类 BankHandler + 注册表
+│   │   │   ├── shandong_handler.py
+│   │   │   ├── everbright_handler.py
+│   │   │   ├── cmb_handler.py
+│   │   │   ├── jining_handler.py
+│   │   │   ├── cgb_handler.py
+│   │   │   └── psbc_handler.py
 │   │   ├── files/           # 文件上传与处理
 │   │   ├── transactions/    # 交易明细查询
 │   │   ├── contracts/       # 合同比对逻辑
@@ -92,14 +100,46 @@ vl_flow/
 │   └── services/            # 通用服务
 │       ├── pdf_processor.py     # PDF 解析与银行识别
 │       ├── pdf/                 # PDF 处理子模块
-│       │   ├── bank_detector.py     # 银行类型检测
-│       │   ├── data_extractor.py    # AI 数据提取
-│       │   ├── excel_exporter.py    # Excel 导出
-│       │   ├── image_marker.py      # 图像标注
-│       │   └── pdf_utils.py         # PDF 工具函数
 │       └── contract_processor.py    # 合同比对
 └── docker-compose.yml       # 基础设施编排
 ```
+
+## 🏗️ 架构设计
+
+### 银行处理器策略模式
+
+采用策略模式封装各银行的处理逻辑，提升可维护性和扩展性：
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    BankHandler (基类)                    │
+├─────────────────────────────────────────────────────────┤
+│ + get_transactions()    获取交易明细                     │
+│ + get_summary()         获取汇总信息                     │
+│ + export_to_excel()     导出 Excel                      │
+│ + create_records()      创建数据库记录                   │
+│ + delete_records()      删除关联记录                     │
+│ + get_bank_names()      银行匹配名称                     │
+│ + get_summary_schema()  汇总 Schema                     │
+│ + get_transaction_schema()  交易 Schema                 │
+└─────────────────────────────────────────────────────────┘
+          ▲
+          │ 继承
+    ┌─────┴─────┬─────────┬─────────┬─────────┬─────────┐
+    │           │         │         │         │         │
+┌───┴───┐ ┌─────┴───┐ ┌───┴───┐ ┌───┴───┐ ┌───┴───┐ ┌───┴───┐
+│Shandong│ │Everbright│ │  CMB  │ │Jining │ │  CGB  │ │ PSBC  │
+│Handler │ │ Handler  │ │Handler│ │Handler│ │Handler│ │Handler│
+└────────┘ └──────────┘ └───────┘ └───────┘ └───────┘ └───────┘
+```
+
+### 添加新银行（3 步）
+
+1. 创建 `backend/src/banks/xxx_handler.py`
+2. 继承 `BankHandler` 并实现所有抽象方法
+3. 使用 `@register_bank` 装饰器注册
+
+**无需修改任何 Router 代码！**
 
 ## 📡 API 概览
 
@@ -110,30 +150,13 @@ vl_flow/
 *   `POST /api/files/upload` - 上传银行流水文件
 *   `POST /api/files/{id}/recognize` - 触发识别
 *   `GET /api/files/{id}/export` - 导出 Excel
-*   `GET /api/transactions/{id}` - 获取交易明细与汇总
+*   `GET /api/transactions/{id}` - 获取交易明细
+*   `GET /api/transactions/{id}/summary` - 获取汇总信息
 
 ### 📋 合同比对
 *   `POST /api/contracts/compare` - 上传文档进行比对
 *   `GET /api/contracts/{id}` - 查询任务状态
 *   `GET /api/contracts/{id}/diffs` - 获取差异数据
-
-## 🧩 核心特性
-
-### 银行识别流程
-
-```
-PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入对应表
-          ↓
-    1. 文件名匹配
-    2. 印章识别
-    3. Logo识别
-```
-
-### 合同比对
-
-*   支持 PDF/Word 文档上传
-*   Tiptap 富文本编辑器展示差异
-*   双栏对比、差异高亮、同步滚动
 
 ## 📄 License
 

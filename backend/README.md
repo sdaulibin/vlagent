@@ -48,23 +48,34 @@ backend/
 │   ├── database.py         # 数据库连接 (SQLModel + asyncpg)
 │   ├── exceptions.py       # 自定义异常
 │   ├── json_repir.py       # JSON 修复工具
+│   ├── banks/              # 🆕 银行处理器模块 (策略模式)
+│   │   ├── __init__.py         # 模块入口，自动注册所有 Handler
+│   │   ├── base.py             # 基类 BankHandler + 注册装饰器
+│   │   ├── shandong_handler.py # 山东地方银行
+│   │   ├── everbright_handler.py # 光大银行
+│   │   ├── cmb_handler.py      # 招商银行
+│   │   ├── jining_handler.py   # 济宁银行
+│   │   ├── cgb_handler.py      # 广发银行
+│   │   └── psbc_handler.py     # 邮储银行
 │   ├── files/              # 文件上传与银行识别
-│   │   ├── api.py          # 上传/识别/导出 API
-│   │   └── models.py       # 数据模型 (多银行表)
+│   │   ├── router.py       # 上传/识别/导出 API
+│   │   └── models.py       # 数据模型
 │   ├── transactions/       # 交易明细查询
-│   │   ├── api.py          # 交易查询 API
-│   │   └── models.py       # 交易数据模型
+│   │   ├── router.py       # 交易查询 API
+│   │   ├── models.py       # 交易数据模型
+│   │   └── service.py      # 记录创建服务
 │   └── contracts/          # 合同比对
-│       ├── api.py          # 比对任务 API
+│       ├── router.py       # 比对任务 API
 │       └── models.py       # 合同数据模型
 ├── config/
-│   ├── bank_schemas/       # 🆕 银行模板配置
+│   ├── bank_schemas/       # 银行模板配置 (JSON)
 │   │   ├── bank_registry.json   # 银行注册表
 │   │   ├── shandong_local.json  # 山东地方银行
 │   │   ├── everbright.json      # 光大银行
 │   │   ├── cmb.json             # 招商银行
 │   │   ├── jining.json          # 济宁银行
-│   │   └── cgb.json             # 广发银行
+│   │   ├── cgb.json             # 广发银行
+│   │   └── psbc.json            # 邮储银行
 │   └── prompts.json        # AI 提示词配置
 └── services/               # 通用服务
     ├── pdf_processor.py        # PDF 解析 & 银行识别入口
@@ -74,38 +85,68 @@ backend/
     │   ├── excel_exporter.py   # Excel 导出 (广发跨页合并)
     │   ├── image_marker.py     # 图像标注处理
     │   └── pdf_utils.py        # PDF 工具函数
-    ├── core/                   # 核心工具
     └── contract_processor.py   # 合同比对处理
 ```
 
-## 🏦 多银行识别架构
+## 🏗️ 银行处理器架构
 
-### 银行识别流程
+### 策略模式设计
 
+采用策略模式将各银行的处理逻辑封装为独立的 Handler 类：
+
+```python
+from src.banks import get_bank_handler
+
+# 获取银行处理器
+handler = get_bank_handler("psbc")
+
+# 调用统一接口
+transactions = await handler.get_transactions(session, file_id)
+summary = await handler.get_summary(session, file_id)
 ```
-PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入对应表
-          ↓
-    1. 文件名匹配
-    2. 印章识别
-    3. Logo识别
-```
+
+### BankHandler 抽象方法
+
+| 方法 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `get_transactions()` | 抽象 | 获取交易明细 |
+| `get_summary()` | 抽象 | 获取汇总信息 |
+| `export_to_excel()` | 抽象 | 导出到 Excel |
+| `create_records()` | 抽象 | 创建数据库记录 |
+| `delete_records()` | 抽象 | 删除关联记录 |
+| `get_bank_names()` | 抽象 | 银行匹配名称列表 |
+| `get_summary_schema()` | 抽象 | 汇总 Schema |
+| `get_transaction_schema()` | 抽象 | 交易 Schema |
+| `get_vertical_line_config()` | 可选 | 辅助线配置 |
+| `get_summary_config()` | 可选 | 汇总提取配置 |
 
 ### 添加新银行模板
 
-1. 在 `config/bank_schemas/` 创建新的 JSON 配置：
+**只需 3 步，无需修改任何 Router 代码：**
 
-```json
-{
-    "template_id": "new_bank",
-    "bank_names": ["新银行名称"],
-    "summary_schema": { ... },
-    "transaction_schema": [ ... ]
-}
+1. 创建 `src/banks/xxx_handler.py`：
+
+```python
+from src.banks.base import BankHandler, register_bank
+
+@register_bank
+class XxxHandler(BankHandler):
+    bank_type = "xxx"
+    
+    def get_bank_names(self) -> List[str]:
+        return ["XXX银行", "XXX Bank"]
+    
+    def get_summary_schema(self) -> Dict[str, Any]:
+        return {"账号": "", "户名": "", ...}
+    
+    def get_transaction_schema(self) -> Dict[str, Any]:
+        return {"交易时间": "", "金额": "", ...}
+    
+    # ... 实现其他抽象方法
 ```
 
-2. 在 `bank_registry.json` 中注册
-3. 在 `src/files/models.py` 添加对应的数据表
-4. 在 `src/files/api.py` 添加记录创建函数
+2. 在 `src/banks/__init__.py` 中导入新 Handler
+3. 在 `src/transactions/models.py` 添加对应数据表
 
 ## 📡 API 接口
 
@@ -117,7 +158,9 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 | `POST` | `/api/files/upload` | 上传文件 |
 | `POST` | `/api/files/{id}/recognize` | 触发识别 |
 | `GET` | `/api/files/{id}/export` | 导出 Excel |
-| `GET` | `/api/transactions/{id}` | 获取交易明细与汇总 |
+| `DELETE` | `/api/files/{id}` | 删除文件及关联数据 |
+| `GET` | `/api/transactions/{id}` | 获取交易明细 |
+| `GET` | `/api/transactions/{id}/summary` | 获取汇总信息 |
 
 ### 📋 合同比对
 
@@ -151,7 +194,6 @@ PDF上传 → 银行类型检测 → 加载对应Schema → AI提取 → 存入�
 | 招商银行 | `CmbSummary` | `CmbTransaction` |
 | 济宁银行 | `JiningSummary` | `JiningTransaction` |
 | 广发银行 | `CgbSummary` | `CgbTransaction` |
+| 邮储银行 | `PsbcSummary` | `PsbcTransaction` |
 
 每种银行的表结构与其 Schema 字段对应，确保数据完整性。
-
-> 🆕 广发银行 `CgbTransaction` 支持 `summary_id` 外键，用于多汇总场景
