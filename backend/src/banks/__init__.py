@@ -12,6 +12,7 @@ from src.banks.cmb_handler import CmbHandler
 from src.banks.jining_handler import JiningHandler
 from src.banks.cgb_handler import CgbHandler
 from src.banks.psbc_handler import PsbcHandler
+from src.banks.icbc_handler import IcbcHandler
 
 __all__ = [
     "get_bank_handler",
@@ -23,4 +24,5 @@ __all__ = [
     "JiningHandler",
     "CgbHandler",
     "PsbcHandler",
+    "IcbcHandler",
 ]

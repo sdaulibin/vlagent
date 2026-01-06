@@ -1,0 +1,34 @@
+{
+    "template_id": "icbc",
+    "bank_names": [
+        "中国工商银行",
+        "工商银行",
+        "工行",
+        "ICBC"
+    ],
+    "vertical_line_config": {
+        "enabled": false,
+        "lines": []
+    },
+    "summary_config": {
+        "first_page_only": true
+    },
+    "summary_schema": {
+        "账号": "",
+        "本方账号户名": "",
+        "币种": "",
+        "本方账号开户行": "",
+        "财务日期范围": ""
+    },
+    "transaction_schema": {
+        "交易时间": "",
+        "转入金额": "",
+        "转出金额": "",
+        "对方账号": "",
+        "借贷标志": "",
+        "对方单位": "",
+        "对方行号": "",
+        "摘要": "",
+        "用途": ""
+    }
+}

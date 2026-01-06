@@ -16,6 +16,8 @@ from src.transactions.models import (
     CgbSummary, CgbTransaction,
     # 邮储银行
     PsbcSummary, PsbcTransaction,
+    # 工商银行
+    IcbcSummary, IcbcTransaction,
 )
 
 
@@ -292,6 +294,44 @@ def create_psbc_summary_record(file_id: int, summary_data: dict) -> Optional[Psb
         expense_count=summary_data.get("支出总笔数", ""),
         start_date=summary_data.get("起始日期", ""),
         end_date=summary_data.get("结束日期", "")
+    )
+
+
+# ============================================================
+# 工商银行（中国工商银行）记录创建
+# ============================================================
+
+def create_icbc_transaction_records(file_id: int, raw_transactions: list) -> List[IcbcTransaction]:
+    """将原始交易数据转换为工商银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = IcbcTransaction(
+            file_id=file_id,
+            transaction_time=item.get("交易时间", ""),
+            income=item.get("转入金额", ""),
+            expense=item.get("转出金额", ""),
+            counterparty_account=item.get("对方账号", ""),
+            debit_credit=item.get("借贷标志", ""),
+            counterparty_name=item.get("对方单位", ""),
+            counterparty_bank_code=item.get("对方行号", ""),
+            description=item.get("摘要", ""),
+            purpose=item.get("用途", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_icbc_summary_record(file_id: int, summary_data: dict) -> Optional[IcbcSummary]:
+    """创建工商银行汇总记录"""
+    if not summary_data:
+        return None
+    return IcbcSummary(
+        file_id=file_id,
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("本方账号户名", ""),
+        currency=summary_data.get("币种", ""),
+        bank_name=summary_data.get("本方账号开户行", ""),
+        date_range=summary_data.get("财务日期范围", "")
     )
 
 

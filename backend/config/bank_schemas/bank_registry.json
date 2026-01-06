@@ -10,7 +10,10 @@
     "中国邮政储蓄银行": "psbc",
     "邮储银行": "psbc",
     "邮政储蓄银行": "psbc",
-    "邮政储蓄": "psbc"
+    "邮政储蓄": "psbc",
+    "中国工商银行": "icbc",
+    "工商银行": "icbc",
+    "工行": "icbc"
   },
   "default": "shandong_local"
 }
