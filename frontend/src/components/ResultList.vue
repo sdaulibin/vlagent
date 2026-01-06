@@ -84,7 +84,8 @@ const bankTypeColor = computed(() => {
         'cmb': 'bg-red-100 text-red-700',
         'jining': 'bg-teal-100 text-teal-700',
         'cgb': 'bg-orange-100 text-orange-700',
-        'psbc': 'bg-green-100 text-green-700'
+        'psbc': 'bg-green-100 text-green-700',
+        'icbc': 'bg-rose-100 text-rose-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -119,6 +120,12 @@ const getAmountDisplay = (item: Transaction) => {
         return { text: item.expense || '0', isIncome: false, prefix: '-' };
     } else if (bankType.value === 'psbc') {
         // 邮储银行：收入/支出
+        if (item.income && parseFloat(item.income) > 0) {
+            return { text: item.income, isIncome: true, prefix: '+' };
+        }
+        return { text: item.expense || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'icbc') {
+        // 工商银行：转入/转出
         if (item.income && parseFloat(item.income) > 0) {
             return { text: item.income, isIncome: true, prefix: '+' };
         }
@@ -452,6 +459,30 @@ const prevPage = () => {
                                 <p class="font-bold text-green-600">{{ currentSummary.expense_total || '0' }}</p>
                             </div>
                         </div>
+                        
+                        <!-- 工商银行基本信息 -->
+                        <div v-else-if="bankType === 'icbc'" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">本方账号户名</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.account_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">账号</p>
+                                <p class="font-medium text-gray-700 break-all">{{ currentSummary.account_number || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">币种</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.currency || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">本方账号开户行</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.bank_name || '-' }}</p>
+                            </div>
+                            <div class="summary-item">
+                                <p class="text-xs text-gray-400">财务日期范围</p>
+                                <p class="font-medium text-gray-700">{{ currentSummary.date_range || '-' }}</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- 明细列表分隔线 -->
@@ -548,6 +579,13 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">记账日期</p>
                                             <p class="text-sm text-gray-600">{{ item.transaction_date || '-' }}</p>
                                         </div>
+                                        <!-- 工商银行字段 -->
+                                        <div v-else-if="bankType === 'icbc'">
+                                            <p class="text-xs text-gray-400">借贷标志</p>
+                                            <span :class="['inline-block px-2 py-0.5 rounded text-xs font-medium', item.debit_credit === '贷' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600']">
+                                                {{ item.debit_credit || '-' }}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <!-- 山东银行/光大银行: 对方户名/对方名称 -->
@@ -571,9 +609,17 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">对方户名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>
+                                        <div v-else-if="bankType === 'icbc'">
+                                            <p class="text-xs text-gray-400">对方单位</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
+                                        </div>
                                         <div v-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">对方行名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_bank">{{ item.counterparty_bank || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'icbc'">
+                                            <p class="text-xs text-gray-400">对方行号</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_bank_code">{{ item.counterparty_bank_code || '-' }}</p>
                                         </div>
                                         
                                         <!-- 对方账号/收付方账号 -->
@@ -607,6 +653,10 @@ const prevPage = () => {
                                             <p class="text-sm text-gray-600 truncate" :title="item.card_no">{{ item.card_no || '-' }}</p>
                                         </div>
                                         <div v-if="bankType === 'psbc'">
+                                            <p class="text-xs text-gray-400">用途</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.purpose">{{ item.purpose || '-' }}</p>
+                                        </div>
+                                        <div v-if="bankType === 'icbc'">
                                             <p class="text-xs text-gray-400">用途</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.purpose">{{ item.purpose || '-' }}</p>
                                         </div>
