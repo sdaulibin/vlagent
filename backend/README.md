@@ -57,7 +57,8 @@ backend/
 │   │   ├── jining_handler.py   # 济宁银行
 │   │   ├── cgb_handler.py      # 广发银行
 │   │   ├── psbc_handler.py     # 邮储银行
-│   │   └── icbc_handler.py     # 🆕 工商银行
+│   │   ├── icbc_handler.py     # 工商银行
+│   │   └── ccb_handler.py      # 🆕 建设银行
 │   ├── files/              # 文件上传与银行识别
 │   │   ├── router.py       # 上传/识别/导出 API
 │   │   └── models.py       # 数据模型
@@ -77,7 +78,8 @@ backend/
 │   │   ├── jining.json          # 济宁银行
 │   │   ├── cgb.json             # 广发银行
 │   │   ├── psbc.json            # 邮储银行
-│   │   └── icbc.json            # 🆕 工商银行
+│   │   ├── icbc.json            # 工商银行
+│   │   └── ccb.json             # 🆕 建设银行
 │   └── prompts/            # 🆕 AI 提示词配置 (按银行拆分)
 │       ├── default.json        # 默认提示词
 │       └── *.json              # 各银行专属提示词
@@ -201,5 +203,6 @@ class XxxHandler(BankHandler):
 | 广发银行     | `CgbSummary`           | `CgbTransaction`           |
 | 邮储银行     | `PsbcSummary`          | `PsbcTransaction`          |
 | 工商银行     | `IcbcSummary`          | `IcbcTransaction`          |
+| 建设银行     | `CcbSummary`           | `CcbTransaction`           |
 
 > 🆕 模型已按银行拆分到 `src/models/` 目录，`transactions/models.py` 作为统一导出入口。
