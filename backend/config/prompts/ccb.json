@@ -1,0 +1,77 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from China Construction Bank (CCB) account details",
+    "column_order": [
+      "账号",
+      "交易时间",
+      "借方发生额",
+      "贷方发生额",
+      "余额",
+      "币种",
+      "对方户名",
+      "对方账号",
+      "对方开户机构",
+      "记账日期",
+      "摘要",
+      "备注",
+      "账户明细编号-交易流水号",
+      "企业流水号",
+      "凭证种类",
+      "凭证号",
+      "交易介质编号"
+    ],
+    "column_descriptions": {
+      "账号": "本方账户号码，格式如 '37101983710051014358'",
+      "交易时间": "交易发生时间，格式如 '20240104 16:05:56'",
+      "借方发生额": "支出金额，无数据则为空或 0.00",
+      "贷方发生额": "收入金额，格式如 '1085168.30'",
+      "余额": "交易后账户余额，格式如 '10931401.51'",
+      "币种": "货币类型，如 '人民币元'",
+      "对方户名": "交易对方的名称",
+      "对方账号": "交易对方的账号",
+      "对方开户机构": "对方账号的开户银行，可能含分行支行信息",
+      "记账日期": "记账日期，格式如 '20240104'",
+      "摘要": "交易摘要，如 '结汇'、'电子转账'、'手续费'",
+      "备注": "备注信息，如对公人民币转账说明",
+      "账户明细编号-交易流水号": "流水号，格式如 '9216-37198371016SPG6YNCS'",
+      "企业流水号": "企业端流水号（可能为空）",
+      "凭证种类": "凭证类型，如 '电子转账凭证'",
+      "凭证号": "凭证编号（可能为空）",
+      "交易介质编号": "交易介质编号，如 '105405627067'"
+    },
+    "extraction_rules": [
+      "Skip header rows (containing '账号', '交易时间' text)",
+      "Ignore footer info",
+      "账号列可能每行都重复，需要正确提取",
+      "借方发生额为支出，贷方发生额为收入",
+      "Keep original amount format",
+      "对方开户机构可能跨多行显示，需合并",
+      "账户明细编号-交易流水号格式为：数字-字母数字组合"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from China Construction Bank account details header",
+    "location": "Summary info is in the top area of the page, including '本方户名' on the left and '打印日期' on the right",
+    "target_fields": {
+      "本方户名": "Account holder name, like '青岛开创食品有限责任公司'",
+      "打印日期": "Print date in the top-right area, format like '2025年1月13日'"
+    },
+    "extraction_rules": [
+      "本方户名 appears after '本方户名：' label on the left side",
+      "打印日期 appears after '打印日期：' label on the right side",
+      "Only extract from top header area, NOT from transaction detail table"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

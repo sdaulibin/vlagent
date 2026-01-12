@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         CgbSummary, CgbTransaction,
         PsbcSummary, PsbcTransaction,
         IcbcSummary, IcbcTransaction,
+        CcbSummary, CcbTransaction,
     )
 
 
@@ -51,6 +52,10 @@ class FileRecord(SQLModel, table=True):
     # 工商银行关联
     icbc_transactions: List["IcbcTransaction"] = Relationship(back_populates="file_record")
     icbc_summary: Optional["IcbcSummary"] = Relationship(back_populates="file_record")
+    
+    # 建设银行关联
+    ccb_transactions: List["CcbTransaction"] = Relationship(back_populates="file_record")
+    ccb_summary: Optional["CcbSummary"] = Relationship(back_populates="file_record")
 
 
 # 从 transactions 模块导入模型（向后兼容）
@@ -62,6 +67,7 @@ from src.transactions.models import (
     CgbSummary, CgbTransaction,
     PsbcSummary, PsbcTransaction,
     IcbcSummary, IcbcTransaction,
+    CcbSummary, CcbTransaction,
     SummaryRecord, TransactionRecord,
 )
 
@@ -74,5 +80,6 @@ __all__ = [
     "CgbSummary", "CgbTransaction",
     "PsbcSummary", "PsbcTransaction",
     "IcbcSummary", "IcbcTransaction",
+    "CcbSummary", "CcbTransaction",
     "SummaryRecord", "TransactionRecord",
 ]

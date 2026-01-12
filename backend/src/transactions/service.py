@@ -18,6 +18,8 @@ from src.transactions.models import (
     PsbcSummary, PsbcTransaction,
     # 工商银行
     IcbcSummary, IcbcTransaction,
+    # 建设银行
+    CcbSummary, CcbTransaction,
 )
 
 
@@ -332,6 +334,49 @@ def create_icbc_summary_record(file_id: int, summary_data: dict) -> Optional[Icb
         currency=summary_data.get("币种", ""),
         bank_name=summary_data.get("本方账号开户行", ""),
         date_range=summary_data.get("财务日期范围", "")
+    )
+
+
+# ============================================================
+# 建设银行（中国建设银行）记录创建
+# ============================================================
+
+def create_ccb_transaction_records(file_id: int, raw_transactions: list) -> List[CcbTransaction]:
+    """将原始交易数据转换为建设银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = CcbTransaction(
+            file_id=file_id,
+            account_number=item.get("账号", ""),
+            transaction_time=item.get("交易时间", ""),
+            debit_amount=item.get("借方发生额", ""),
+            credit_amount=item.get("贷方发生额", ""),
+            balance=item.get("余额", ""),
+            currency=item.get("币种", ""),
+            counterparty_name=item.get("对方户名", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_bank=item.get("对方开户机构", ""),
+            booking_date=item.get("记账日期", ""),
+            description=item.get("摘要", ""),
+            remark=item.get("备注", ""),
+            transaction_serial=item.get("账户明细编号-交易流水号", ""),
+            enterprise_serial=item.get("企业流水号", ""),
+            voucher_type=item.get("凭证种类", ""),
+            voucher_number=item.get("凭证号", ""),
+            transaction_medium=item.get("交易介质编号", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_ccb_summary_record(file_id: int, summary_data: dict) -> Optional[CcbSummary]:
+    """创建建设银行汇总记录"""
+    if not summary_data:
+        return None
+    return CcbSummary(
+        file_id=file_id,
+        account_name=summary_data.get("本方户名", ""),
+        print_date=summary_data.get("打印日期", "")
     )
 
 

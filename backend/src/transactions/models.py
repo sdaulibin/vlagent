@@ -26,6 +26,9 @@ from src.models.psbc_models import PsbcSummary, PsbcTransaction
 # 工商银行
 from src.models.icbc_models import IcbcSummary, IcbcTransaction
 
+# 建设银行
+from src.models.ccb_models import CcbSummary, CcbTransaction
+
 
 # 向后兼容的别名
 SummaryRecord = ShandongLocalSummary
@@ -47,6 +50,8 @@ __all__ = [
     "PsbcSummary", "PsbcTransaction",
     # 工商银行
     "IcbcSummary", "IcbcTransaction",
+    # 建设银行
+    "CcbSummary", "CcbTransaction",
     # 向后兼容别名
     "SummaryRecord", "TransactionRecord",
 ]

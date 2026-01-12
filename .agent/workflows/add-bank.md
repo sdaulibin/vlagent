@@ -9,8 +9,9 @@ description: 添加新银行流水识别模板
 ## 所需信息
 
 请提供以下信息：
+
 1. **银行名称**（如：工商银行）
-2. **模板ID**（如：icbc，用于文件命名）
+2. **模板 ID**（如：icbc，用于文件命名）
 3. **银行关键词**（用于自动识别，如：工商银行、中国工商银行、ICBC）
 4. **汇总信息字段**（如：户名、账号、收支汇总等）
 5. **交易明细字段**（如：交易时间、收入、支出、余额等）
@@ -21,29 +22,29 @@ description: 添加新银行流水识别模板
 
 ```json
 {
-    "template_id": "模板ID",
-    "bank_names": ["银行名称1", "银行名称2"],
-    "vertical_line_config": {
-        "enabled": false,
-        "lines": []
-    },
-    "summary_schema": {
-        "户名": "",
-        "账号": "",
-        "起止日期": "",
-        "收入总金额": "",
-        "支出总金额": ""
-    },
-    "transaction_schema": {
-        "流水号": "",
-        "交易时间": "",
-        "收入": "",
-        "支出": "",
-        "余额": "",
-        "对方账号": "",
-        "对方户名": "",
-        "摘要": ""
-    }
+  "template_id": "模板ID",
+  "bank_names": ["银行名称1", "银行名称2"],
+  "vertical_line_config": {
+    "enabled": false,
+    "lines": []
+  },
+  "summary_schema": {
+    "户名": "",
+    "账号": "",
+    "起止日期": "",
+    "收入总金额": "",
+    "支出总金额": ""
+  },
+  "transaction_schema": {
+    "流水号": "",
+    "交易时间": "",
+    "收入": "",
+    "支出": "",
+    "余额": "",
+    "对方账号": "",
+    "对方户名": "",
+    "摘要": ""
+  }
 }
 ```
 
@@ -65,6 +66,7 @@ description: 添加新银行流水识别模板
 ## 步骤 3：创建数据库模型（可选）
 
 如果需要自定义字段，在 `backend/src/transactions/models.py` 中添加：
+
 - Summary 模型（汇总信息）
 - Transaction 模型（交易明细）
 
@@ -77,12 +79,13 @@ description: 添加新银行流水识别模板
 
 ## 现有模板参考
 
-| 银行 | 模板ID | Schema 文件 |
-|-----|--------|------------|
-| 广发银行 | cgb | cgb.json |
-| 招商银行 | cmb | cmb.json |
-| 光大银行 | everbright | everbright.json |
-| 济宁银行 | jining | jining.json |
+| 银行         | 模板 ID        | Schema 文件         |
+| ------------ | -------------- | ------------------- |
+| 广发银行     | cgb            | cgb.json            |
+| 招商银行     | cmb            | cmb.json            |
+| 光大银行     | everbright     | everbright.json     |
+| 济宁银行     | jining         | jining.json         |
 | 山东地方银行 | shandong_local | shandong_local.json |
-| 邮储银行 | psbc | psbc.json |
-
+| 邮储银行     | psbc           | psbc.json           |
+| 工商银行     | icbc           | icbc.json           |
+| 建设银行     | ccb            | ccb.json            |
