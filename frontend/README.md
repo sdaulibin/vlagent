@@ -41,7 +41,8 @@ src/
 │   │   ├── CgbSummary.vue
 │   │   ├── PsbcSummary.vue
 │   │   ├── IcbcSummary.vue
-│   │   └── CcbSummary.vue
+│   │   ├── CcbSummary.vue
+│   │   └── AbcSummary.vue
 │   ├── ContractUpload.vue  # 合同上传
 │   ├── ContractHistory.vue # 合同历史记录
 │   ├── ContractResultView.vue # 合同比对结果
@@ -66,6 +67,7 @@ src/
 | **邮储银行**     | 收支总金额、总笔数         | 交易时间、对方行名、用途、附言               |
 | **工商银行**     | 本方账号户名、币种、开户行 | 交易时间、转入/转出金额、对方单位、用途      |
 | **建设银行**     | 本方户名、打印日期         | 交易时间、借贷金额、对方开户机构、交易流水号 |
+| **农业银行**     | 账号、户名、收支笔数金额   | 交易时间、收入/支出金额、对方开户行          |
 
 ### 类型定义
 
@@ -79,7 +81,8 @@ type BankType =
   | "cgb"
   | "psbc"
   | "icbc"
-  | "ccb";
+  | "ccb"
+  | "abc";
 
 interface Summary {
   bank_type: BankType;
@@ -145,6 +148,7 @@ interface Transaction {
 - `PsbcSummary.vue` - 邮储银行
 - `IcbcSummary.vue` - 工商银行
 - `CcbSummary.vue` - 建设银行
+- `AbcSummary.vue` - 农业银行
 
 ### `TiptapViewer.vue` & `ContractResultView.vue`
 

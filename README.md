@@ -22,6 +22,7 @@
 | **邮储银行**     | `psbc`           | 账号、户名、收支汇总         | 交易时间、收支金额、对方行名、用途附言     |
 | **工商银行**     | `icbc`           | 本方账号户名、币种、开户行   | 交易时间、转入/转出金额、对方单位、用途    |
 | **建设银行**     | `ccb`            | 本方户名、打印日期           | 交易时间、借贷金额、对方开户机构、记账日期 |
+| **农业银行**     | `abc`            | 账号、户名、收支笔数金额     | 交易时间、收入/支出金额、对方开户行        |
 
 > 💡 通过策略模式扩展新银行模板，只需创建 Handler 文件即可
 > 🆕 广发银行支持多汇总识别、跨页记录自动合并
@@ -87,10 +88,10 @@ vl_flow/
 │   │   ├── banks/           # 银行处理器模块 (策略模式)
 │   │   │   ├── base.py          # 基类 BankHandler + 注册表
 │   │   │   ├── *_handler.py     # 各银行处理器
-│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb
+│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb, abc
 │   │   ├── models/          # 🆕 银行模型模块 (按银行拆分)
 │   │   │   ├── *_models.py      # 各银行数据模型
-│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb
+│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb, abc
 │   │   ├── files/           # 文件上传与处理
 │   │   ├── transactions/    # 交易明细查询 (统一导出入口)
 │   │   ├── contracts/       # 合同比对逻辑
