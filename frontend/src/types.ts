@@ -8,7 +8,8 @@ export type BankType =
   | "psbc"
   | "icbc"
   | "ccb"
-  | "abc";
+  | "abc"
+  | "boc";
 
 // 统一交易记录接口（包含所有银行的字段）
 export interface Transaction {
@@ -66,6 +67,13 @@ export interface Transaction {
   voucher_type?: string; // 凭证种类
   voucher_number?: string; // 凭证号
   transaction_medium?: string; // 交易介质编号
+
+  // 中国银行字段
+  value_date?: string; // 起息日 Val.D.
+  voucher?: string; // 凭证 Vou.
+  transaction_details?: string; // 凭证号/业务号/用途/摘要
+  reference_no?: string; // 机构/柜员/流水 Reference No.
+  notes?: string; // 备注 Notes
 }
 
 // 统一汇总接口（包含所有银行的字段）
@@ -111,6 +119,9 @@ export interface Summary {
 
   // 建设银行字段
   print_date?: string; // 打印日期
+
+  // 中国银行字段
+  account_type?: string; // 账户类型 Account Type
 }
 
 export interface FileItem {
@@ -133,4 +144,5 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
   icbc: "工商银行",
   ccb: "建设银行",
   abc: "农业银行",
+  boc: "中国银行",
 };

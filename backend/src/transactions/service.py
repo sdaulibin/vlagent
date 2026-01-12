@@ -22,6 +22,8 @@ from src.transactions.models import (
     CcbSummary, CcbTransaction,
     # 农业银行
     AbcSummary, AbcTransaction,
+    # 中国银行
+    BocSummary, BocTransaction,
 )
 
 
@@ -424,6 +426,48 @@ def create_abc_summary_record(file_id: int, summary_data: dict) -> Optional[AbcS
         income_total=summary_data.get("总收入金额", ""),
         expense_count=summary_data.get("总支出笔数", ""),
         expense_total=summary_data.get("总支出金额", "")
+    )
+
+
+# ============================================================
+# 中国银行（中行）记录创建
+# ============================================================
+
+def create_boc_transaction_records(file_id: int, raw_transactions: list) -> List[BocTransaction]:
+    """将原始交易数据转换为中国银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = BocTransaction(
+            file_id=file_id,
+            sequence=item.get("序号", ""),
+            booking_date=item.get("记账日", ""),
+            value_date=item.get("起息日", ""),
+            transaction_type=item.get("交易类型", ""),
+            voucher=item.get("凭证", ""),
+            transaction_details=item.get("凭证号业务号用途摘要", ""),
+            debit_amount=item.get("借方发生额", ""),
+            credit_amount=item.get("贷方发生额", ""),
+            balance=item.get("余额", ""),
+            reference_no=item.get("机构柜员流水", ""),
+            notes=item.get("备注", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_boc_summary_record(file_id: int, summary_data: dict) -> Optional[BocSummary]:
+    """创建中国银行汇总记录"""
+    if not summary_data:
+        return None
+    return BocSummary(
+        file_id=file_id,
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("账户名称", ""),
+        currency=summary_data.get("币种", ""),
+        account_type=summary_data.get("账户类型", ""),
+        bank_name=summary_data.get("开户行", ""),
+        start_date=summary_data.get("起始日期", ""),
+        end_date=summary_data.get("截止日期", "")
     )
 
 

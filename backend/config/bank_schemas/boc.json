@@ -1,0 +1,41 @@
+{
+    "template_id": "boc",
+    "bank_names": [
+        "中国银行",
+        "中行",
+        "BOC",
+        "Bank of China"
+    ],
+    "vertical_line_config": {
+        "enabled": false,
+        "lines": []
+    },
+    "summary_config": {
+        "first_page_only": true,
+        "description": "汇总信息在首页顶部（账号、户名、币种等）"
+    },
+    "summary_schema": {
+        "账号": "",
+        "账户名称": "",
+        "币种": "",
+        "账户类型": "",
+        "开户行": "",
+        "起始日期": "",
+        "截止日期": ""
+    },
+    "transaction_schema": [
+        {
+            "序号": "",
+            "记账日": "",
+            "起息日": "",
+            "交易类型": "",
+            "凭证": "",
+            "凭证号业务号用途摘要": "",
+            "借方发生额": "",
+            "贷方发生额": "",
+            "余额": "",
+            "机构柜员流水": "",
+            "备注": ""
+        }
+    ]
+}

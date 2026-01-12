@@ -32,6 +32,9 @@ from src.models.ccb_models import CcbSummary, CcbTransaction
 # 农业银行
 from src.models.abc_models import AbcSummary, AbcTransaction
 
+# 中国银行
+from src.models.boc_models import BocSummary, BocTransaction
+
 
 # 向后兼容的别名
 SummaryRecord = ShandongLocalSummary
@@ -57,6 +60,8 @@ __all__ = [
     "CcbSummary", "CcbTransaction",
     # 农业银行
     "AbcSummary", "AbcTransaction",
+    # 中国银行
+    "BocSummary", "BocTransaction",
     # 向后兼容别名
     "SummaryRecord", "TransactionRecord",
 ]

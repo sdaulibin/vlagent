@@ -19,7 +19,9 @@
     "建行": "ccb",
     "中国农业银行": "abc",
     "农业银行": "abc",
-    "农行": "abc"
+    "农行": "abc",
+    "中国银行": "boc",
+    "中行": "boc"
   },
   "default": "shandong_local"
 }

@@ -15,6 +15,7 @@ from src.banks.psbc_handler import PsbcHandler
 from src.banks.icbc_handler import IcbcHandler
 from src.banks.ccb_handler import CcbHandler
 from src.banks.abc_handler import AbcHandler
+from src.banks.boc_handler import BocHandler
 
 __all__ = [
     "get_bank_handler",
@@ -29,4 +30,5 @@ __all__ = [
     "IcbcHandler",
     "CcbHandler",
     "AbcHandler",
+    "BocHandler",
 ]

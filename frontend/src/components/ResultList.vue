@@ -88,7 +88,8 @@ const bankTypeColor = computed(() => {
         'psbc': 'bg-green-100 text-green-700',
         'icbc': 'bg-rose-100 text-rose-700',
         'ccb': 'bg-sky-100 text-sky-700',
-        'abc': 'bg-emerald-100 text-emerald-700'
+        'abc': 'bg-emerald-100 text-emerald-700',
+        'boc': 'bg-red-100 text-red-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -148,6 +149,12 @@ const getAmountDisplay = (item: Transaction) => {
             return { text: item.income, isIncome: true, prefix: '+' };
         }
         return { text: item.expense || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'boc') {
+        // 中国银行：贷方发生额（收入）/借方发生额（支出）
+        if (item.credit_amount && parseFloat(item.credit_amount) > 0) {
+            return { text: item.credit_amount, isIncome: true, prefix: '+' };
+        }
+        return { text: item.debit_amount || '0', isIncome: false, prefix: '-' };
     } else {
         // 山东地方银行
         if (item.income && parseFloat(item.income) > 0) {
@@ -159,7 +166,7 @@ const getAmountDisplay = (item: Transaction) => {
 
 // 获取交易日期显示
 const getDateDisplay = (item: Transaction) => {
-    return item.transaction_date || item.transaction_time || '-';
+    return item.transaction_date || item.transaction_time || item.booking_date || '-';
 };
 
 const nextPage = () => {
@@ -370,6 +377,10 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">对方户名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
                                         </div>
+                                        <div v-else-if="bankType === 'boc'">
+                                            <p class="text-xs text-gray-400">备注 (对方信息)</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.notes">{{ item.notes || '-' }}</p>
+                                        </div>
                                         <div v-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">对方行名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_bank">{{ item.counterparty_bank || '-' }}</p>
@@ -393,6 +404,10 @@ const prevPage = () => {
                                         <div v-if="bankType === 'shandong_local'">
                                             <p class="text-xs text-gray-400">摘要备注</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.description">{{ item.description || '-' }}</p>
+                                        </div>
+                                        <div v-else-if="bankType === 'boc'">
+                                            <p class="text-xs text-gray-400">凭证号/业务号/用途/摘要</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_details">{{ item.transaction_details || '-' }}</p>
                                         </div>
                                         <div v-else>
                                             <p class="text-xs text-gray-400">摘要</p>
@@ -490,6 +505,25 @@ const prevPage = () => {
                                         <div>
                                             <p class="text-xs text-gray-400">交易介质编号</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.transaction_medium">{{ item.transaction_medium || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <!-- 中国银行额外字段 -->
+                                    <div v-if="bankType === 'boc'" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2 border-t border-gray-100 pt-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">序号 No.</p>
+                                            <p class="text-sm text-gray-600">{{ item.sequence || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">起息日 Val.D.</p>
+                                            <p class="text-sm text-gray-600">{{ item.value_date || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">凭证 Vou.</p>
+                                            <p class="text-sm text-gray-600">{{ item.voucher || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">机构/柜员/流水 Reference No.</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.reference_no">{{ item.reference_no || '-' }}</p>
                                         </div>
                                     </div>
                                 </div>

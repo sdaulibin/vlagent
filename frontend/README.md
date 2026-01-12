@@ -82,7 +82,8 @@ type BankType =
   | "psbc"
   | "icbc"
   | "ccb"
-  | "abc";
+  | "abc"
+  | "boc";
 
 interface Summary {
   bank_type: BankType;
@@ -149,6 +150,7 @@ interface Transaction {
 - `IcbcSummary.vue` - 工商银行
 - `CcbSummary.vue` - 建设银行
 - `AbcSummary.vue` - 农业银行
+- `BocSummary.vue` - 🆕 中国银行 (中英双语)
 
 ### `TiptapViewer.vue` & `ContractResultView.vue`
 

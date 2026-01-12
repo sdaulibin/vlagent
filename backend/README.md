@@ -59,7 +59,8 @@ backend/
 │   │   ├── psbc_handler.py     # 邮储银行
 │   │   ├── icbc_handler.py     # 工商银行
 │   │   ├── ccb_handler.py      # 建设银行
-│   │   └── abc_handler.py      # 🆕 农业银行
+│   │   ├── abc_handler.py      # 农业银行
+│   │   └── boc_handler.py      # 🆕 中国银行 (中英双语)
 │   ├── files/              # 文件上传与银行识别
 │   │   ├── router.py       # 上传/识别/导出 API
 │   │   └── models.py       # 数据模型
@@ -81,10 +82,12 @@ backend/
 │   │   ├── psbc.json            # 邮储银行
 │   │   ├── icbc.json            # 工商银行
 │   │   ├── ccb.json             # 建设银行
-│   │   └── abc.json             # 🆕 农业银行
+│   │   ├── abc.json             # 农业银行
+│   │   └── boc.json             # 🆕 中国银行 (中英双语)
 │   └── prompts/            # 🆕 AI 提示词配置 (按银行拆分)
 │       ├── default.json        # 默认提示词
-│       └── *.json              # 各银行专属提示词
+│       ├── abc.json            # 农业银行专属
+│       └── boc.json            # 🆕 中国银行专属
 └── services/               # 通用服务
     ├── pdf_processor.py        # PDF 解析 & 银行识别入口
     ├── pdf/                    # PDF 处理子模块
@@ -207,5 +210,6 @@ class XxxHandler(BankHandler):
 | 工商银行     | `IcbcSummary`          | `IcbcTransaction`          |
 | 建设银行     | `CcbSummary`           | `CcbTransaction`           |
 | 农业银行     | `AbcSummary`           | `AbcTransaction`           |
+| 中国银行     | `BocSummary`           | `BocTransaction`           |
 
 > 🆕 模型已按银行拆分到 `src/models/` 目录，`transactions/models.py` 作为统一导出入口。

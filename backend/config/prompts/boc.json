@@ -1,0 +1,70 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Bank of China (BOC) account history with bilingual headers",
+    "column_order": [
+      "序号",
+      "记账日",
+      "起息日",
+      "交易类型",
+      "凭证",
+      "凭证号业务号用途摘要",
+      "借方发生额",
+      "贷方发生额",
+      "余额",
+      "机构柜员流水",
+      "备注"
+    ],
+    "column_descriptions": {
+      "序号": "Transaction sequence number (No.)",
+      "记账日": "Booking date (Bk.D.), format like '240301' means 2024-03-01",
+      "起息日": "Value date (Val.D.), format like '240301'",
+      "交易类型": "Transaction type (Type), like '小额普通', '代发划转', '收费'",
+      "凭证": "Voucher (Vou.), like '9001' or empty",
+      "凭证号业务号用途摘要": "Voucher No./Trans. No./Details - combined field containing transaction details",
+      "借方发生额": "Debit amount (outgoing), may be empty if credit",
+      "贷方发生额": "Credit amount (incoming), may be empty if debit",
+      "余额": "Balance after transaction",
+      "机构柜员流水": "Reference No. with format like '29927/98080105/168382678'",
+      "备注": "Notes, may contain counterparty info like company name"
+    },
+    "extraction_rules": [
+      "Headers are bilingual Chinese/English - focus on Chinese labels",
+      "Skip header rows containing column names",
+      "Skip footer summary rows (借方合计, 贷方合计)",
+      "记账日 format is YYMMDD, convert to YYYY-MM-DD if needed",
+      "借方发生额 and 贷方发生额 are mutually exclusive (one will be empty)",
+      "凭证号业务号用途摘要 may span multiple lines - merge them",
+      "备注 column contains counterparty information"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Bank of China statement header",
+    "location": "Summary info in page header only",
+    "target_fields": {
+      "账号": "Account No. - found in page header",
+      "账户名称": "Account Name - company or individual name",
+      "币种": "Currency - like '人民币(CNY)'",
+      "账户类型": "Account Type - like '单位人民币活期基本账户'",
+      "开户行": "Bank Name - opening bank branch",
+      "起始日期": "From date (YYYYMMDD format)",
+      "截止日期": "To date (YYYYMMDD format)"
+    },
+    "extraction_rules": [
+      "Header fields are labeled with both Chinese and English",
+      "Only extract from page header, ignore footer totals",
+      "Account info from header is consistent across pages"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}
