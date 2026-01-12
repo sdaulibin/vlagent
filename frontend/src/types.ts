@@ -7,7 +7,8 @@ export type BankType =
   | "cgb"
   | "psbc"
   | "icbc"
-  | "ccb";
+  | "ccb"
+  | "abc";
 
 // 统一交易记录接口（包含所有银行的字段）
 export interface Transaction {
@@ -131,4 +132,5 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
   psbc: "邮储银行",
   icbc: "工商银行",
   ccb: "建设银行",
+  abc: "农业银行",
 };

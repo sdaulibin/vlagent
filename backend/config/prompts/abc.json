@@ -1,0 +1,66 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Agricultural Bank of China (ABC) account history",
+    "column_order": [
+      "交易时间",
+      "收入金额",
+      "支出金额",
+      "账户余额",
+      "对方账号",
+      "对方户名",
+      "对方开户行",
+      "摘要"
+    ],
+    "column_descriptions": {
+      "交易时间": "交易时间，格式如 '2023-09-22 10:17:43'",
+      "收入金额": "收入金额，无数据则为 0 或空",
+      "支出金额": "支出金额，无数据则为 0 或空",
+      "账户余额": "交易后账户余额",
+      "对方账号": "交易对方的银行账号",
+      "对方户名": "交易对方的名称",
+      "对方开户行": "对方的开户银行，如 '中国农业银行股份有限公司青岛市北第三支行'",
+      "摘要": "交易摘要，如 '转存'、'转取'、'费用外收'、'贷款还款'"
+    },
+    "extraction_rules": [
+      "Skip header rows containing column names",
+      "Skip footer summary rows (总收入笔数, 总支出笔数 etc.)",
+      "交易时间格式为 YYYY-MM-DD HH:MM:SS",
+      "收入金额和支出金额二选一有值",
+      "对方开户行可能跨多行显示，需合并",
+      "Keep original amount format with decimal places"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Agricultural Bank of China account history",
+    "location": "Summary info is split: header info at top of first page (账号、户名、币种、起止日期), footer info at bottom of last page (总收入/支出笔数/金额)",
+    "target_fields": {
+      "账号": "Account number, like '38-07580104000011', found in page header",
+      "户名": "Account holder name, found in page header",
+      "币种": "Currency type, like '人民币', found in page header",
+      "起止日期": "Date range, like '2023年09月22日 - 2024年04月27日', found in page header",
+      "总收入笔数": "Total income transaction count, found at bottom of last page",
+      "总收入金额": "Total income amount, found at bottom of last page",
+      "总支出笔数": "Total expense transaction count, found at bottom of last page",
+      "总支出金额": "Total expense amount, found at bottom of last page"
+    },
+    "extraction_rules": [
+      "Header fields: 账号 after '账号:', 户名 after '户名:', 币种 after '币种:', 起止日期 after '起止日期:'",
+      "Footer fields are in a summary row at the bottom of the last page",
+      "Footer format: 总收入笔数 X 总收入金额 Y 总支出笔数 Z 总支出金额 W",
+      "If extracting from first page, footer fields may be empty",
+      "If extracting from last page, header fields will repeat - use them"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

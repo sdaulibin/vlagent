@@ -20,6 +20,8 @@ from src.transactions.models import (
     IcbcSummary, IcbcTransaction,
     # 建设银行
     CcbSummary, CcbTransaction,
+    # 农业银行
+    AbcSummary, AbcTransaction,
 )
 
 
@@ -377,6 +379,51 @@ def create_ccb_summary_record(file_id: int, summary_data: dict) -> Optional[CcbS
         file_id=file_id,
         account_name=summary_data.get("本方户名", ""),
         print_date=summary_data.get("打印日期", "")
+    )
+
+
+# ============================================================
+# 农业银行（中国农业银行）记录创建
+# ============================================================
+
+def create_abc_transaction_records(file_id: int, raw_transactions: list) -> List[AbcTransaction]:
+    """将原始交易数据转换为农业银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = AbcTransaction(
+            file_id=file_id,
+            transaction_time=item.get("交易时间", ""),
+            income=item.get("收入金额", ""),
+            expense=item.get("支出金额", ""),
+            balance=item.get("账户余额", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_name=item.get("对方户名", ""),
+            counterparty_bank=item.get("对方开户行", ""),
+            description=item.get("摘要", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_abc_summary_record(file_id: int, summary_data: dict) -> Optional[AbcSummary]:
+    """创建农业银行汇总记录
+    
+    注意：农业银行汇总信息分布在首页顶部和末页底部
+    - 首页：账号、户名、币种、起止日期
+    - 末页：总收入笔数、总收入金额、总支出笔数、总支出金额
+    """
+    if not summary_data:
+        return None
+    return AbcSummary(
+        file_id=file_id,
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("户名", ""),
+        currency=summary_data.get("币种", ""),
+        date_range=summary_data.get("起止日期", ""),
+        income_count=summary_data.get("总收入笔数", ""),
+        income_total=summary_data.get("总收入金额", ""),
+        expense_count=summary_data.get("总支出笔数", ""),
+        expense_total=summary_data.get("总支出金额", "")
     )
 
 

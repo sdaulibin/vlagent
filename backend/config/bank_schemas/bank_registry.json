@@ -16,7 +16,10 @@
     "工行": "icbc",
     "中国建设银行": "ccb",
     "建设银行": "ccb",
-    "建行": "ccb"
+    "建行": "ccb",
+    "中国农业银行": "abc",
+    "农业银行": "abc",
+    "农行": "abc"
   },
   "default": "shandong_local"
 }

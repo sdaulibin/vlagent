@@ -87,7 +87,8 @@ const bankTypeColor = computed(() => {
         'cgb': 'bg-orange-100 text-orange-700',
         'psbc': 'bg-green-100 text-green-700',
         'icbc': 'bg-rose-100 text-rose-700',
-        'ccb': 'bg-sky-100 text-sky-700'
+        'ccb': 'bg-sky-100 text-sky-700',
+        'abc': 'bg-emerald-100 text-emerald-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -141,6 +142,12 @@ const getAmountDisplay = (item: Transaction) => {
             return { text: item.credit_amount, isIncome: true, prefix: '+' };
         }
         return { text: item.debit_amount || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'abc') {
+        // 农业银行：收入金额/支出金额
+        if (item.income && parseFloat(item.income) > 0) {
+            return { text: item.income, isIncome: true, prefix: '+' };
+        }
+        return { text: item.expense || '0', isIncome: false, prefix: '-' };
     } else {
         // 山东地方银行
         if (item.income && parseFloat(item.income) > 0) {
