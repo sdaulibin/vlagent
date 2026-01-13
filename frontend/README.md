@@ -42,7 +42,8 @@ src/
 │   │   ├── PsbcSummary.vue
 │   │   ├── IcbcSummary.vue
 │   │   ├── CcbSummary.vue
-│   │   └── AbcSummary.vue
+│   │   ├── AbcSummary.vue
+│   │   └── BocSummary.vue  # 🆕 中国银行
 │   ├── ContractUpload.vue  # 合同上传
 │   ├── ContractHistory.vue # 合同历史记录
 │   ├── ContractResultView.vue # 合同比对结果
