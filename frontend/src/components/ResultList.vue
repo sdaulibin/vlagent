@@ -388,6 +388,10 @@ const prevPage = () => {
                                             <p class="text-xs text-gray-400">备注 (对方信息)</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.notes">{{ item.notes || '-' }}</p>
                                         </div>
+                                        <div v-else-if="bankType === 'bocom'">
+                                            <p class="text-xs text-gray-400">对方户名</p>
+                                            <p class="text-sm text-gray-700 truncate" :title="item.counterparty_name">{{ item.counterparty_name || '-' }}</p>
+                                        </div>
                                         <div v-if="bankType === 'psbc'">
                                             <p class="text-xs text-gray-400">对方行名</p>
                                             <p class="text-sm text-gray-700 truncate" :title="item.counterparty_bank">{{ item.counterparty_bank || '-' }}</p>
@@ -531,6 +535,43 @@ const prevPage = () => {
                                         <div>
                                             <p class="text-xs text-gray-400">机构/柜员/流水 Reference No.</p>
                                             <p class="text-sm text-gray-600 truncate" :title="item.reference_no">{{ item.reference_no || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <!-- 交通银行额外字段 -->
+                                    <div v-if="bankType === 'bocom'" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2 border-t border-gray-100 pt-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">会计日期</p>
+                                            <p class="text-sm text-gray-600">{{ item.accounting_date || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易名称</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_name">{{ item.transaction_name || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">对方行名</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.counterparty_bank">{{ item.counterparty_bank || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">流水号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.serial_no">{{ item.serial_no || '-' }}</p>
+                                        </div>
+                                    </div>
+                                    <div v-if="bankType === 'bocom'" class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                                        <div>
+                                            <p class="text-xs text-gray-400">卡号</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.card_number">{{ item.card_number || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">交易地点</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.transaction_location">{{ item.transaction_location || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">凭证种类</p>
+                                            <p class="text-sm text-gray-600">{{ item.voucher_type || '-' }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-400">凭证号码</p>
+                                            <p class="text-sm text-gray-600 truncate" :title="item.voucher_number">{{ item.voucher_number || '-' }}</p>
                                         </div>
                                     </div>
                                 </div>
