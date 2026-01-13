@@ -24,6 +24,8 @@ from src.transactions.models import (
     AbcSummary, AbcTransaction,
     # 中国银行
     BocSummary, BocTransaction,
+    # 交通银行
+    BocomSummary, BocomTransaction,
 )
 
 
@@ -475,3 +477,48 @@ def create_boc_summary_record(file_id: int, summary_data: dict) -> Optional[BocS
 create_transaction_records = create_shandong_transaction_records
 create_summary_record = create_shandong_summary_record
 
+
+# ============================================================
+# 交通银行（交行）记录创建
+# ============================================================
+
+def create_bocom_transaction_records(file_id: int, raw_transactions: list) -> List[BocomTransaction]:
+    """将原始交易数据转换为交通银行交易记录"""
+    records = []
+    for idx, item in enumerate(raw_transactions):
+        t = BocomTransaction(
+            file_id=file_id,
+            sequence=item.get("序号", ""),
+            accounting_date=item.get("会计日期", ""),
+            transaction_date=item.get("交易日期", ""),
+            transaction_name=item.get("交易名称", ""),
+            voucher_type=item.get("凭证种类", ""),
+            voucher_number=item.get("凭证号码", ""),
+            debit_amount=item.get("借方发生额", ""),
+            credit_amount=item.get("贷方发生额", ""),
+            balance=item.get("余额", ""),
+            card_number=item.get("卡号", ""),
+            transaction_location=item.get("交易地点", ""),
+            counterparty_account=item.get("对方账号", ""),
+            counterparty_name=item.get("对方户名", ""),
+            counterparty_bank=item.get("对方行名", ""),
+            description=item.get("摘要", ""),
+            serial_no=item.get("流水号", "")
+        )
+        records.append(t)
+    return records
+
+
+def create_bocom_summary_record(file_id: int, summary_data: dict) -> Optional[BocomSummary]:
+    """创建交通银行汇总记录"""
+    if not summary_data:
+        return None
+    return BocomSummary(
+        file_id=file_id,
+        bank_branch=summary_data.get("开户机构", ""),
+        account_number=summary_data.get("账号", ""),
+        account_name=summary_data.get("户名", ""),
+        currency=summary_data.get("币种", ""),
+        year=summary_data.get("年份", ""),
+        month=summary_data.get("月份", "")
+    )

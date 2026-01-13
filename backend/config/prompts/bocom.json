@@ -1,0 +1,76 @@
+{
+  "transaction_extraction": {
+    "role": "Bank statement OCR expert",
+    "task": "Extract transaction data from Bank of Communications (交通银行) account statement",
+    "column_order": [
+      "序号",
+      "会计日期",
+      "交易日期",
+      "交易名称",
+      "凭证种类",
+      "凭证号码",
+      "借方发生额",
+      "贷方发生额",
+      "余额",
+      "卡号",
+      "交易地点",
+      "对方账号",
+      "对方户名",
+      "对方行名",
+      "摘要",
+      "流水号"
+    ],
+    "column_descriptions": {
+      "序号": "Transaction sequence number, integer starting from 1",
+      "会计日期": "Accounting date, format YYYYMMDD like '20240402'",
+      "交易日期": "Transaction date, format YYYYMMDD like '20240402'",
+      "交易名称": "Transaction name like '短信网银往来', '单笔借方转账服务'",
+      "凭证种类": "Voucher type, may be empty",
+      "凭证号码": "Voucher number, may be empty",
+      "借方发生额": "Debit amount (outgoing), may be empty if credit",
+      "贷方发生额": "Credit amount (incoming), may be empty if debit",
+      "余额": "Balance after transaction",
+      "卡号": "Card number, may be empty",
+      "交易地点": "Transaction location like '交付平台', '支付平台'",
+      "对方账号": "Counterparty account number",
+      "对方户名": "Counterparty name",
+      "对方行名": "Counterparty bank name",
+      "摘要": "Description/purpose",
+      "流水号": "Transaction serial number like 'EBP000004017994020'"
+    },
+    "extraction_rules": [
+      "Title shows '交通银行XX分行明细对账单'",
+      "Skip header rows containing column names",
+      "会计日期 and 交易日期 are in YYYYMMDD format",
+      "借方发生额 and 贷方发生额 are mutually exclusive (one will be empty)",
+      "流水号 starts with 'EBP' prefix"
+    ],
+    "output_constraints": [
+      "Output only valid JSON array",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  },
+  "summary_extraction": {
+    "role": "Bank document analysis expert",
+    "task": "Extract summary information from Bank of Communications statement header",
+    "location": "Summary info in page header",
+    "target_fields": {
+      "开户机构": "Opening bank branch like '交通银行青岛李沧支行'",
+      "账号": "Account number",
+      "户名": "Account holder name (company or individual)",
+      "币种": "Currency like '人民币'",
+      "年份": "Year like '2024'",
+      "月份": "Month like '04'"
+    },
+    "extraction_rules": [
+      "Header shows bank name, account info, and date period",
+      "年份 and 月份 indicate the statement period"
+    ],
+    "output_constraints": [
+      "Output only valid JSON",
+      "No explanation text allowed",
+      "Keep original language (Chinese) for extracted values"
+    ]
+  }
+}

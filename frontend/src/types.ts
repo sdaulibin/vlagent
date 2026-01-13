@@ -9,7 +9,8 @@ export type BankType =
   | "icbc"
   | "ccb"
   | "abc"
-  | "boc";
+  | "boc"
+  | "bocom";
 
 // 统一交易记录接口（包含所有银行的字段）
 export interface Transaction {
@@ -74,6 +75,12 @@ export interface Transaction {
   transaction_details?: string; // 凭证号/业务号/用途/摘要
   reference_no?: string; // 机构/柜员/流水 Reference No.
   notes?: string; // 备注 Notes
+
+  // 交通银行字段
+  accounting_date?: string; // 会计日期
+  transaction_name?: string; // 交易名称
+  card_number?: string; // 卡号
+  transaction_location?: string; // 交易地点
 }
 
 // 统一汇总接口（包含所有银行的字段）
@@ -122,6 +129,11 @@ export interface Summary {
 
   // 中国银行字段
   account_type?: string; // 账户类型 Account Type
+
+  // 交通银行字段
+  bank_branch?: string; // 开户机构
+  year?: string; // 年份
+  month?: string; // 月份
 }
 
 export interface FileItem {
@@ -145,4 +157,5 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
   ccb: "建设银行",
   abc: "农业银行",
   boc: "中国银行",
+  bocom: "交通银行",
 };

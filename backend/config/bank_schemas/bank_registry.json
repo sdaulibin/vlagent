@@ -21,7 +21,9 @@
     "农业银行": "abc",
     "农行": "abc",
     "中国银行": "boc",
-    "中行": "boc"
+    "中行": "boc",
+    "交通银行": "bocom",
+    "交行": "bocom"
   },
   "default": "shandong_local"
 }

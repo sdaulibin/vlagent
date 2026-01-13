@@ -89,7 +89,8 @@ const bankTypeColor = computed(() => {
         'icbc': 'bg-rose-100 text-rose-700',
         'ccb': 'bg-sky-100 text-sky-700',
         'abc': 'bg-emerald-100 text-emerald-700',
-        'boc': 'bg-red-100 text-red-700'
+        'boc': 'bg-red-100 text-red-700',
+        'bocom': 'bg-indigo-100 text-indigo-700'
     };
     return colors[bankType.value] || 'bg-gray-100 text-gray-700';
 });
@@ -151,6 +152,12 @@ const getAmountDisplay = (item: Transaction) => {
         return { text: item.expense || '0', isIncome: false, prefix: '-' };
     } else if (bankType.value === 'boc') {
         // 中国银行：贷方发生额（收入）/借方发生额（支出）
+        if (item.credit_amount && parseFloat(item.credit_amount) > 0) {
+            return { text: item.credit_amount, isIncome: true, prefix: '+' };
+        }
+        return { text: item.debit_amount || '0', isIncome: false, prefix: '-' };
+    } else if (bankType.value === 'bocom') {
+        // 交通银行：贷方发生额（收入）/借方发生额（支出）
         if (item.credit_amount && parseFloat(item.credit_amount) > 0) {
             return { text: item.credit_amount, isIncome: true, prefix: '+' };
         }

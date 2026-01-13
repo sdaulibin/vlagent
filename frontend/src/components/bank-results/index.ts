@@ -9,6 +9,7 @@ export { default as IcbcSummary } from './IcbcSummary.vue';
 export { default as CcbSummary } from './CcbSummary.vue';
 export { default as AbcSummary } from './AbcSummary.vue';
 export { default as BocSummary } from './BocSummary.vue';
+export { default as BocomSummary } from './BocomSummary.vue';
 
 import type { BankType } from '../../types';
 import type { Component } from 'vue';
@@ -22,6 +23,7 @@ import IcbcSummary from './IcbcSummary.vue';
 import CcbSummary from './CcbSummary.vue';
 import AbcSummary from './AbcSummary.vue';
 import BocSummary from './BocSummary.vue';
+import BocomSummary from './BocomSummary.vue';
 
 // 银行类型到汇总组件的映射
 export const SummaryComponents: Record<BankType, Component> = {
@@ -35,6 +37,7 @@ export const SummaryComponents: Record<BankType, Component> = {
     'ccb': CcbSummary,
     'abc': AbcSummary,
     'boc': BocSummary,
+    'bocom': BocomSummary,
 };
 
 // 根据银行类型获取汇总组件
