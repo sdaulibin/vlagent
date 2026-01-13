@@ -43,7 +43,8 @@ src/
 │   │   ├── IcbcSummary.vue
 │   │   ├── CcbSummary.vue
 │   │   ├── AbcSummary.vue
-│   │   └── BocSummary.vue  # 🆕 中国银行
+│   │   ├── BocSummary.vue  # 🆕 中国银行
+│   │   └── BocomSummary.vue # 🆕 交通银行
 │   ├── ContractUpload.vue  # 合同上传
 │   ├── ContractHistory.vue # 合同历史记录
 │   ├── ContractResultView.vue # 合同比对结果
@@ -84,7 +85,8 @@ type BankType =
   | "icbc"
   | "ccb"
   | "abc"
-  | "boc";
+  | "boc"
+  | "bocom";
 
 interface Summary {
   bank_type: BankType;
@@ -152,6 +154,7 @@ interface Transaction {
 - `CcbSummary.vue` - 建设银行
 - `AbcSummary.vue` - 农业银行
 - `BocSummary.vue` - 🆕 中国银行 (中英双语)
+- `BocomSummary.vue` - 🆕 交通银行
 
 ### `TiptapViewer.vue` & `ContractResultView.vue`
 
