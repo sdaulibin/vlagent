@@ -1,217 +1,107 @@
-# Backend Service
+# ⚙️ Backend Service
 
-基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，负责处理文档识别、比对以及与本地 LLM 交互。
+基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，专门用于文档的智能化处理与结构化数据提取。
+
+---
 
 ## 🚀 快速启动
 
-### 1. 环境准备
-
-- **Python 3.11+**: 推荐使用 [uv](https://github.com/astral-sh/uv) 管理环境
-- **Poppler**: PDF 转图片处理
+### 📋 前置要求
+- **Python 3.11+**: 推荐使用 [uv](https://github.com/astral-sh/uv) 进行高效的包管理。
+- **Poppler**: 用于 PDF 解析的核心依赖。
   - macOS: `brew install poppler`
-  - Ubuntu: `sudo apt-get install poppler-utils`
+  - Linux: `sudo apt-get install poppler-utils`
 
-### 2. 配置环境变量
+### 🛠️ 环境配置
+1. **安装依赖**:
+   ```bash
+   uv sync
+   ```
+2. **配置环境变量**:
+   复制 `.env.example` 并重命名为 `.env`，根据实际情况修改配置：
+   ```ini
+   # --- AI 模型配置 ---
+   OPENAI_KEY=your-api-key-here
+   OPENAI_URL=http://your-llm-gateway/v1
+   MODEL_LOCAL=qwen-vl-local-name
 
-复制 `.env.example` 或创建 `.env` 文件：
+   # --- 应用配置 ---
+   RES_DIR=res                 # 资源存储目录
+   RECOGNITION_TIMEOUT=300     # 识别超时时间 (秒)
 
-```ini
-# AI Model Configuration
-MODEL_LOCAL=qwen-vl-local
-MODEL_LOCAL_URL=http://localhost:8080/v1/chat/completions
-MODEL_LOCAL_KEY=your-api-key
+   # --- 数据库配置 ---
+   # 开发环境默认使用 SQLite，生产环境推荐 PostgreSQL
+   DATABASE_URL=postgresql+asyncpg://user:pass@localhost/vl_flow
+   ```
 
-# Database (默认使用 SQLite)
-# DATABASE_URL=postgresql://user:password@localhost:5432/vl_flow
-```
+3. **运行服务**:
+   ```bash
+   uv run uvicorn main:app --reload --port 8000
+   ```
+   API 文档将自动生成在: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### 3. 安装与运行
+---
 
-```bash
-# 安装依赖
-uv sync
+## 🏗️ 核心架构：策略模式 (Strategy Pattern)
 
-# 启动服务
-uv run uvicorn main:app --reload --port 8000
-```
+后端采用高度解耦的策略模式来处理不同银行的流水模板。每种银行都有其专属的 `Handler`，这使得系统具有极强的扩展性。
 
-API 文档: http://localhost:8000/docs
+### 🧩 BankHandler 接口
+所有的银行处理器都必须继承 `BankHandler` 基类并实现核心方法：
+
+| 方法 | 说明 |
+| :--- | :--- |
+| `get_transactions()` | 从数据库检索该银行的交易明细 |
+| `get_summary()` | 从数据库检索该银行的汇总信息 |
+| `create_records()` | 将 AI 提取的原始数据转换为数据库持久化记录 |
+| `get_bank_names()` | 返回用于匹配该银行的关键词列表 |
+| `get_schemas()` | 提供给 AI 的 JSON Schema 定义 |
+
+### 🆕 添加新银行支持 (只需 3 步)
+1. **定义 Model**: 在 `src/models/` 创建 `xxx_models.py`，定义汇总和明细表结构。
+2. **实现 Handler**: 创建 `src/banks/xxx_handler.py`，继承 `BankHandler` 并使用 `@register_bank` 装饰。
+3. **配置 Prompt**: 在 `config/prompts/` 添加 `xxx.json`，定制专属的 AI 提取提示词。
+
+---
 
 ## 📁 目录结构
 
-```
+```bash
 backend/
-├── main.py                 # 应用入口
-├── api.py                  # 路由注册
-├── src/                    # 业务模块
-│   ├── config.py           # 环境变量配置 (pydantic-settings)
-│   ├── database.py         # 数据库连接 (SQLModel + asyncpg)
-│   ├── exceptions.py       # 自定义异常
-│   ├── json_repir.py       # JSON 修复工具
-│   ├── banks/              # 银行处理器模块 (策略模式)
-│   │   ├── __init__.py         # 模块入口，自动注册所有 Handler
-│   │   ├── base.py             # 基类 BankHandler + 注册装饰器
-│   │   ├── shandong_handler.py # 山东地方银行
-│   │   ├── everbright_handler.py # 光大银行
-│   │   ├── cmb_handler.py      # 招商银行
-│   │   ├── jining_handler.py   # 济宁银行
-│   │   ├── cgb_handler.py      # 广发银行
-│   │   ├── psbc_handler.py     # 邮储银行
-│   │   ├── icbc_handler.py     # 工商银行
-│   │   ├── ccb_handler.py      # 建设银行
-│   │   ├── abc_handler.py      # 农业银行
-│   │   ├── boc_handler.py      # 🆕 中国银行 (中英双语)
-│   │   └── bocom_handler.py    # 🆕 交通银行
-│   ├── files/              # 文件上传与银行识别
-│   │   ├── router.py       # 上传/识别/导出 API
-│   │   └── models.py       # 数据模型
-│   ├── transactions/       # 交易明细查询
-│   │   ├── router.py       # 交易查询 API
-│   │   ├── models.py       # 交易数据模型
-│   │   └── service.py      # 记录创建服务
-│   └── contracts/          # 合同比对
-│       ├── router.py       # 比对任务 API
-│       └── models.py       # 合同数据模型
-├── config/
-│   ├── bank_schemas/       # 银行模板配置 (JSON)
-│   │   ├── bank_registry.json   # 银行注册表
-│   │   ├── shandong_local.json  # 山东地方银行
-│   │   ├── everbright.json      # 光大银行
-│   │   ├── cmb.json             # 招商银行
-│   │   ├── jining.json          # 济宁银行
-│   │   ├── cgb.json             # 广发银行
-│   │   ├── psbc.json            # 邮储银行
-│   │   ├── icbc.json            # 工商银行
-│   │   ├── ccb.json             # 建设银行
-│   │   ├── abc.json             # 农业银行
-│   │   └── boc.json             # 🆕 中国银行 (中英双语)
-│   └── prompts/            # 🆕 AI 提示词配置 (按银行拆分)
-│       ├── default.json        # 默认提示词
-│       ├── abc.json            # 农业银行专属
-│       └── boc.json            # 🆕 中国银行专属
-└── services/               # 通用服务
-    ├── pdf_processor.py        # PDF 解析 & 银行识别入口
-    ├── pdf/                    # PDF 处理子模块
-    │   ├── bank_detector.py    # 银行类型检测 (文件名/印章/Logo)
-    │   ├── data_extractor.py   # AI 数据提取
-    │   ├── excel_exporter.py   # Excel 导出 (广发跨页合并)
-    │   ├── image_marker.py     # 图像标注处理
-    │   └── pdf_utils.py        # PDF 工具函数
-    └── contract_processor.py   # 合同比对处理
+├── main.py            # FastAPI 应用入口与中间件配置
+├── api.py             # 统一路由分发中心
+├── src/
+│   ├── banks/         # 银行处理器实现 (Strategy implementations)
+│   ├── models/        # 各银行数据模型 (SQLModel)
+│   ├── files/         # 文件上传、存储与识别状态管理
+│   ├── transactions/  # 统一的交易数据查询接口
+│   └── contracts/     # 合同比对逻辑实现
+├── services/          # 通用业务逻辑
+│   ├── pdf/           # PDF 解析、银行检测、数据提取、Excel 导出
+│   └── contract_processor.py # 文本比对算法
+└── config/            # 外部化配置 (JSON schemas, Prompts)
 ```
 
-## 🏗️ 银行处理器架构
+---
 
-### 策略模式设计
+## 📡 核心 API 概览
 
-采用策略模式将各银行的处理逻辑封装为独立的 Handler 类：
+### 🏦 银行流水模块
+- `POST /api/files/upload`: 上传 PDF/图片。
+- `POST /api/files/{id}/recognize`: 异步启动 AI 识别任务。
+- `GET /api/transactions/{id}`: 获取识别后的结构化明细。
+- `GET /api/files/{id}/export`: 生成并下载标准化的 Excel 报表。
 
-```python
-from src.banks import get_bank_handler
+### 📋 合同比对模块
+- `POST /api/contracts/compare`: 上传两个文档进行语义差异分析。
+- `GET /api/contracts/{id}/diffs`: 获取详细的差异点列表（增删改）。
 
-# 获取银行处理器
-handler = get_bank_handler("psbc")
+---
 
-# 调用统一接口
-transactions = await handler.get_transactions(session, file_id)
-summary = await handler.get_summary(session, file_id)
-```
-
-### BankHandler 抽象方法
-
-| 方法                         | 类型 | 说明             |
-| :--------------------------- | :--- | :--------------- |
-| `get_transactions()`         | 抽象 | 获取交易明细     |
-| `get_summary()`              | 抽象 | 获取汇总信息     |
-| `export_to_excel()`          | 抽象 | 导出到 Excel     |
-| `create_records()`           | 抽象 | 创建数据库记录   |
-| `delete_records()`           | 抽象 | 删除关联记录     |
-| `get_bank_names()`           | 抽象 | 银行匹配名称列表 |
-| `get_summary_schema()`       | 抽象 | 汇总 Schema      |
-| `get_transaction_schema()`   | 抽象 | 交易 Schema      |
-| `get_vertical_line_config()` | 可选 | 辅助线配置       |
-| `get_summary_config()`       | 可选 | 汇总提取配置     |
-
-### 添加新银行模板
-
-**只需 3 步，无需修改任何 Router 代码：**
-
-1. 创建 `src/banks/xxx_handler.py`：
-
-```python
-from src.banks.base import BankHandler, register_bank
-
-@register_bank
-class XxxHandler(BankHandler):
-    bank_type = "xxx"
-
-    def get_bank_names(self) -> List[str]:
-        return ["XXX银行", "XXX Bank"]
-
-    def get_summary_schema(self) -> Dict[str, Any]:
-        return {"账号": "", "户名": "", ...}
-
-    def get_transaction_schema(self) -> Dict[str, Any]:
-        return {"交易时间": "", "金额": "", ...}
-
-    # ... 实现其他抽象方法
-```
-
-2. 在 `src/banks/__init__.py` 中导入新 Handler
-3. 在 `src/models/` 添加对应数据模型
-4. 在 `config/prompts/` 添加专属提示词 (可选)
-
-## 📡 API 接口
-
-### 🏦 银行流水
-
-| 方法     | 路径                             | 描述               |
-| :------- | :------------------------------- | :----------------- |
-| `GET`    | `/api/files`                     | 获取文件列表       |
-| `POST`   | `/api/files/upload`              | 上传文件           |
-| `POST`   | `/api/files/{id}/recognize`      | 触发识别           |
-| `GET`    | `/api/files/{id}/export`         | 导出 Excel         |
-| `DELETE` | `/api/files/{id}`                | 删除文件及关联数据 |
-| `GET`    | `/api/transactions/{id}`         | 获取交易明细       |
-| `GET`    | `/api/transactions/{id}/summary` | 获取汇总信息       |
-
-### 📋 合同比对
-
-| 方法   | 路径                        | 描述         |
-| :----- | :-------------------------- | :----------- |
-| `POST` | `/api/contracts/compare`    | 创建比对任务 |
-| `GET`  | `/api/contracts/{id}`       | 查询任务状态 |
-| `GET`  | `/api/contracts/{id}/diffs` | 获取差异列表 |
-
-## 📦 主要依赖
-
-| 包名        | 版本     | 用途                |
-| :---------- | :------- | :------------------ |
-| `fastapi`   | ≥0.124.2 | Web 框架            |
-| `sqlmodel`  | ≥0.0.27  | ORM                 |
-| `openai`    | ≥2.9.0   | LLM API 调用        |
-| `pdf2image` | ≥1.17.0  | PDF 转图片          |
-| `openpyxl`  | ≥3.1.5   | Excel 导出          |
-| `pandas`    | ≥2.3.3   | 数据处理            |
-| `pillow`    | ≥12.0.0  | 图像处理            |
-| `asyncpg`   | ≥0.31.0  | PostgreSQL 异步驱动 |
-
-## 🗄️ 数据模型
-
-### 银行流水表结构
-
-| 银行         | 汇总表                 | 明细表                     |
-| :----------- | :--------------------- | :------------------------- |
-| 山东地方银行 | `ShandongLocalSummary` | `ShandongLocalTransaction` |
-| 光大银行     | `EverbrightSummary`    | `EverbrightTransaction`    |
-| 招商银行     | `CmbSummary`           | `CmbTransaction`           |
-| 济宁银行     | `JiningSummary`        | `JiningTransaction`        |
-| 广发银行     | `CgbSummary`           | `CgbTransaction`           |
-| 邮储银行     | `PsbcSummary`          | `PsbcTransaction`          |
-| 工商银行     | `IcbcSummary`          | `IcbcTransaction`          |
-| 建设银行     | `CcbSummary`           | `CcbTransaction`           |
-| 农业银行     | `AbcSummary`           | `AbcTransaction`           |
-| 中国银行     | `BocSummary`           | `BocTransaction`           |
-| 交通银行     | `BocomSummary`         | `BocomTransaction`         |
-
-> 🆕 模型已按银行拆分到 `src/models/` 目录，`transactions/models.py` 作为统一导出入口。
+## 📦 技术栈详情
+- **Framework**: FastAPI (Asynchronous)
+- **ORM**: SQLModel (SQLAlchemy + Pydantic)
+- **DB Driver**: asyncpg
+- **PDF Engine**: pdf2image + Pillow
+- **Data Export**: Pandas + Openpyxl
+- **AI Integration**: OpenAI SDK (compatible with local LLM gateways)

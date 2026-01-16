@@ -1,172 +1,104 @@
-# vl_flow
+# 🌊 vl_flow
 
-基于 Qwen-VL 大模型的智能文档识别与分析平台。
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.124-009688.svg)](https://fastapi.tiangolo.com/)
+[![Vue 3.5](https://img.shields.io/badge/Vue-3.5-4FC08D.svg)](https://vuejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ 功能
+**vl_flow** 是一个基于 **Qwen-VL** 大模型的智能文档识别与分析平台。它利用先进的多模态模型能力，实现了银行流水的高精度识别与结构化、合同差异的智能比对等核心功能。
 
-| 场景                | 状态 | 说明                                                   |
-| :------------------ | :--: | :----------------------------------------------------- |
-| **🏦 银行流水识别** |  ✅  | 智能提取交易明细、对方账户信息，支持多银行模板自动识别 |
-| **📋 合同比对**     |  ✅  | 智能比对 PDF/Word 文档差异，支持并排高亮显示增删改内容 |
-| **📄 发票识别**     |  🔜  | 开发中，支持多票据自动分类与关键信息提取               |
+---
 
-### 🏦 银行流水识别 - 多银行支持
+## ✨ 核心功能
 
-| 银行             | 模板 ID          | 汇总信息                     | 交易明细                                   |
-| :--------------- | :--------------- | :--------------------------- | :----------------------------------------- |
-| **山东地方银行** | `shandong_local` | 账户名称、账(卡)号、收支汇总 | 交易时间、收支金额、对方户名、摘要备注     |
-| **光大银行**     | `everbright`     | 账户名称、账号、借贷发生额   | 交易日期、借/贷、对方名称、凭证号、流水号  |
-| **招商银行**     | `cmb`            | 账号名、出入账汇总           | 交易流水号、收付方信息、公司一卡通号       |
-| **济宁银行**     | `jining`         | 账户名称、账号、收支汇总     | 交易时间、收付金额、对方信息、开户机构     |
-| **广发银行**     | `cgb`            | 户名、账号、收支笔数金额     | 流水号、交易时间、对方账户、摘要附言       |
-| **邮储银行**     | `psbc`           | 账号、户名、收支汇总         | 交易时间、收支金额、对方行名、用途附言     |
-| **工商银行**     | `icbc`           | 本方账号户名、币种、开户行   | 交易时间、转入/转出金额、对方单位、用途    |
-| **建设银行**     | `ccb`            | 本方户名、打印日期           | 交易时间、借贷金额、对方开户机构、记账日期 |
-| **农业银行**     | `abc`            | 账号、户名、收支笔数金额     | 交易时间、收入/支出金额、对方开户行        |
-| **中国银行**     | `boc`            | 账号、户名、币种、账户类型   | 记账日、起息日、借贷金额、用途摘要备注     |
-| **交通银行**     | `bocom`          | 开户机构、账号、年月         | 会计日期、交易名称、借贷金额、流水号       |
+### 🏦 银行流水识别 (Multi-Bank Support)
+智能识别多种银行流水 PDF，自动提取账户信息、余额明细、交易双方等关键数据。
+- **高精度识别**: 基于 Qwen-VL，支持复杂表格和跨页识别。
+- **自动检测**: 自动识别银行类型，智能匹配识别策略。
+- **一键导出**: 识别结果可直接导出为 Excel 文档。
+- **跨页合并**: 自动处理跨页连续记录，确保数据完整性。
 
-> 💡 通过策略模式扩展新银行模板，只需创建 Handler 文件即可
-> 🆕 广发银行支持多汇总识别、跨页记录自动合并
+### 📋 合同比对 (Smart Contract Diff)
+智能分析两个 PDF/Word 文档之间的差异，并以直观的界面呈现。
+- **语义比对**: 不仅仅是文字匹配，更能理解格式与内容的变更。
+- **并排显示**: 左右对照，清晰标注增、删、改内容。
+- **多格式支持**: 支持 PDF 与 Word 格式的互相转化与比对。
+
+---
 
 ## 🛠️ 技术栈
 
-- **前端**: Vue 3.5 + TypeScript 5.9 + Tailwind CSS 4 + Tiptap 3
-- **后端**: FastAPI 0.124 + SQLModel 0.0.27 + Python 3.11
-- **数据库**: PostgreSQL / SQLite (开发环境)
-- **AI 模型**: Qwen-VL (本地部署) / 通义千问 VL
-- **包管理**: uv (后端) + npm (前端)
+| 领域 | 技术选择 |
+| :--- | :--- |
+| **前端** | Vue 3.5 + TypeScript 5.9 + Tailwind CSS 4 + Tiptap 3 |
+| **后端** | FastAPI 0.124 + SQLModel 0.0.27 + Python 3.11 |
+| **AI 模型** | Qwen-VL (Local Deployment) / DashScope API |
+| **数据库** | PostgreSQL (Production) / SQLite (Dev) |
+| **包管理** | [uv](https://github.com/astral-sh/uv) (Backend) + npm (Frontend) |
+
+---
 
 ## 🚀 快速开始
 
-### 前置要求
-
-- Python 3.11+
-- Node.js 18+
-- Poppler (PDF 处理依赖)
+### 📋 环境要求
+- **Python 3.11+**
+- **Node.js 18+**
+- **Poppler** (用于 PDF 转图片)
   - macOS: `brew install poppler`
   - Ubuntu: `sudo apt-get install poppler-utils`
 
-### 1. 配置环境变量
+### 1️⃣ 克隆与配置
+```bash
+git clone https://github.com/your-repo/vl_flow.git
+cd vl_flow
+```
 
+### 2️⃣ 启动后端
 ```bash
 cd backend
 cp .env.example .env
-# 编辑 .env 配置本地 LLM 地址
-```
-
-### 2. 启动后端服务
-
-```bash
-cd backend
+# 编辑 .env 配置 LLM 地址与数据库连接
 uv sync
 uv run uvicorn main:app --reload --port 8000
 ```
 
-### 3. 启动前端服务
-
+### 3️⃣ 启动前端
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+访问 [http://localhost:5173](http://localhost:5173) 即可进入系统。
 
-访问 http://localhost:5173 即可开始使用。
+---
 
 ## 📁 项目结构
 
-```
+```bash
 vl_flow/
-├── frontend/                # Vue 3 前端应用
-│   ├── src/views/           # 页面视图 (Home, BankStatement, ContractCompare)
-│   ├── src/components/      # 组件 (FileList, ResultList 等)
-│   │   └── bank-results/    # 🆕 银行汇总组件 (按银行拆分)
-│   ├── src/api/             # API 请求封装
-│   └── src/types.ts         # TypeScript 类型定义
-├── backend/                 # FastAPI 后端服务
-│   ├── main.py              # 应用入口
-│   ├── api.py               # 路由注册
-│   ├── src/                 # 业务模块
-│   │   ├── banks/           # 银行处理器模块 (策略模式)
-│   │   │   ├── base.py          # 基类 BankHandler + 注册表
-│   │   │   ├── *_handler.py     # 各银行处理器
-│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb, abc
-│   │   ├── models/          # 🆕 银行模型模块 (按银行拆分)
-│   │   │   ├── *_models.py      # 各银行数据模型
-│   │   │   └── ...              # shandong, everbright, cmb, jining, cgb, psbc, icbc, ccb, abc
-│   │   ├── files/           # 文件上传与处理
-│   │   ├── transactions/    # 交易明细查询 (统一导出入口)
-│   │   ├── contracts/       # 合同比对逻辑
-│   │   ├── config.py        # 环境变量配置
-│   │   └── database.py      # 数据库连接
-│   ├── config/
-│   │   ├── bank_schemas/    # 银行模板配置 (JSON)
-│   │   └── prompts/         # 🆕 AI 提示词配置 (按银行拆分)
-│   │       ├── default.json
-│   │       └── *.json           # 各银行专属提示词
-│   └── services/            # 通用服务
-│       ├── pdf_processor.py     # PDF 解析与银行识别
-│       ├── pdf/                 # PDF 处理子模块
-│       └── contract_processor.py    # 合同比对
-└── docker-compose.yml       # 基础设施编排
+├── backend/          # FastAPI 后端服务 (Logic, AI, DB)
+│   ├── src/banks/    # 银行处理策略实现
+│   ├── src/models/   # 结构化数据模型
+│   └── config/       # 识别提示词与 Schema 配置
+├── frontend/         # Vue 3 前端应用 (UI, Dashboard)
+│   ├── src/views/    # 核心页面 (流水识别、合同比对)
+│   └── src/components/ bank-results/ # 各银行 UI 展示组件
+└── docker-compose.yml # 容器化部署配置
 ```
 
-## 🏗️ 架构设计
+---
 
-### 银行处理器策略模式
+## 🏗️ 架构概览
 
-采用策略模式封装各银行的处理逻辑，提升可维护性和扩展性：
+### 插件化银行处理器 (Strategy Pattern)
+系统采用策略模式，添加新银行支持仅需 3 步：
+1. **定义模型**: 在 `backend/src/models` 添加结构。
+2. **实现处理器**: 继承 `BankHandler` 并实现提取逻辑。
+3. **前端渲染**: 在 `frontend/src/components/bank-results` 添加展示组件。
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    BankHandler (基类)                    │
-├─────────────────────────────────────────────────────────┤
-│ + get_transactions()    获取交易明细                     │
-│ + get_summary()         获取汇总信息                     │
-│ + export_to_excel()     导出 Excel                      │
-│ + create_records()      创建数据库记录                   │
-│ + delete_records()      删除关联记录                     │
-│ + get_bank_names()      银行匹配名称                     │
-│ + get_summary_schema()  汇总 Schema                     │
-│ + get_transaction_schema()  交易 Schema                 │
-└─────────────────────────────────────────────────────────┘
-          ▲
-          │ 继承
-     ┌──────┴──────┬────────┬────────┬────────┬────────┬────────┐
-     │             │        │        │        │        │        │
- ┌───┴───┐ ┌───────┴──┐ ┌───┴──┐ ┌───┴──┐ ┌───┴──┐ ┌───┴──┐ ┌───┴──┐
- │Shandong│ │Everbright│ │ CMB  │ │Jining│ │ CGB  │ │ PSBC │ │ ICBC │
- │Handler │ │ Handler  │ │Handle│ │Handle│ │Handle│ │Handle│ │Handle│
- └────────┘ └──────────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
-```
+---
 
-### 添加新银行（3 步）
+## 📄 开源协议
 
-1. 创建 `backend/src/banks/xxx_handler.py`
-2. 继承 `BankHandler` 并实现所有抽象方法
-3. 使用 `@register_bank` 装饰器注册
-
-**无需修改任何 Router 代码！**
-
-## 📡 API 概览
-
-访问 Swagger UI: http://localhost:8000/docs
-
-### 🏦 银行流水
-
-- `GET /api/files` - 获取已上传文件列表
-- `POST /api/files/upload` - 上传银行流水文件
-- `POST /api/files/{id}/recognize` - 触发识别
-- `GET /api/files/{id}/export` - 导出 Excel
-- `GET /api/transactions/{id}` - 获取交易明细
-- `GET /api/transactions/{id}/summary` - 获取汇总信息
-
-### 📋 合同比对
-
-- `POST /api/contracts/compare` - 上传文档进行比对
-- `GET /api/contracts/{id}` - 查询任务状态
-- `GET /api/contracts/{id}/diffs` - 获取差异数据
-
-## 📄 License
-
-MIT License
+本项目采用 [MIT License](LICENSE) 开源协议。
