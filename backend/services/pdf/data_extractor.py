@@ -3,7 +3,7 @@ import json
 import concurrent.futures
 from src.config import MODEL_LOCAL
 from services.core.request_ai import request_stream
-from src.json_repir import fix_json
+from src.json_repair import fix_json
 
 # Schema 配置文件路径
 SCHEMA_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "schemas.json")

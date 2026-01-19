@@ -17,7 +17,7 @@ from pathlib import Path
 from pdf2image import convert_from_path
 from src.config import MODEL_LOCAL, RES_DIR
 from services.core.request_ai import request_stream
-from src.json_repir import fix_json
+from src.json_repair import fix_json
 from services.pdf_processor import load_schema
 
 # 合同比对输出目录

@@ -5,7 +5,7 @@ import os
 import json
 import shutil
 from src.config import RES_DIR
-from src.json_repir import fix_json
+from src.json_repair import fix_json
 from .pdf.pdf_utils import split_pdf_to_images, batch_resize_images, resize_image_high_quality
 from .pdf.bank_detector import (
     detect_bank_type, 

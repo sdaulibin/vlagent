@@ -2,7 +2,7 @@ import os
 import json
 import pandas as pd
 import re
-from src.json_repir import fix_json
+from src.json_repair import fix_json
 
 def deduplicate_records(records: list, unique_key: str = "交易流水号"):
     """

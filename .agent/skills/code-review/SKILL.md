@@ -1,94 +1,21 @@
 ---
 name: code-review
-description: 对 Python 代码进行全面的代码审查，检查代码质量、安全性和最佳实践
+description: Reviews code changes for bugs, style issues, and best practices. Use when reviewing PRs or checking code quality.
 ---
 
-# Python 代码审查 Skill
+# Code Review Skill
 
-当用户请求对 Python 代码进行审查时，使用此 skill 进行全面的代码质量分析。
+When reviewing code, follow these steps:
 
-## 触发条件
+## Review checklist
 
-当用户提到以下关键词时自动触发：
+1. **Correctness**: Does the code do what it's supposed to?
+2. **Edge cases**: Are error conditions handled?
+3. **Style**: Does it follow project conventions?
+4. **Performance**: Are there obvious inefficiencies?
 
-- "代码审查"、"code review"
-- "检查代码"、"review this code"
-- "代码质量检查"
+## How to provide feedback
 
-## 审查维度
-
-### 1. 代码风格 (PEP 8)
-
-- 检查缩进是否使用 4 个空格
-- 检查行长度是否超过 120 字符
-- 检查命名规范（函数使用 snake_case，类使用 PascalCase）
-- 检查导入顺序（标准库 → 第三方库 → 本地模块）
-
-### 2. 代码质量
-
-- 检查函数是否过长（超过 50 行需要考虑拆分）
-- 检查是否有重复代码
-- 检查是否有未使用的变量或导入
-- 检查是否有过深的嵌套层级（超过 3 层）
-
-### 3. 安全性检查
-
-- 检查是否有硬编码的密码或密钥
-- 检查 SQL 查询是否使用参数化
-- 检查是否有不安全的 eval() 或 exec() 调用
-- 检查文件操作是否有路径遍历风险
-
-### 4. 文档和注释
-
-- 检查函数是否有 docstring
-- 检查复杂逻辑是否有注释说明
-- 检查类型注解是否完整
-
-## 执行步骤
-
-1. **读取目标文件**：使用 `view_file` 工具读取要审查的代码
-2. **运行静态分析**：如果项目有配置，运行以下命令：
-
-   ```bash
-   # 代码风格检查
-   ruff check <file_path>
-
-   # 类型检查（如果有 mypy 配置）
-   mypy <file_path>
-   ```
-
-3. **人工分析**：按照上述维度逐一检查
-4. **生成报告**：输出结构化的审查报告
-
-## 报告格式
-
-```markdown
-## 代码审查报告
-
-### 📊 总体评分: X/10
-
-### ✅ 优点
-
-- 优点 1
-- 优点 2
-
-### ⚠️ 需要改进
-
-- 问题 1：描述 + 建议
-- 问题 2：描述 + 建议
-
-### 🔴 必须修复
-
-- 严重问题 1
-- 严重问题 2
-
-### 📝 改进建议
-
-具体的代码修改建议...
-```
-
-## 示例对话
-
-**用户**: 帮我审查一下 backend/src/config.py 的代码
-
-**AI**: 我来对这个文件进行代码审查...（然后按照上述流程执行）
+- Be specific about what needs to change
+- Explain why, not just what
+- Suggest alternatives when possible

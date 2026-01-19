@@ -5,7 +5,7 @@ import json
 # Add backend to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from core.json_repir import fix_json
+from src.json_repair import fix_json
 
 def test_truncation():
     test_cases = [
