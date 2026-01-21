@@ -92,6 +92,8 @@ vl_flow/
 
 ## 🏗️ 架构概览
 
+![系统架构图](docs/architecture.svg)
+
 ### 插件化银行处理器 (Strategy Pattern)
 
 系统采用策略模式，添加新银行支持仅需 3 步：
