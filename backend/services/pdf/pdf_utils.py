@@ -33,6 +33,39 @@ def split_pdf_to_images(pdf_path, output_folder, image_format='PNG', dpi=200):
     print(f"转换完成，共生成 {len(image_paths)} 张图片")
     return image_paths
 
+
+def pdf_to_images(pdf_path, max_pages=None, dpi=200):
+    """
+    将PDF转换为图片（支持限制页数）
+    
+    Args:
+        pdf_path (str): PDF文件路径
+        max_pages (int): 最大转换页数，None 表示全部
+        dpi (int): 图像分辨率
+    
+    Returns:
+        str: 输出目录路径
+    """
+    # 创建输出目录
+    base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    output_dir = os.path.join(os.path.dirname(pdf_path), f"task_{base_name}_images")
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # 转换PDF
+    if max_pages:
+        images = convert_from_path(pdf_path, dpi=dpi, first_page=1, last_page=max_pages)
+    else:
+        images = convert_from_path(pdf_path, dpi=dpi)
+    
+    for i, image in enumerate(images):
+        output_filename = f"{base_name}_page_{i+1:03d}.png"
+        output_path = os.path.join(output_dir, output_filename)
+        image.save(output_path, "PNG")
+    
+    return output_dir
+
 def resize_image_high_quality(input_path, output_path, max_width=1200, max_height=1200, quality=85):
     """
     高质量地调整图片大小并压缩

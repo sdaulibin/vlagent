@@ -28,7 +28,6 @@ from services import pdf_processor
 router = APIRouter(prefix="/files", tags=["files"])
 
 # Load config from env
-from src.config import config
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/Users/binginx/PycharmProjects/vl_flow/backend/res")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -56,6 +55,17 @@ async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
 async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
     """上传文件（仅保存，不处理）"""
     try:
+        # 1. 验证文件格式（仅支持 PDF）
+        from services.pdf.file_validator import validate_pdf_format
+        
+        # 读取文件头部用于验证
+        file_header = await file.read(1024)
+        await file.seek(0)  # 重置文件指针
+        
+        is_valid, error_msg = validate_pdf_format(file.filename, file_header)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
+        
         file_path = os.path.join(UPLOAD_DIR, file.filename)
 
         # 保存文件
@@ -75,6 +85,8 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
             "message": "文件上传成功，请点击开始识别"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -97,6 +109,37 @@ async def start_recognition(file_id: int, session: AsyncSession = Depends(get_se
         
         if db_file.status == "processing":
             return {"status": "processing", "message": "文件正在识别中"}
+        
+        if db_file.status == "invalid":
+            return {"status": "invalid", "message": f"文件验证未通过: {db_file.error_msg}"}
+        
+        # 2. 验证是否为银行流水文件
+        from fastapi.concurrency import run_in_threadpool
+        from services.pdf.file_validator import validate_bank_statement
+        from services.pdf.pdf_utils import pdf_to_images
+        
+        # 转换第一页为图片进行验证
+        images_dir = pdf_to_images(db_file.file_path, max_pages=1)
+        image_files = sorted([f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+        
+        if image_files:
+            first_page = os.path.join(images_dir, image_files[0])
+            is_statement, reason, confidence = await run_in_threadpool(
+                validate_bank_statement, first_page
+            )
+            
+            if not is_statement and confidence >= 0.6:
+                db_file.status = "invalid"
+                db_file.error_msg = f"非银行流水文件: {reason}"
+                await session.commit()
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "非银行流水文件",
+                        "reason": reason,
+                        "confidence": confidence
+                    }
+                )
         
         # 更新状态为处理中
         db_file.status = "processing"
