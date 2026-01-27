@@ -24,3 +24,8 @@ frontend/.env.local
 
 # General
 .env
+
+# Build artifacts
+*.tar.gz
+offline_deploy/
+

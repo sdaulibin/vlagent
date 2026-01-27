@@ -437,3 +437,336 @@ sudo systemctl reload nginx
 
 /var/www/vl_flow/             # Nginx 静态文件
 ```
+
+---
+
+# 🐳 Docker 容器化部署
+
+本节介绍如何使用 Docker 容器化方式部署 vl_flow。
+
+---
+
+## 📋 环境要求
+
+| 组件           | 版本要求 |
+| :------------- | :------- |
+| Docker         | 20.10+   |
+| Docker Compose | 2.0+     |
+| 内存           | 4 GB+    |
+
+---
+
+## 🏗️ 架构概览
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                   应用服务器                                   │
+│  ┌─────────────┐   ┌─────────────┐   ┌──────────────────┐    │
+│  │   Nginx     │──▶│  Frontend   │   │     Backend      │    │
+│  │   :80/443   │   │   (static)  │   │   :8000 (API)    │    │
+│  └─────────────┘   └─────────────┘   └────────┬─────────┘    │
+└───────────────────────────────────────────────│──────────────┘
+                                                │
+                                   ┌────────────▼────────────┐
+                                   │    数据库服务器          │
+                                   │   PostgreSQL :5432      │
+                                   └─────────────────────────┘
+```
+
+---
+
+## 📁 创建 Dockerfile
+
+### 后端 Dockerfile
+
+创建 `backend/Dockerfile`:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装系统依赖 (poppler 用于 PDF 处理)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# 复制依赖文件
+COPY pyproject.toml uv.lock ./
+
+# 安装 Python 依赖
+RUN uv sync --frozen --no-dev
+
+# 复制应用代码
+COPY . .
+
+# 创建资源目录
+RUN mkdir -p /app/res
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动命令
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### 前端 Dockerfile
+
+创建 `frontend/Dockerfile`:
+
+```dockerfile
+# 构建阶段
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 复制依赖文件
+COPY package*.json ./
+
+# 安装依赖
+RUN npm ci
+
+# 复制源码
+COPY . .
+
+# 构建
+RUN npm run build
+
+# 生产阶段
+FROM nginx:alpine
+
+# 复制构建产物
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 复制 Nginx 配置
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### 前端 Nginx 配置
+
+创建 `frontend/nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+
+    # Vue Router history 模式
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API 代理
+    location /api/ {
+        proxy_pass http://backend:8000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        client_max_body_size 100M;
+        proxy_read_timeout 300s;
+    }
+
+    # 静态资源缓存
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+---
+
+## 📝 docker-compose.yml
+
+在项目根目录创建 `docker-compose.yml`:
+
+```yaml
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vl_flow_backend
+    restart: always
+    environment:
+      # 数据库连接 (使用外部数据库服务器)
+      DATABASE_URL: postgresql+asyncpg://用户名:密码@数据库IP:5432/vl_flow
+      # AI 模型配置
+      OPENAI_KEY: ${OPENAI_KEY}
+      OPENAI_URL: ${OPENAI_URL}
+      MODEL_LOCAL: ${MODEL_LOCAL}
+    volumes:
+      - backend_res:/app/res
+    ports:
+      - "8000:8000"
+    networks:
+      - vl_flow_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vl_flow_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - vl_flow_net
+
+volumes:
+  backend_res:
+
+networks:
+  vl_flow_net:
+    driver: bridge
+```
+
+---
+
+## 🔐 环境变量配置
+
+在项目根目录创建 `.env` 文件:
+
+```ini
+# AI 模型配置
+OPENAI_KEY=你的API密钥
+OPENAI_URL=http://你的AI服务地址/v1
+MODEL_LOCAL=模型名称
+```
+
+---
+
+## 🚀 部署步骤
+
+### 1. 代码传输到服务器
+
+**方案 A: Git 仓库 (推荐)**
+
+```bash
+# 添加内部仓库
+git remote add internal http://内部GitLab/group/vl_flow.git
+git push internal main
+
+# 在服务器上克隆
+ssh user@服务器IP
+git clone http://内部GitLab/group/vl_flow.git /opt/vl_flow
+```
+
+**方案 B: 打包传输**
+
+```bash
+# 在开发机打包
+tar --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
+    -czvf vl_flow.tar.gz .
+
+# 传输到服务器
+scp vl_flow.tar.gz user@服务器IP:/opt/
+
+# 解压
+ssh user@服务器IP
+mkdir -p /opt/vl_flow && cd /opt/vl_flow
+tar -xzvf ../vl_flow.tar.gz
+```
+
+### 2. 构建并启动
+
+```bash
+cd /opt/vl_flow
+
+# 构建镜像
+docker compose build
+
+# 启动服务
+docker compose up -d
+
+# 查看日志
+docker compose logs -f
+```
+
+### 3. 验证部署
+
+```bash
+# 后端健康检查
+curl http://localhost:8000/health
+
+# 前端页面
+curl http://localhost/
+```
+
+---
+
+## 📦 离线部署 (无外网环境)
+
+### 在联网机器构建镜像
+
+```bash
+cd /path/to/vl_flow
+
+# 构建镜像
+docker compose build
+
+# 导出镜像
+docker save vl_flow-backend:latest | gzip > vl_flow_backend.tar.gz
+docker save vl_flow-frontend:latest | gzip > vl_flow_frontend.tar.gz
+```
+
+### 传输到内网服务器
+
+```bash
+scp vl_flow_*.tar.gz user@内网服务器IP:/opt/vl_flow/
+scp docker-compose.yml .env user@内网服务器IP:/opt/vl_flow/
+```
+
+### 在内网服务器加载并启动
+
+```bash
+cd /opt/vl_flow
+
+# 加载镜像
+gunzip -c vl_flow_backend.tar.gz | docker load
+gunzip -c vl_flow_frontend.tar.gz | docker load
+
+# 启动服务
+docker compose up -d
+```
+
+---
+
+## 🛠️ 常用命令
+
+| 操作         | 命令                                   |
+| :----------- | :------------------------------------- |
+| 启动服务     | `docker compose up -d`                 |
+| 停止服务     | `docker compose down`                  |
+| 重启服务     | `docker compose restart`               |
+| 查看日志     | `docker compose logs -f backend`       |
+| 重建镜像     | `docker compose build --no-cache`      |
+| 进入容器     | `docker exec -it vl_flow_backend bash` |
+| 查看容器状态 | `docker compose ps`                    |
+
+---
+
+## 🔧 常见问题
+
+| 问题             | 解决方案                               |
+| :--------------- | :------------------------------------- |
+| 无法拉取基础镜像 | 使用离线部署方案或配置镜像加速器       |
+| 容器启动失败     | `docker compose logs backend` 查看日志 |
+| 数据库连接失败   | 检查 DATABASE_URL 和网络连通性         |
+| 端口被占用       | `lsof -i :80` 查找占用进程             |
+| 文件上传失败     | 检查 volumes 挂载和权限                |

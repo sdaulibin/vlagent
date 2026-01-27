@@ -1,15 +1,40 @@
 services:
-  db:
-    image: postgres:15
-    container_name: vl_flow_db
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vl_flow_backend
+    restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: vl_flow
-    ports:
-      - "5432:5432"
+      # 数据库连接
+      DATABASE_URL: ${DATABASE_URL}
+      # AI 模型配置
+      OPENAI_KEY: ${OPENAI_KEY}
+      OPENAI_URL: ${OPENAI_URL}
+      MODEL_LOCAL: ${MODEL_LOCAL}
+      # 上传文件目录
+      UPLOAD_DIR: /app/res
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # 绑定挂载：宿主机目录 -> 容器目录
+      - /root/vl_flow/backend/res:/app/res
+    ports:
+      - "8000:8000"
+    networks:
+      - vl_flow_net
 
-volumes:
-  postgres_data:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vl_flow_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - vl_flow_net
+
+networks:
+  vl_flow_net:
+    driver: bridge
