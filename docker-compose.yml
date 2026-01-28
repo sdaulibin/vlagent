@@ -1,8 +1,7 @@
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    # 使用预构建的镜像（离线部署模式）
+    image: harbor.devops.qdb.com/star/vl_flow_backend:0.1
     container_name: vl_flow_backend
     restart: always
     environment:
@@ -23,13 +22,12 @@ services:
       - vl_flow_net
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    # 使用预构建的镜像（离线部署模式）
+    image: harbor.devops.qdb.com/star/vl_flow_front:0.1
     container_name: vl_flow_frontend
     restart: always
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
       - backend
     networks:

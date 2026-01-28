@@ -4,7 +4,17 @@ from sqlalchemy.orm import sessionmaker
 
 from src.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, echo=True, future=True)
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=True,
+    future=True,
+    # 连接池配置 - 解决连接被关闭的问题
+    pool_pre_ping=True,      # 每次使用前检查连接是否有效
+    pool_size=5,             # 连接池大小
+    max_overflow=10,         # 允许额外创建的连接数
+    pool_recycle=300,        # 5分钟后回收连接，避免数据库主动断开
+    pool_timeout=30,         # 获取连接超时时间
+)
 
 
 async def init_db():

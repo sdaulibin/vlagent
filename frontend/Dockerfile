@@ -1,32 +1,17 @@
-# 构建阶段
-FROM node:20-alpine AS builder
+# ====================================================
+# VL Flow Frontend - 离线部署 Dockerfile
+# 前置步骤：在联网机器上先运行 npm run build:docker
+# ====================================================
 
-WORKDIR /app
-
-# 只复制 package.json（不复制 lock 文件）
-COPY package.json ./
-
-# 安装依赖（让 npm 重新解析）
-RUN npm install
-
-# 调试：检查 vite 是否安装
-RUN echo "=== 检查 vite ===" && ls node_modules/vite/bin/ && echo "vite 已安装"
-
-# 复制源码
-COPY . .
-
-# 构建
-RUN npm run build:docker
-
-# 生产阶段
+# 生产阶段 - 只需要 nginx 和构建产物
 FROM nginx:alpine
 
-# 复制构建产物
-COPY --from=builder /app/dist /usr/share/nginx/html
+# 复制本地构建好的静态文件
+COPY dist /usr/share/nginx/html
 
 # 复制 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
