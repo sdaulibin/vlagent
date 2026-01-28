@@ -3,17 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 复制依赖文件
-COPY package*.json ./
+# 只复制 package.json（不复制 lock 文件）
+COPY package.json ./
 
-# 安装依赖
-RUN npm ci
+# 安装依赖（让 npm 重新解析）
+RUN npm install
+
+# 调试：检查 vite 是否安装
+RUN echo "=== 检查 vite ===" && ls node_modules/vite/bin/ && echo "vite 已安装"
 
 # 复制源码
 COPY . .
 
 # 构建
-RUN npm run build
+RUN npm run build:docker
 
 # 生产阶段
 FROM nginx:alpine
