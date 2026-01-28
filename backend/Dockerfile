@@ -2,9 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 安装系统依赖 (poppler 用于 PDF 处理)
+# 安装系统依赖 (poppler 用于 PDF 处理, 中文字体用于正确渲染 PDF)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
+    fonts-wqy-zenhei \
+    fonts-noto-cjk \
+    fontconfig \
+    && fc-cache -fv \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
