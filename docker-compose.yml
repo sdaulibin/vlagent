@@ -13,6 +13,8 @@ services:
       MODEL_LOCAL: ${MODEL_LOCAL}
       # 上传文件目录
       UPLOAD_DIR: /app/res
+      # 识别超时时间（秒）
+      RECOGNITION_TIMEOUT: ${RECOGNITION_TIMEOUT:-1800}
     volumes:
       # 绑定挂载：宿主机目录 -> 容器目录
       - /root/vl_flow/backend/res:/app/res
