@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
 from src.contracts.router import router as contracts_router
+from src.confirmation_letter.router import router as confirmation_router
 
 api_router = APIRouter()
 
@@ -14,3 +15,7 @@ api_router.include_router(transactions_router)
 
 # 合同比对
 api_router.include_router(contracts_router)
+
+# 询证函识别（独立模块）
+api_router.include_router(confirmation_router)
+

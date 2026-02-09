@@ -88,3 +88,40 @@ export const getFilePreviewUrl = (taskId: number, docType: "a" | "b") => {
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
   return `${baseUrl}/contracts/${taskId}/file/${docType}`;
 };
+
+// ===== 询证函识别 API =====
+
+export const uploadConfirmationLetter = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/confirmation/upload", formData);
+  return response.data;
+};
+
+export const getConfirmationLetters = async () => {
+  const response = await api.get("/confirmation");
+  return response.data;
+};
+
+export const getConfirmationLetter = async (letterId: number) => {
+  const response = await api.get(`/confirmation/${letterId}`);
+  return response.data;
+};
+
+export const recognizeConfirmationLetter = async (letterId: number) => {
+  const response = await api.post(`/confirmation/${letterId}/recognize`);
+  return response.data;
+};
+
+export const updateConfirmationLetter = async (
+  letterId: number,
+  data: Record<string, string>,
+) => {
+  const response = await api.put(`/confirmation/${letterId}`, data);
+  return response.data;
+};
+
+export const deleteConfirmationLetter = async (letterId: number) => {
+  const response = await api.delete(`/confirmation/${letterId}`);
+  return response.data;
+};

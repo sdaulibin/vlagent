@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import BankStatement from '../views/BankStatement.vue'
 import ContractCompare from '../views/ContractCompare.vue'
+import ConfirmationLetter from '../views/ConfirmationLetter.vue'
 
 const routes = [
     {
@@ -18,6 +19,11 @@ const routes = [
         path: '/contract-compare',
         name: 'ContractCompare',
         component: ContractCompare
+    },
+    {
+        path: '/confirmation-letter',
+        name: 'ConfirmationLetter',
+        component: ConfirmationLetter
     }
 ]
 
