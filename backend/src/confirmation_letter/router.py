@@ -4,6 +4,7 @@
 独立的 API 端点，不与银行流水识别共用。
 """
 import os
+import json
 import shutil
 import time
 import asyncio
@@ -16,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
 from src.database import get_session
-from src.confirmation_letter.models import ConfirmationLetter, ConfirmationLetterUpdate
+from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult, ConfirmationResultUpdate
 from src.confirmation_letter.service import process_confirmation_letter
 
 
@@ -28,27 +29,49 @@ UPLOAD_DIR = os.getenv("CONFIRMATION_UPLOAD_DIR",
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.get("", response_model=List[ConfirmationLetter])
-async def get_confirmation_letters(session: AsyncSession = Depends(get_session)):
-    """获取所有询证函记录"""
-    statement = select(ConfirmationLetter).order_by(desc(ConfirmationLetter.created_at))
+@router.get("")
+async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
+    """获取所有询证函文件记录"""
+    statement = select(ConfirmationFile).order_by(desc(ConfirmationFile.created_at))
     result = await session.execute(statement)
-    return result.scalars().all()
+    files = result.scalars().all()
+    
+    # 组装文件 + 识别结果
+    response = []
+    for f in files:
+        file_data = f.model_dump()
+        # 查询关联的识别结果
+        res_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == f.id)
+        res_result = await session.execute(res_stmt)
+        recognition = res_result.scalar_one_or_none()
+        file_data["recognition"] = recognition.model_dump() if recognition else None
+        response.append(file_data)
+    
+    return response
 
 
-@router.get("/{letter_id}", response_model=ConfirmationLetter)
-async def get_confirmation_letter(letter_id: int, session: AsyncSession = Depends(get_session)):
-    """获取单个询证函详情"""
-    statement = select(ConfirmationLetter).where(ConfirmationLetter.id == letter_id)
+@router.get("/{file_id}")
+async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """获取单个询证函详情（文件 + 识别结果）"""
+    statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     result = await session.execute(statement)
-    letter = result.scalar_one_or_none()
-    if not letter:
+    file = result.scalar_one_or_none()
+    if not file:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
-    return letter
+    
+    file_data = file.model_dump()
+    
+    # 查询关联的识别结果
+    res_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
+    res_result = await session.execute(res_stmt)
+    recognition = res_result.scalar_one_or_none()
+    file_data["recognition"] = recognition.model_dump() if recognition else None
+    
+    return file_data
 
 
 @router.post("/upload")
-async def upload_confirmation_letter(
+async def upload_confirmation_file(
     file: UploadFile = File(...), 
     session: AsyncSession = Depends(get_session)
 ):
@@ -64,15 +87,15 @@ async def upload_confirmation_letter(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # 创建记录
-        letter = ConfirmationLetter(filename=file.filename, file_path=file_path)
-        session.add(letter)
+        # 创建文件记录
+        conf_file = ConfirmationFile(filename=file.filename, file_path=file_path)
+        session.add(conf_file)
         await session.commit()
-        await session.refresh(letter)
+        await session.refresh(conf_file)
         
         return {
             "status": "success",
-            "letter_id": letter.id,
+            "file_id": conf_file.id,
             "filename": file.filename,
             "message": "询证函上传成功，请点击开始识别"
         }
@@ -85,30 +108,30 @@ async def upload_confirmation_letter(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{letter_id}/recognize")
-async def recognize_confirmation_letter(
-    letter_id: int, 
+@router.post("/{file_id}/recognize")
+async def recognize_confirmation_file(
+    file_id: int, 
     session: AsyncSession = Depends(get_session)
 ):
     """识别询证函字段"""
     try:
-        # 获取记录
+        # 获取文件记录
         result = await session.execute(
-            select(ConfirmationLetter).where(ConfirmationLetter.id == letter_id)
+            select(ConfirmationFile).where(ConfirmationFile.id == file_id)
         )
-        letter = result.scalar_one_or_none()
+        conf_file = result.scalar_one_or_none()
         
-        if not letter:
+        if not conf_file:
             raise HTTPException(status_code=404, detail="询证函记录不存在")
         
-        if letter.status == "done":
+        if conf_file.status == "done":
             return {"status": "already_done", "message": "已识别完成"}
         
-        if letter.status == "processing":
+        if conf_file.status == "processing":
             return {"status": "processing", "message": "正在识别中"}
         
         # 更新状态
-        letter.status = "processing"
+        conf_file.status = "processing"
         await session.commit()
         
         start_time = time.time()
@@ -116,39 +139,53 @@ async def recognize_confirmation_letter(
         try:
             # 执行识别
             recognition_result = await run_in_threadpool(
-                process_confirmation_letter, letter.file_path
+                process_confirmation_letter, 
+                conf_file.file_path
             )
             
-            # 更新识别结果
-            letter.confirmation_no = recognition_result.get("confirmation_no", "")
-            letter.accounting_firm = recognition_result.get("accounting_firm", "")
-            letter.reply_address = recognition_result.get("reply_address", "")
-            letter.contact_person = recognition_result.get("contact_person", "")
-            letter.phone = recognition_result.get("phone", "")
-            letter.postal_code = recognition_result.get("postal_code", "")
-            letter.debit_account = recognition_result.get("debit_account", "")
-            letter.cutoff_date = recognition_result.get("cutoff_date", "")
-            letter.start_date = recognition_result.get("start_date", "")
-            letter.end_date = recognition_result.get("end_date", "")
-            letter.seal_date = recognition_result.get("seal_date", "")
-            letter.seal_name = recognition_result.get("seal_name", "")
+            # 删除旧的识别结果（如果有）
+            old_result = await session.execute(
+                select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
+            )
+            old = old_result.scalar_one_or_none()
+            if old:
+                await session.delete(old)
             
-            letter.status = "done"
-            letter.recognition_duration = round((time.time() - start_time) * 1000, 2)
-            letter.updated_at = datetime.utcnow()
+            # 创建新的识别结果记录
+            conf_result = ConfirmationResult(
+                file_id=file_id,
+                confirmation_no=recognition_result.get("confirmation_no", ""),
+                accounting_firm=recognition_result.get("accounting_firm", ""),
+                reply_address=recognition_result.get("reply_address", ""),
+                contact_person=recognition_result.get("contact_person", ""),
+                phone=recognition_result.get("phone", ""),
+                postal_code=recognition_result.get("postal_code", ""),
+                debit_account=recognition_result.get("debit_account", ""),
+                cutoff_date=recognition_result.get("cutoff_date", ""),
+                start_date=recognition_result.get("start_date", ""),
+                end_date=recognition_result.get("end_date", ""),
+                seal_date=recognition_result.get("seal_date", ""),
+                seal_name=recognition_result.get("seal_name", ""),
+            )
+            session.add(conf_result)
+            
+            # 更新文件状态
+            conf_file.status = "done"
+            conf_file.recognition_duration = round((time.time() - start_time) * 1000, 2)
+            conf_file.updated_at = datetime.utcnow()
             
             await session.commit()
             
             return {
                 "status": "success",
-                "letter_id": letter.id,
-                "recognition_duration_ms": letter.recognition_duration,
+                "file_id": conf_file.id,
+                "recognition_duration_ms": conf_file.recognition_duration,
                 "result": recognition_result
             }
             
         except Exception as e:
-            letter.status = "failed"
-            letter.error_msg = str(e)
+            conf_file.status = "failed"
+            conf_file.error_msg = str(e)
             await session.commit()
             raise
     
@@ -160,65 +197,82 @@ async def recognize_confirmation_letter(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{letter_id}")
-async def update_confirmation_letter(
-    letter_id: int, 
-    data: ConfirmationLetterUpdate,
+@router.put("/{file_id}/result")
+async def update_confirmation_result(
+    file_id: int, 
+    data: ConfirmationResultUpdate,
     session: AsyncSession = Depends(get_session)
 ):
     """人工修改识别结果"""
-    result = await session.execute(
-        select(ConfirmationLetter).where(ConfirmationLetter.id == letter_id)
+    # 检查文件是否存在
+    file_result = await session.execute(
+        select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     )
-    letter = result.scalar_one_or_none()
-    
-    if not letter:
+    if not file_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="询证函记录不存在")
+    
+    # 查询识别结果
+    result = await session.execute(
+        select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
+    )
+    conf_result = result.scalar_one_or_none()
+    
+    if not conf_result:
+        # 如果没有识别结果，创建一个新的
+        conf_result = ConfirmationResult(file_id=file_id)
+        session.add(conf_result)
     
     # 更新非空字段
     update_data = data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if value is not None:
-            setattr(letter, field, value)
+            setattr(conf_result, field, value)
     
-    letter.updated_at = datetime.utcnow()
+    conf_result.updated_at = datetime.utcnow()
     await session.commit()
-    await session.refresh(letter)
+    await session.refresh(conf_result)
     
-    return {"status": "success", "letter": letter}
+    return {"status": "success", "result": conf_result}
 
 
-@router.delete("/{letter_id}")
-async def delete_confirmation_letter(
-    letter_id: int, 
+@router.delete("/{file_id}")
+async def delete_confirmation_file(
+    file_id: int, 
     session: AsyncSession = Depends(get_session)
 ):
-    """删除询证函记录及所有关联文件"""
+    """删除询证函文件及关联的识别结果"""
     result = await session.execute(
-        select(ConfirmationLetter).where(ConfirmationLetter.id == letter_id)
+        select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     )
-    letter = result.scalar_one_or_none()
+    conf_file = result.scalar_one_or_none()
     
-    if not letter:
+    if not conf_file:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
     
     cleaned = []
     
-    # 1. 删除上传的 PDF 文件
-    if letter.file_path and os.path.exists(letter.file_path):
-        os.remove(letter.file_path)
-        cleaned.append(f"PDF: {letter.file_path}")
+    # 1. 删除关联的识别结果
+    res_result = await session.execute(
+        select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
+    )
+    conf_result = res_result.scalar_one_or_none()
+    if conf_result:
+        await session.delete(conf_result)
+        cleaned.append(f"识别结果: result_id={conf_result.id}")
     
-    # 2. 删除 PDF 转图片过程中生成的临时目录
-    #    split_pdf_to_images / pdf_to_images 生成的目录格式：task_{basename}_images
-    if letter.file_path:
-        pdf_dir = os.path.dirname(letter.file_path)
-        base_name = os.path.splitext(os.path.basename(letter.file_path))[0]
+    # 2. 删除上传的 PDF 文件
+    if conf_file.file_path and os.path.exists(conf_file.file_path):
+        os.remove(conf_file.file_path)
+        cleaned.append(f"PDF: {conf_file.file_path}")
+    
+    # 3. 清理可能存在的临时图片目录
+    if conf_file.file_path:
+        pdf_dir = os.path.dirname(conf_file.file_path)
+        base_name = os.path.splitext(os.path.basename(conf_file.file_path))[0]
         
-        # 清理可能存在的临时图片目录
         temp_patterns = [
-            f"task_{base_name}_images",         # pdf_to_images 生成
-            f"_tmp_images",                      # 测试脚本生成
+            f"task_{base_name}_images",
+            f"_tmp_images",
         ]
         for pattern in temp_patterns:
             temp_dir = os.path.join(pdf_dir, pattern)
@@ -226,14 +280,13 @@ async def delete_confirmation_letter(
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 cleaned.append(f"临时目录: {temp_dir}")
     
-    # 3. 删除数据库记录
-    await session.delete(letter)
+    # 4. 删除文件记录
+    await session.delete(conf_file)
     await session.commit()
-    cleaned.append(f"数据库记录: id={letter_id}")
+    cleaned.append(f"文件记录: id={file_id}")
     
     return {
         "status": "success", 
-        "message": f"询证函 {letter_id} 已完全删除",
+        "message": f"询证函 {file_id} 已完全删除",
         "cleaned": cleaned
     }
-

@@ -11,10 +11,7 @@ import {
   deleteConfirmationLetter
 } from '../api';
 
-interface ConfirmationLetterItem {
-  id: number;
-  filename: string;
-  status: string;
+interface RecognitionData {
   confirmation_no: string;
   accounting_firm: string;
   reply_address: string;
@@ -27,6 +24,13 @@ interface ConfirmationLetterItem {
   end_date: string;
   seal_date: string;
   seal_name: string;
+}
+
+interface ConfirmationLetterItem {
+  id: number;
+  filename: string;
+  status: string;
+  recognition: RecognitionData | null;
   recognition_duration: number | null;
 }
 
@@ -72,10 +76,11 @@ const selectLetter = async (id: number) => {
   try {
     const letter = await getConfirmationLetter(id);
     selectedLetter.value = letter;
-    // 初始化表单数据
+    // 初始化表单数据（从嵌套的 recognition 对象中读取）
     formData.value = {};
+    const recognition = letter.recognition;
     formFields.forEach(f => {
-      formData.value[f.key] = letter[f.key as keyof ConfirmationLetterItem] as string || '';
+      formData.value[f.key] = recognition?.[f.key as keyof RecognitionData] || '';
     });
   } catch (e) {
     console.error("加载询证函详情失败", e);

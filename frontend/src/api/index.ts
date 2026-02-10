@@ -117,7 +117,7 @@ export const updateConfirmationLetter = async (
   letterId: number,
   data: Record<string, string>,
 ) => {
-  const response = await api.put(`/confirmation/${letterId}`, data);
+  const response = await api.put(`/confirmation/${letterId}/result`, data);
   return response.data;
 };
 

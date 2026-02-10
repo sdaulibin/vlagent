@@ -1,20 +1,35 @@
 """
 询证函数据模型
+
+分为两张表：
+- ConfirmationFile: 文件上传信息
+- ConfirmationResult: 识别结果字段
 """
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 from typing import Optional
 
 
-class ConfirmationLetter(SQLModel, table=True):
-    """询证函记录"""
-    __tablename__ = "confirmation_letters"
+class ConfirmationFile(SQLModel, table=True):
+    """询证函文件记录"""
+    __tablename__ = "confirmation_files"
     
     id: Optional[int] = Field(default=None, primary_key=True)
     filename: str = Field(index=True)
     file_path: str
     status: str = Field(default="pending")  # pending, processing, done, failed
     error_msg: Optional[str] = None
+    recognition_duration: Optional[float] = Field(default=None, description="识别耗时(ms)")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+
+class ConfirmationResult(SQLModel, table=True):
+    """询证函识别结果"""
+    __tablename__ = "confirmation_results"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    file_id: int = Field(index=True, foreign_key="confirmation_files.id")
     
     # 识别字段（12项）
     confirmation_no: Optional[str] = Field(default=None, description="函证编号")
@@ -30,14 +45,12 @@ class ConfirmationLetter(SQLModel, table=True):
     seal_date: Optional[str] = Field(default=None, description="印章日期")
     seal_name: Optional[str] = Field(default=None, description="印章名称")
     
-    # 元数据
-    recognition_duration: Optional[float] = Field(default=None, description="识别耗时(ms)")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
 
 
-class ConfirmationLetterUpdate(SQLModel):
-    """询证函更新模型（用于人工修改）"""
+class ConfirmationResultUpdate(SQLModel):
+    """识别结果更新模型（用于人工修改）"""
     confirmation_no: Optional[str] = None
     accounting_firm: Optional[str] = None
     reply_address: Optional[str] = None
