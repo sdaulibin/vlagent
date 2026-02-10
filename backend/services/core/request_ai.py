@@ -29,7 +29,8 @@ def request_stream(question="", file_base="", model=MODEL_QWEN_VLMAX,
     model = model
     client = OpenAI(
         api_key=api_key,
-        base_url=base_url
+        base_url=base_url,
+        timeout=300.0,  # 5分钟超时，处理大图片
     )
     message = []
     if system_content is not None:
