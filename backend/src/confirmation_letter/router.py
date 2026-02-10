@@ -193,7 +193,7 @@ async def delete_confirmation_letter(
     letter_id: int, 
     session: AsyncSession = Depends(get_session)
 ):
-    """删除询证函记录"""
+    """删除询证函记录及所有关联文件"""
     result = await session.execute(
         select(ConfirmationLetter).where(ConfirmationLetter.id == letter_id)
     )
@@ -202,12 +202,38 @@ async def delete_confirmation_letter(
     if not letter:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
     
-    # 删除文件
+    cleaned = []
+    
+    # 1. 删除上传的 PDF 文件
     if letter.file_path and os.path.exists(letter.file_path):
         os.remove(letter.file_path)
+        cleaned.append(f"PDF: {letter.file_path}")
     
-    # 删除记录
+    # 2. 删除 PDF 转图片过程中生成的临时目录
+    #    split_pdf_to_images / pdf_to_images 生成的目录格式：task_{basename}_images
+    if letter.file_path:
+        pdf_dir = os.path.dirname(letter.file_path)
+        base_name = os.path.splitext(os.path.basename(letter.file_path))[0]
+        
+        # 清理可能存在的临时图片目录
+        temp_patterns = [
+            f"task_{base_name}_images",         # pdf_to_images 生成
+            f"_tmp_images",                      # 测试脚本生成
+        ]
+        for pattern in temp_patterns:
+            temp_dir = os.path.join(pdf_dir, pattern)
+            if os.path.exists(temp_dir) and os.path.isdir(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                cleaned.append(f"临时目录: {temp_dir}")
+    
+    # 3. 删除数据库记录
     await session.delete(letter)
     await session.commit()
+    cleaned.append(f"数据库记录: id={letter_id}")
     
-    return {"status": "success", "message": f"询证函 {letter_id} 已删除"}
+    return {
+        "status": "success", 
+        "message": f"询证函 {letter_id} 已完全删除",
+        "cleaned": cleaned
+    }
+
