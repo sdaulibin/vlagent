@@ -1,6 +1,6 @@
 # ⚙️ Backend Service
 
-基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，专门用于文档的智能化处理与结构化数据提取。
+基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，支持银行流水识别、询证函识别和合同比对等多种文档智能处理功能。
 
 ---
 
@@ -73,18 +73,25 @@
 
 ```bash
 backend/
-├── main.py            # FastAPI 应用入口与中间件配置
-├── api.py             # 统一路由分发中心
+├── main.py                # FastAPI 应用入口与中间件配置
+├── api.py                 # 统一路由分发中心
 ├── src/
-│   ├── banks/         # 银行处理器实现 (Strategy implementations)
-│   ├── models/        # 各银行数据模型 (SQLModel)
-│   ├── files/         # 文件上传、存储与识别状态管理
-│   ├── transactions/  # 统一的交易数据查询接口
-│   └── contracts/     # 合同处理（保留用于未来扩展）
-├── services/          # 通用业务逻辑
-│   ├── pdf/           # PDF 解析、银行检测、数据提取、Excel 导出
+│   ├── banks/             # 银行处理器实现 (Strategy Pattern)
+│   ├── models/            # 各银行数据模型 (SQLModel)
+│   ├── files/             # 文件上传、存储与识别状态管理
+│   ├── transactions/      # 统一的交易数据查询接口
+│   ├── confirmation_letter/  # 📝 询证函识别模块
+│   │   ├── models.py      #   ConfirmationFile + ConfirmationResult (分表存储)
+│   │   ├── router.py      #   API 路由
+│   │   └── service.py     #   AI 识别逻辑与 Prompt
+│   ├── contracts/         # 📄 合同比对模块
+│   ├── config.py          # 全局配置
+│   ├── database.py        # 数据库引擎与会话管理
+│   └── exceptions.py      # 自定义异常
+├── services/              # 通用业务逻辑
+│   ├── pdf/               # PDF 解析、银行检测、数据提取、Excel 导出
 │   └── contract_processor.py # 文本比对算法
-└── config/            # 外部化配置 (JSON schemas, Prompts)
+└── config/                # 外部化配置 (JSON schemas, Prompts)
 ```
 
 ---
@@ -97,6 +104,23 @@ backend/
 - `POST /api/files/{id}/recognize`: 异步启动 AI 识别任务。
 - `GET /api/transactions/{id}`: 获取识别后的结构化明细。
 - `GET /api/files/{id}/export`: 生成并下载标准化的 Excel 报表。
+
+### 📝 询证函模块
+
+文件信息与识别结果分表存储（`confirmation_files` + `confirmation_results`）：
+
+- `POST /api/confirmation/upload`: 上传询证函 PDF。
+- `POST /api/confirmation/{id}/recognize`: AI 识别 12 个关键字段。
+- `GET /api/confirmation`: 获取所有询证函列表（含识别结果）。
+- `GET /api/confirmation/{id}`: 获取单个询证函详情。
+- `PUT /api/confirmation/{id}/result`: 人工修改识别结果。
+- `DELETE /api/confirmation/{id}`: 删除询证函及关联数据。
+
+### 📄 合同比对模块
+
+- `POST /api/contracts/upload`: 上传待比对合同。
+- `POST /api/contracts/{id}/compare`: 执行合同差异比对。
+- `GET /api/contracts/{id}`: 获取比对结果。
 
 ---
 

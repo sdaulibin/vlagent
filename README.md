@@ -6,7 +6,7 @@
 [![Vue 3.5](https://img.shields.io/badge/Vue-3.5-4FC08D.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**vl_flow** 是一个基于 **Qwen-VL** 大模型的智能文档识别与分析平台。它利用先进的多模态模型能力，实现了银行流水的高精度识别与结构化。
+**vl_flow** 是一个基于 **Qwen-VL** 大模型的智能文档识别与分析平台。它利用先进的多模态模型能力，实现了银行流水识别、询证函识别和合同比对等多种文档智能处理功能。
 
 ---
 
@@ -20,6 +20,21 @@
 - **自动检测**: 自动识别银行类型，智能匹配识别策略。
 - **一键导出**: 识别结果可直接导出为 Excel 文档。
 - **跨页合并**: 自动处理跨页连续记录，确保数据完整性。
+
+### 📝 询证函智能识别 (Confirmation Letter)
+
+银行询证函的 AI 识别与结构化提取，支持 12 个关键字段。
+
+- **智能提取**: 自动识别函证编号、事务所名称、回函地址等关键信息。
+- **人工修正**: 支持人工校对和修改识别结果。
+- **分表存储**: 文件信息与识别结果独立存储，架构清晰。
+
+### 📄 合同比对 (Contract Compare)
+
+智能比对两份合同文档的差异，精确定位变更内容。
+
+- **逐段比对**: 基于文本段落的细粒度差异检测。
+- **可视化展示**: 前端直观展示新增、删除、修改的内容。
 
 ---
 
@@ -78,14 +93,20 @@ npm run dev
 
 ```bash
 vl_flow/
-├── backend/          # FastAPI 后端服务 (Logic, AI, DB)
-│   ├── src/banks/    # 银行处理策略实现
-│   ├── src/models/   # 结构化数据模型
-│   └── config/       # 识别提示词与 Schema 配置
-├── frontend/         # Vue 3 前端应用 (UI, Dashboard)
-│   ├── src/views/    # 核心页面 (流水识别)
-│   └── src/components/ bank-results/ # 各银行 UI 展示组件
-└── docker-compose.yml # 容器化部署配置
+├── backend/                    # FastAPI 后端服务
+│   ├── src/banks/              # 银行处理策略实现 (Strategy Pattern)
+│   ├── src/models/             # 银行流水数据模型 (SQLModel)
+│   ├── src/files/              # 文件上传与识别管理
+│   ├── src/transactions/       # 交易数据查询接口
+│   ├── src/confirmation_letter/# 询证函识别模块
+│   ├── src/contracts/          # 合同比对模块
+│   ├── services/               # PDF 处理、数据提取等通用服务
+│   └── config/                 # 识别提示词与 Schema 配置
+├── frontend/                   # Vue 3 前端应用
+│   ├── src/views/              # 页面 (Home, BankStatement, ConfirmationLetter, ContractCompare)
+│   └── src/components/         # UI 组件 (bank-results/ 等)
+├── docs/                       # 项目文档与 ER 图
+└── docker-compose.yml          # 容器化部署配置
 ```
 
 ---
