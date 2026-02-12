@@ -92,6 +92,6 @@ def validate_bank_statement(image_path: str) -> tuple[bool, str, float]:
         return is_statement, reason, confidence
         
     except Exception as e:
-        # 发生异常时，默认允许通过（避免阻断正常流程）
+        # 发生异常时默认不通过，避免非流水文件绕过校验
         print(f"银行流水验证异常: {e}")
-        return True, f"验证过程出现异常，默认通过: {str(e)}", 0.5
+        return False, f"验证过程出现异常: {str(e)}", 1.0

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from typing import List
 from pathlib import Path
 from uuid import uuid4
+from urllib.parse import quote
 import shutil
 import os
 
@@ -101,18 +103,11 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
     ext = os.path.splitext(filename)[1].lower()
     media_type = MIME_TYPES.get(ext, 'application/octet-stream')
     
-    # 使用 inline 而不是 attachment, 让浏览器直接预览而不是下载
-    from starlette.responses import Response
-    from urllib.parse import quote
-    
-    with open(file_path, 'rb') as f:
-        content = f.read()
-    
     # URL 编码文件名以处理中文字符
     encoded_filename = quote(filename)
-    
-    return Response(
-        content=content,
+
+    return FileResponse(
+        path=file_path,
         media_type=media_type,
         headers={
             "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
@@ -154,7 +149,11 @@ async def compare_contracts(
         
         try:
             # 执行比对并获取内容
-            result_data = contract_processor.compare_documents_with_content(file_a_path, file_b_path)
+            result_data = await run_in_threadpool(
+                contract_processor.compare_documents_with_content,
+                file_a_path,
+                file_b_path,
+            )
             
             content_a = result_data.get("content_a", "")
             content_b = result_data.get("content_b", "")

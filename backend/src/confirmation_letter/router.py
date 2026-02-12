@@ -50,22 +50,24 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
 @router.get("")
 async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     """获取所有询证函文件记录"""
-    statement = select(ConfirmationFile).order_by(desc(ConfirmationFile.created_at))
+    statement = (
+        select(ConfirmationFile, ConfirmationResult)
+        .outerjoin(ConfirmationResult, ConfirmationResult.file_id == ConfirmationFile.id)
+        .order_by(desc(ConfirmationFile.created_at))
+    )
     result = await session.execute(statement)
-    files = result.scalars().all()
-    
-    # 组装文件 + 识别结果
-    response = []
-    for f in files:
-        file_data = f.model_dump()
-        # 查询关联的识别结果
-        res_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == f.id)
-        res_result = await session.execute(res_stmt)
-        recognition = res_result.scalar_one_or_none()
-        file_data["recognition"] = recognition.model_dump() if recognition else None
-        response.append(file_data)
-    
-    return response
+    rows = result.all()
+
+    # 组装文件 + 识别结果（单次查询，避免 N+1）
+    response_map = {}
+    for file_obj, rec_obj in rows:
+        if file_obj.id in response_map:
+            continue
+        file_data = file_obj.model_dump()
+        file_data["recognition"] = rec_obj.model_dump() if rec_obj else None
+        response_map[file_obj.id] = file_data
+
+    return list(response_map.values())
 
 
 @router.get("/{file_id}")

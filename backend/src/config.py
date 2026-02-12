@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
+    DATABASE_ECHO: bool = False
     
     class Config:
         env_file = ".env"

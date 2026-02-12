@@ -6,7 +6,7 @@ from src.config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,
+    echo=settings.DATABASE_ECHO,
     future=True,
     # 连接池配置 - 解决连接被关闭的问题
     pool_pre_ping=True,      # 每次使用前检查连接是否有效
@@ -14,6 +14,10 @@ engine = create_async_engine(
     max_overflow=10,         # 允许额外创建的连接数
     pool_recycle=300,        # 5分钟后回收连接，避免数据库主动断开
     pool_timeout=30,         # 获取连接超时时间
+)
+
+SessionLocal = sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
 )
 
 
@@ -37,8 +41,5 @@ async def init_db():
 
 
 async def get_session() -> AsyncSession:
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with async_session() as session:
+    async with SessionLocal() as session:
         yield session
