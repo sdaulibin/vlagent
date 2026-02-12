@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -38,6 +39,23 @@ async def init_db():
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
+        # 兼容已有数据库：补充询证函新增字段（幂等）
+        await conn.execute(text(
+            "ALTER TABLE confirmation_results "
+            "ADD COLUMN IF NOT EXISTS signature_name VARCHAR"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE confirmation_results "
+            "ADD COLUMN IF NOT EXISTS format_type VARCHAR"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE confirmation_results "
+            "ADD COLUMN IF NOT EXISTS format_check_passed BOOLEAN"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE confirmation_results "
+            "ADD COLUMN IF NOT EXISTS format_mismatches_json TEXT"
+        ))
 
 
 async def get_session() -> AsyncSession:

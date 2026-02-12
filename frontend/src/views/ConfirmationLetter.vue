@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { FileText, ArrowLeft, Play, Save, Trash2, Upload } from 'lucide-vue-next';
+import { FileText, ArrowLeft, Play, Save, Trash2, Upload, RefreshCcw, ExternalLink } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
   uploadConfirmationLetter,
@@ -8,8 +8,16 @@ import {
   getConfirmationLetter,
   recognizeConfirmationLetter,
   updateConfirmationLetter,
-  deleteConfirmationLetter
+  deleteConfirmationLetter,
+  getConfirmationPreviewUrl
 } from '../api';
+
+interface FormatMismatch {
+  item: string;
+  expected: string;
+  actual: string;
+  severity: string;
+}
 
 interface RecognitionData {
   confirmation_no: string;
@@ -24,6 +32,10 @@ interface RecognitionData {
   end_date: string;
   seal_date: string;
   seal_name: string;
+  signature_name: string;
+  format_type?: string;
+  format_check_passed?: boolean;
+  format_mismatches?: FormatMismatch[];
 }
 
 interface ConfirmationLetterItem {
@@ -55,13 +67,14 @@ const formFields = [
   { key: 'end_date', label: '终止日期' },
   { key: 'seal_date', label: '印章日期' },
   { key: 'seal_name', label: '印章名称' },
+  { key: 'signature_name', label: '落款名称' },
 ];
 
 // 编辑表单数据
 const formData = ref<Record<string, string>>({});
 
-const hasPendingLetters = computed(() => {
-  return letters.value.some(l => l.status === 'pending');
+const hasRetryableLetters = computed(() => {
+  return letters.value.some(l => l.status === 'pending' || l.status === 'failed');
 });
 
 const loadLetters = async () => {
@@ -107,12 +120,12 @@ const handleFileUpload = async (event: Event) => {
 };
 
 const handleStartRecognition = async () => {
-  const pendingLetters = letters.value.filter(l => l.status === 'pending');
-  if (pendingLetters.length === 0) return;
+  const retryableLetters = letters.value.filter(l => l.status === 'pending' || l.status === 'failed');
+  if (retryableLetters.length === 0) return;
 
   isRecognizing.value = true;
   try {
-    for (const letter of pendingLetters) {
+    for (const letter of retryableLetters) {
       await recognizeConfirmationLetter(letter.id);
     }
     await loadLetters();
@@ -125,6 +138,18 @@ const handleStartRecognition = async () => {
     console.error("识别失败", e);
   } finally {
     isRecognizing.value = false;
+  }
+};
+
+const handleRecognizeOne = async (id: number) => {
+  try {
+    await recognizeConfirmationLetter(id);
+    await loadLetters();
+    if (selectedLetter.value?.id === id) {
+      await selectLetter(id);
+    }
+  } catch (e) {
+    console.error("单条识别失败", e);
   }
 };
 
@@ -159,6 +184,12 @@ const handleDelete = async (id: number) => {
 
 const goBack = () => {
   router.push('/');
+};
+
+const openPreview = () => {
+  if (!selectedLetter.value) return;
+  const url = getConfirmationPreviewUrl(selectedLetter.value.id);
+  window.open(url, '_blank');
 };
 
 const getStatusText = (status: string) => {
@@ -219,11 +250,11 @@ onMounted(() => {
         <!-- Start Recognition -->
         <button
           @click="handleStartRecognition"
-          :disabled="isRecognizing || !hasPendingLetters"
+          :disabled="isRecognizing || !hasRetryableLetters"
           class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-medium shadow-lg hover:from-emerald-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Play class="w-5 h-5" />
-          {{ isRecognizing ? '识别中...' : (hasPendingLetters ? '开始识别' : '暂无待识别文件') }}
+          {{ isRecognizing ? '识别中...' : (hasRetryableLetters ? '开始识别/重试失败' : '暂无可识别文件') }}
         </button>
 
         <!-- File List -->
@@ -253,6 +284,13 @@ onMounted(() => {
               >
                 <Trash2 class="w-4 h-4" />
               </button>
+              <button
+                v-if="letter.status === 'pending' || letter.status === 'failed'"
+                @click.stop="handleRecognizeOne(letter.id)"
+                class="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+              >
+                <RefreshCcw class="w-4 h-4" />
+              </button>
             </li>
             <li v-if="letters.length === 0" class="p-4 text-center text-slate-400 text-sm">
               暂无询证函记录
@@ -265,18 +303,46 @@ onMounted(() => {
       <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-medium text-slate-700">识别结果</h3>
-          <button
-            v-if="selectedLetter"
-            @click="handleSave"
-            :disabled="isSaving"
-            class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <Save class="w-4 h-4" />
-            {{ isSaving ? '保存中...' : '保存修改' }}
-          </button>
+          <div v-if="selectedLetter" class="flex items-center gap-2">
+            <button
+              @click="openPreview"
+              class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink class="w-4 h-4" />
+              预览原文
+            </button>
+            <button
+              @click="handleSave"
+              :disabled="isSaving"
+              class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Save class="w-4 h-4" />
+              {{ isSaving ? '保存中...' : '保存修改' }}
+            </button>
+          </div>
         </div>
 
         <div v-if="selectedLetter" class="p-4 flex-1 overflow-auto">
+          <div
+            v-if="selectedLetter.recognition"
+            class="mb-4 p-3 rounded-lg border"
+            :class="selectedLetter.recognition.format_check_passed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'"
+          >
+            <p class="text-sm font-medium text-slate-700">
+              格式类型：{{ selectedLetter.recognition.format_type || 'unknown' }}
+            </p>
+            <p class="text-xs mt-1" :class="selectedLetter.recognition.format_check_passed ? 'text-emerald-700' : 'text-amber-700'">
+              {{ selectedLetter.recognition.format_check_passed ? '格式校验通过' : '格式存在不一致项' }}
+            </p>
+            <ul
+              v-if="selectedLetter.recognition.format_mismatches && selectedLetter.recognition.format_mismatches.length > 0"
+              class="mt-2 text-xs text-amber-800 space-y-1"
+            >
+              <li v-for="(m, idx) in selectedLetter.recognition.format_mismatches" :key="idx">
+                [{{ m.item }}] 期望: {{ m.expected }} | 实际: {{ m.actual }}
+              </li>
+            </ul>
+          </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div v-for="field in formFields" :key="field.key" class="flex flex-col gap-1">
               <label class="text-sm font-medium text-slate-600">{{ field.label }}</label>

@@ -113,6 +113,12 @@ export const recognizeConfirmationLetter = async (letterId: number) => {
   return response.data;
 };
 
+export const getConfirmationPreviewUrl = (letterId: number) => {
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  return `${baseUrl}/confirmation/${letterId}/file`;
+};
+
 export const updateConfirmationLetter = async (
   letterId: number,
   data: Record<string, string>,

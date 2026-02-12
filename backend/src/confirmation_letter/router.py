@@ -7,7 +7,6 @@ import os
 import json
 import shutil
 import time
-import asyncio
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -15,11 +14,19 @@ from typing import List
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
 from src.database import get_session
-from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult, ConfirmationResultUpdate
+from src.confirmation_letter.models import (
+    ConfirmationFile,
+    ConfirmationResult,
+    ConfirmationResultUpdate,
+    ConfirmationFileDTO,
+    ConfirmationRecognitionDTO,
+    FormatMismatch,
+)
 from src.confirmation_letter.service import process_confirmation_letter
 
 
@@ -47,7 +54,59 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
     return str(target_path)
 
 
-@router.get("")
+def _parse_mismatches(raw_json: str | None) -> List[FormatMismatch]:
+    if not raw_json:
+        return []
+    try:
+        data = json.loads(raw_json)
+        if isinstance(data, list):
+            return [FormatMismatch(**item) for item in data if isinstance(item, dict)]
+    except Exception:
+        return []
+    return []
+
+
+def _to_recognition_dto(recognition: ConfirmationResult | None) -> ConfirmationRecognitionDTO | None:
+    if not recognition:
+        return None
+    return ConfirmationRecognitionDTO(
+        id=recognition.id,
+        file_id=recognition.file_id,
+        confirmation_no=recognition.confirmation_no,
+        accounting_firm=recognition.accounting_firm,
+        reply_address=recognition.reply_address,
+        contact_person=recognition.contact_person,
+        phone=recognition.phone,
+        postal_code=recognition.postal_code,
+        debit_account=recognition.debit_account,
+        cutoff_date=recognition.cutoff_date,
+        start_date=recognition.start_date,
+        end_date=recognition.end_date,
+        seal_date=recognition.seal_date,
+        seal_name=recognition.seal_name,
+        signature_name=recognition.signature_name,
+        format_type=recognition.format_type,
+        format_check_passed=recognition.format_check_passed,
+        format_mismatches=_parse_mismatches(recognition.format_mismatches_json),
+        created_at=recognition.created_at,
+        updated_at=recognition.updated_at,
+    )
+
+
+def _to_file_dto(file_obj: ConfirmationFile, rec_obj: ConfirmationResult | None) -> ConfirmationFileDTO:
+    return ConfirmationFileDTO(
+        id=file_obj.id,
+        filename=file_obj.filename,
+        status=file_obj.status,
+        error_msg=file_obj.error_msg,
+        recognition_duration=file_obj.recognition_duration,
+        created_at=file_obj.created_at,
+        updated_at=file_obj.updated_at,
+        recognition=_to_recognition_dto(rec_obj),
+    )
+
+
+@router.get("", response_model=List[ConfirmationFileDTO])
 async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     """获取所有询证函文件记录"""
     statement = (
@@ -63,14 +122,12 @@ async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     for file_obj, rec_obj in rows:
         if file_obj.id in response_map:
             continue
-        file_data = file_obj.model_dump()
-        file_data["recognition"] = rec_obj.model_dump() if rec_obj else None
-        response_map[file_obj.id] = file_data
+        response_map[file_obj.id] = _to_file_dto(file_obj, rec_obj)
 
     return list(response_map.values())
 
 
-@router.get("/{file_id}")
+@router.get("/{file_id}", response_model=ConfirmationFileDTO)
 async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个询证函详情（文件 + 识别结果）"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
@@ -79,15 +136,31 @@ async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(ge
     if not file:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
     
-    file_data = file.model_dump()
-    
     # 查询关联的识别结果
     res_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
     res_result = await session.execute(res_stmt)
     recognition = res_result.scalar_one_or_none()
-    file_data["recognition"] = recognition.model_dump() if recognition else None
-    
-    return file_data
+    return _to_file_dto(file, recognition)
+
+
+@router.get("/{file_id}/file")
+async def preview_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """预览询证函原始文件"""
+    statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
+    result = await session.execute(statement)
+    file_obj = result.scalar_one_or_none()
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="询证函记录不存在")
+    if not os.path.exists(file_obj.file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    from urllib.parse import quote
+    encoded_filename = quote(file_obj.filename)
+    return FileResponse(
+        path=file_obj.file_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"},
+    )
 
 
 @router.post("/upload")
@@ -186,6 +259,13 @@ async def recognize_confirmation_file(
                 end_date=recognition_result.get("end_date", ""),
                 seal_date=recognition_result.get("seal_date", ""),
                 seal_name=recognition_result.get("seal_name", ""),
+                signature_name=recognition_result.get("signature_name", ""),
+                format_type=recognition_result.get("format_type", "unknown"),
+                format_check_passed=recognition_result.get("format_check_passed", False),
+                format_mismatches_json=json.dumps(
+                    recognition_result.get("format_mismatches", []),
+                    ensure_ascii=False,
+                ),
             )
             session.add(conf_result)
             
