@@ -1,6 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse
 from typing import List
+from pathlib import Path
+from uuid import uuid4
 import shutil
 import os
 
@@ -15,6 +17,22 @@ router = APIRouter(prefix="/contracts", tags=["contracts"])
 
 UPLOAD_DIR = "/Users/binginx/PycharmProjects/vl_flow/backend/res/contracts"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _build_safe_upload_path(upload_dir: str, original_filename: str, prefix: str = "") -> str:
+    """Build a safe, unique path under upload_dir and prevent path traversal."""
+    safe_name = Path((original_filename or "").strip()).name
+    if not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="文件名无效")
+
+    stem, suffix = os.path.splitext(safe_name)
+    unique_name = f"{prefix}{stem}_{uuid4().hex}{suffix}"
+
+    base_dir = Path(upload_dir).resolve()
+    target_path = (base_dir / unique_name).resolve()
+    if base_dir not in target_path.parents:
+        raise HTTPException(status_code=400, detail="非法文件路径")
+    return str(target_path)
 
 # 文件类型映射
 MIME_TYPES = {
@@ -113,8 +131,8 @@ async def compare_contracts(
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         
         # 保存文件
-        file_a_path = os.path.join(UPLOAD_DIR, f"a_{file_a.filename}")
-        file_b_path = os.path.join(UPLOAD_DIR, f"b_{file_b.filename}")
+        file_a_path = _build_safe_upload_path(UPLOAD_DIR, file_a.filename, prefix="a_")
+        file_b_path = _build_safe_upload_path(UPLOAD_DIR, file_b.filename, prefix="b_")
         
         with open(file_a_path, "wb") as buffer:
             shutil.copyfileobj(file_a.file, buffer)

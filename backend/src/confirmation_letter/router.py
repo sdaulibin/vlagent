@@ -8,6 +8,8 @@ import json
 import shutil
 import time
 import asyncio
+from pathlib import Path
+from uuid import uuid4
 from datetime import datetime
 from typing import List
 
@@ -27,6 +29,22 @@ router = APIRouter(prefix="/confirmation", tags=["confirmation_letter"])
 UPLOAD_DIR = os.getenv("CONFIRMATION_UPLOAD_DIR", 
                        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "res", "confirmation"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
+    """Build a safe, unique path under upload_dir and prevent path traversal."""
+    safe_name = Path((original_filename or "").strip()).name
+    if not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="文件名无效")
+
+    stem, suffix = os.path.splitext(safe_name)
+    unique_name = f"{stem}_{uuid4().hex}{suffix}"
+
+    base_dir = Path(upload_dir).resolve()
+    target_path = (base_dir / unique_name).resolve()
+    if base_dir not in target_path.parents:
+        raise HTTPException(status_code=400, detail="非法文件路径")
+    return str(target_path)
 
 
 @router.get("")
@@ -81,7 +99,7 @@ async def upload_confirmation_file(
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
         
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
         
         # 保存文件
         with open(file_path, "wb") as buffer:

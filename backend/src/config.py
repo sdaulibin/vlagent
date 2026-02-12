@@ -1,16 +1,15 @@
 """
 全局配置管理 - 基于 pydantic-settings
 """
-import os
+from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional
 
 
 class Settings(BaseSettings):
     """应用配置"""
     
     # AI Model Configuration
-    OPENAI_KEY: str = "0928eb03406f2c1a28eab92393a341986ff006f42f4e0f9b6f5e621c9522e02c"
+    OPENAI_KEY: str = Field(..., description="Required. Read from environment variable OPENAI_KEY")
     OPENAI_URL: str = "http://10.1.82.113:30208/v1"
     MODEL_LOCAL: str = "d3vcf7gre7tl90toeog0"
     
@@ -19,7 +18,7 @@ class Settings(BaseSettings):
     RECOGNITION_TIMEOUT: int = 1800  # 自动停止识别任务的超时时间（秒）30分钟
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:123456@localhost/vl_flow"
+    DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
     
     class Config:
         env_file = ".env"

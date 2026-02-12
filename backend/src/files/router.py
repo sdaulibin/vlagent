@@ -8,6 +8,8 @@ from fastapi.responses import StreamingResponse
 from typing import List
 from io import BytesIO
 from urllib.parse import quote
+from pathlib import Path
+from uuid import uuid4
 import shutil
 import os
 
@@ -30,6 +32,22 @@ router = APIRouter(prefix="/files", tags=["files"])
 # Load config from env
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/Users/binginx/PycharmProjects/vl_flow/backend/res")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
+    """Build a safe, unique path under upload_dir and prevent path traversal."""
+    safe_name = Path((original_filename or "").strip()).name
+    if not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="文件名无效")
+
+    stem, suffix = os.path.splitext(safe_name)
+    unique_name = f"{stem}_{uuid4().hex}{suffix}"
+
+    base_dir = Path(upload_dir).resolve()
+    target_path = (base_dir / unique_name).resolve()
+    if base_dir not in target_path.parents:
+        raise HTTPException(status_code=400, detail="非法文件路径")
+    return str(target_path)
 
 
 @router.get("", response_model=List[FileRecord])
@@ -66,7 +84,7 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         if not is_valid:
             raise HTTPException(status_code=400, detail=error_msg)
         
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
 
         # 保存文件
         with open(file_path, "wb") as buffer:
