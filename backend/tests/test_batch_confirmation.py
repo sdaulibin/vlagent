@@ -21,6 +21,13 @@ from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_stream
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
+from src.confirmation_letter.service import (
+    FIELD_EXTRACTION_PROMPT,
+    _validate_and_normalize_fields,
+    _extract_plain_text,
+    merge_recognition_results,
+    ALL_FIELDS,
+)
 
 # ========== 配置 ==========
 INPUT_DIR = "/Users/binginx/Desktop/2026年/星辰/运营管理部/50样本"
@@ -28,56 +35,6 @@ OUTPUT_DIR = INPUT_DIR  # Excel 输出到同目录
 MAX_WORKERS = 1  # 串行处理，避免 AI 服务过载
 DPI = 200
 # ==========================
-
-FIELD_EXTRACTION_PROMPT = """
-Role: 银行询证函信息提取专家
-
-Task: 从银行询证函扫描图片中精确提取以下 12 项字段信息。请仔细阅读整个文档，不要遗漏任何字段。
-
-## 待提取字段及识别规则：
-
-1. **confirmation_no (函证编号)**
-   - 这是最重要的字段，请务必仔细查找
-   - 常见位置：标题「银行询证函」附近（上方、下方、右侧），或页面右上角
-   - 常见格式：「编号：xxx」「函证编号：xxx」「NO.xxx」「索引号：xxx」
-   - 编号通常是字母+数字组合，如 hdsy-yh-008、XZ-2024-001 等
-   - 关键字优先级：函证编号 > 询证函编号 > 编号 > NO. > 索引号
-   - 注意：不包含页码后缀
-
-2. **accounting_firm (事务所名称)** - 关键字：「本公司聘请的」「会计师事务所」，提取事务所全称（含"特殊普通合伙"及分所名称）
-3. **reply_address (回函地址)** - 关键字：回函地址、收件地址、回函请寄、回函邮寄地址，提取完整地址
-4. **contact_person (联系人)** - 关键字：联系人、收件人、回函快递收件人
-5. **phone (电话)** - 关键字：电话、联系电话、收件手机号、收件电话
-6. **postal_code (邮编)** - 6位数字格式
-7. **debit_account (扣费账号)** - 银行账号格式
-8. **cutoff_date (截止日期)** - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
-9. **start_date (起始日期)** - 区间起始日期
-10. **end_date (终止日期)** - 区间终止日期
-11. **seal_date (印章日期)** - 印章中的日期
-12. **seal_name (印章名称)** - 印章中的单位名称
-
-## 输出要求：
-- 返回 JSON 格式
-- 无法识别的字段返回空字符串 ""
-- 日期格式统一为 YYYY-MM-DD
-- 仅输出 JSON，无需解释
-
-## JSON Schema:
-{
-    "confirmation_no": "",
-    "accounting_firm": "",
-    "reply_address": "",
-    "contact_person": "",
-    "phone": "",
-    "postal_code": "",
-    "debit_account": "",
-    "cutoff_date": "",
-    "start_date": "",
-    "end_date": "",
-    "seal_date": "",
-    "seal_name": ""
-}
-"""
 
 # 字段中文名映射
 FIELD_LABELS = {
@@ -94,6 +51,7 @@ FIELD_LABELS = {
     "end_date": "终止日期",
     "seal_date": "印章日期",
     "seal_name": "印章名称",
+    "signature_name": "落款名称",
     "status": "识别状态",
     "duration_s": "耗时(秒)",
     "error": "错误信息",
@@ -102,14 +60,29 @@ FIELD_LABELS = {
 FIELD_KEYS = list(FIELD_LABELS.keys())
 
 
+def _extract_fields_from_image(image_path: str) -> dict:
+    """从单张图片提取字段"""
+    response = request_stream(
+        question=FIELD_EXTRACTION_PROMPT,
+        file_base=image_path,
+        model=MODEL_LOCAL,
+        show_request=False,
+    ).strip()
+    try:
+        return json.loads(fix_json(response))
+    except Exception as e:
+        print(f"JSON 解析失败: {e}, 原始响应: {response[:200]}")
+        return {}
+
+
 def recognize_single_pdf(pdf_path: str) -> dict:
-    """识别单个 PDF 询证函"""
+    """识别单个 PDF 询证函（与 service.py 逻辑一致）"""
     filename = os.path.basename(pdf_path)
     result = {"filename": filename, "status": "failed", "error": "", "duration_s": 0}
 
     start = time.time()
     try:
-        # 1. PDF 转图片（仅第一页）
+        # 1. PDF 转图片
         tmp_dir = os.path.join(os.path.dirname(pdf_path), "_tmp_images")
         os.makedirs(tmp_dir, exist_ok=True)
 
@@ -118,22 +91,27 @@ def recognize_single_pdf(pdf_path: str) -> dict:
             result["error"] = "PDF 转图片失败"
             return result
 
+        # 2. 识别第一页
         first_page = image_paths[0]
+        fields = _extract_fields_from_image(first_page)
+        text_pages = [_extract_plain_text(first_page)]
 
-        # 2. AI 识别
-        response = request_stream(
-            question=FIELD_EXTRACTION_PROMPT,
-            file_base=first_page,
-            model=MODEL_LOCAL,
-            show_request=False,
-        ).strip()
+        # 3. 多页合并
+        if len(image_paths) > 1:
+            pages_results = [fields]
+            for page_path in image_paths[1:]:
+                page_result = _extract_fields_from_image(page_path)
+                pages_results.append(page_result)
+                text_pages.append(_extract_plain_text(page_path))
+            fields = merge_recognition_results(pages_results)
 
-        # 3. 解析 JSON
-        data = json.loads(fix_json(response))
-        result.update(data)
+        # 4. 后处理（与 service.py 完全一致）
+        merged_text = "\n".join(text_pages)
+        normalized = _validate_and_normalize_fields(fields, merged_text)
+        result.update(normalized)
         result["status"] = "success"
 
-        # 4. 清理临时图片
+        # 5. 清理临时图片
         for p in image_paths:
             if os.path.exists(p):
                 os.remove(p)

@@ -358,6 +358,7 @@ async def delete_confirmation_file(
     conf_result = res_result.scalar_one_or_none()
     if conf_result:
         await session.delete(conf_result)
+        await session.flush()  # 先刷新，确保子表记录先删除，避免外键约束冲突
         cleaned.append(f"识别结果: result_id={conf_result.id}")
     
     # 2. 删除上传的 PDF 文件

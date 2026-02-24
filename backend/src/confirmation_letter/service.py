@@ -32,18 +32,40 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息。�
    - 编号通常是字母+数字组合，如 hdsy-yh-008、XZ-2024-001 等
    - 关键字优先级：函证编号 > 询证函编号 > 编号 > NO. > 索引号
    - 注意：不包含页码后缀
+   - 【注意】二维码/条形码下方的编号优先级最低，不要优先使用
 
-2. **accounting_firm (事务所名称)** - 关键字：「本公司聘请的」「会计师事务所」，提取事务所全称（含"特殊普通合伙"及分所名称）
+2. **accounting_firm (事务所名称)**
+   - 【重要】仅从「本公司聘请的xxx」或「聘请的xxx」句式中提取事务所名称
+   - 事务所名称包含「会计师事务所」关键字
+   - 必须提取完整全称，包括：事务所名 + （特殊普通合伙）+ 分所名称（如"济南分所""大连分所"等）
+   - 示例："和信会计师事务所（特殊普通合伙）济南分所"、"安永华明会计师事务所（特殊普通合伙）济南分所"
+   - 【注意】不要将页面其他位置的公司名称（如落款公司、银行名称）误认为事务所名称
 3. **reply_address (回函地址)** - 关键字：回函地址、收件地址、回函请寄、回函邮寄地址，提取完整地址
-4. **contact_person (联系人)** - 关键字：联系人、收件人、回函快递收件人
-5. **phone (电话)** - 关键字：电话、联系电话、收件手机号、收件电话
+4. **contact_person (回函联系人)**
+   - 【重要】当存在「业务联系人」和「回函收件人」两种联系人时，必须提取「回函收件人」
+   - 优先级：回函收件人 > 回函联系人 > 收件人 > 联系人
+   - 通常在「回函地址」之后出现
+   - 不要提取「业务联系人」
+5. **phone (回函联系电话)**
+   - 【重要】提取与「回函收件人」对应的电话，不是「业务联系电话」
+   - 通常紧跟回函收件人之后
+   - 优先级：回函收件人旁的电话 > 业务联系电话
 6. **postal_code (邮编)** - 6位数字格式
 7. **debit_account (扣费账号)** - 银行账号格式
 8. **cutoff_date (截止日期)** - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
-9. **start_date (起始日期)** - 区间起始日期
-10. **end_date (终止日期)** - 区间终止日期
-11. **seal_date (印章日期)** - 印章中的日期
-12. **seal_name (印章名称)** - 印章中的单位名称
+9. **start_date (起始日期)**
+   - 【重要】优先从账户信息表格上方的文字描述中提取，如「自2025年1月1日起至」
+   - 其次从正文中提取区间起始日期
+10. **end_date (终止日期)**
+   - 【重要】优先从账户信息表格上方的文字描述中提取，如「至2025年9月30日期间」
+   - 其次从正文中提取区间终止日期
+11. **seal_date (印章日期)**
+   - 仅提取印章中或印章附近的日期（可能是手写日期）
+   - 【注意】如果无法识别印章区域的日期，返回空字符串，不要从其他位置取日期
+12. **seal_name (印章名称)**
+   - 仅提取印章/公章中或印章/公章附近的单位名称，即盖章中显示的文字
+   - 【注意】如果无法识别印章内容，返回空字符串，不要从其他位置取单位名称
+   - 【注意】不要包含「预留签章」「采用电子授权」等非单位名称的文字
 13. **signature_name (落款名称)** - 落款处单位名称（如果没有则返回空字符串）
 
 ## 输出要求：
@@ -127,11 +149,17 @@ def _parse_confirmation_no(text: str, ai_value: str = "") -> str:
         if match:
             return _clean_id_value(match.group(1))
 
+    # AI 返回值优先于二维码/条形码编号
+    ai_cleaned = _clean_id_value(ai_value)
+    if ai_cleaned:
+        return ai_cleaned
+
+    # 二维码/条形码编号优先级最低
     barcode_match = re.search(r"条形码.{0,20}?([A-Za-z0-9\-]{6,})", raw)
     if barcode_match:
         return _clean_id_value(barcode_match.group(1))
 
-    return _clean_id_value(ai_value)
+    return ""
 
 
 def _normalize_date(value: str) -> str:
@@ -139,6 +167,8 @@ def _normalize_date(value: str) -> str:
         return ""
 
     value = value.strip()
+    # 去除空格（OCR 文本中年月日之间可能有空格，如 "2022 年 1 月 1 日"）
+    value = re.sub(r"\s+", "", value)
     patterns = [
         r"(\d{4})[年/\-.](\d{1,2})[月/\-.](\d{1,2})日?",
         r"(\d{4})(\d{2})(\d{2})",
@@ -160,13 +190,18 @@ def _normalize_phone(value: str) -> str:
     if not value:
         return ""
     compact = re.sub(r"\s+", "", value)
+    # 优先匹配标准 11 位手机号
     mobile = re.search(r"1[3-9]\d{9}", compact)
     if mobile:
         return mobile.group(0)
-
+    # 匹配座机（带区号）
     landline = re.search(r"(0\d{2,3}-?\d{7,8})", compact)
     if landline:
         return landline.group(1)
+    # 兜底：接受 7 位以上的数字串（OCR 可能漏识部分数字）
+    fallback = re.search(r"([\d\-]{7,20})", compact)
+    if fallback:
+        return fallback.group(1)
     return ""
 
 
@@ -186,6 +221,29 @@ def _normalize_account(value: str) -> str:
     return ""
 
 
+def _normalize_seal_name(value: str) -> str:
+    """清理印章名称中的无关文字"""
+    if not value:
+        return ""
+    name = value.strip()
+    # 去除 [] 【】 () （）括号
+    name = re.sub(r"[\[\]【】]", "", name)
+    # 去除「预留签章」「采用电子授权」等无关文字
+    noise_patterns = [
+        r"[（(]?\s*预留签章\s*[）)]?",
+        r"[（(]?\s*采用电子授权\s*[）)]?",
+        r"[（(]?\s*电子签章\s*[）)]?",
+        r"[（(]?\s*签章\s*[）)]?",
+        r"预留签章[/／]采用电子授权",
+    ]
+    for pattern in noise_patterns:
+        name = re.sub(pattern, "", name)
+    # 清理多余符号和空格
+    name = re.sub(r"[，。、；\s/／]+$", "", name)
+    name = re.sub(r"^[，。、；\s/／]+", "", name)
+    return name.strip()
+
+
 def _extract_signature_name(text: str, ai_value: str = "") -> str:
     patterns = [
         r"(?:落款|单位名称|公司名称)\s*[:：]?\s*([^\n，。]{2,60})",
@@ -198,16 +256,154 @@ def _extract_signature_name(text: str, ai_value: str = "") -> str:
     return (ai_value or "").strip()
 
 
+def _extract_accounting_firm(text: str, ai_value: str = "") -> str:
+    """从 OCR 文本中提取事务所名称，包含分所后缀"""
+    raw = text or ""
+    # 先去除文本中的 [] 【】 括号，统一处理
+    cleaned = re.sub(r"[\[\]【】]", "", raw)
+
+    # 按优先级匹配：带分所 > 带有限公司 > 带（特殊普通合伙） > 通用
+    patterns = [
+        # 1. 聘请的xxx事务所xxx分所
+        r"聘请的?\s*(.{2,30}会计师事务所.{0,20}?分所)",
+        # 2. 聘请的xxx事务所有限公司
+        r"聘请的?\s*(.{2,30}会计师事务所.{0,10}?有限公司)",
+        # 3. 聘请的xxx事务所（特殊普通合伙）
+        r"聘请的?\s*(.{2,30}会计师事务所[（(][^）)]*[）)])",
+        # 4. 回函寄至xxx事务所xxx分所
+        r"回函.*?寄.*?至\s*(.{2,30}会计师事务所.{0,20}?分所)",
+        # 5. 回函寄至xxx事务所有限公司
+        r"回函.*?寄.*?至\s*(.{2,30}会计师事务所.{0,10}?有限公司)",
+        # 6. 回函寄至xxx事务所（特殊普通合伙）
+        r"回函.*?寄.*?至\s*(.{2,30}会计师事务所[（(][^）)]*[）)])",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, cleaned)
+        if match:
+            name = match.group(1).strip()
+            # 截断：在常见后续词语处停止（如"正在"、"对"、"进行"等）
+            name = re.split(r"(?:正在|对[本我]|进行|截至|应当)", name)[0].strip()
+            name = re.sub(r"[，。、；\s]+$", "", name)
+            if name:
+                return name
+
+    # 回退到 AI 返回值
+    ai_clean = re.sub(r"[\[\]【】]", "", (ai_value or "")).strip()
+    # 同样截断 AI 返回值中的多余内容
+    ai_clean = re.split(r"(?:正在|对[本我]|进行|截至|应当)", ai_clean)[0].strip()
+    ai_clean = re.sub(r"[，。、；\s]+$", "", ai_clean)
+    return ai_clean
+
+
+def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") -> tuple[str, str]:
+    """从 OCR 文本中提取回函联系人和电话（优先回函收件人，而非业务联系人）"""
+    raw = text or ""
+    contact = ""
+    phone = ""
+
+    # 优先提取「回函收件人」
+    contact_patterns = [
+        r"回函\s*收件人\s*[:：]\s*([^\n，。电]{1,20})",
+        r"回函\s*联系人\s*[:：]\s*([^\n，。电]{1,20})",
+        r"回函.*?收件人\s*[:：]\s*([^\n，。电]{1,20})",
+    ]
+    for pattern in contact_patterns:
+        match = re.search(pattern, raw)
+        if match:
+            contact = match.group(1).strip()
+            break
+
+    # 如果没找到回函收件人，查找回函地址之后的联系人/收件人
+    if not contact:
+        # 从「回函地址」之后的文本中查找
+        addr_match = re.search(r"回函[地址]*\s*[:：]", raw)
+        if addr_match:
+            after_addr = raw[addr_match.end():]
+            general_patterns = [
+                r"收件人\s*[:：]\s*([^\n，。电]{1,20})",
+                r"联系人\s*[:：]\s*([^\n，。电]{1,20})",
+            ]
+            for pattern in general_patterns:
+                match = re.search(pattern, after_addr)
+                if match:
+                    contact = match.group(1).strip()
+                    break
+
+    # 提取回函联系电话：优先在回函收件人附近找
+    if contact:
+        # 在联系人出现位置之后找电话
+        contact_pos = raw.find(contact)
+        if contact_pos >= 0:
+            nearby_text = raw[contact_pos:contact_pos + 100]
+            phone_match = re.search(r"电话\s*[:：]\s*([\d\-]{7,20})", nearby_text)
+            if phone_match:
+                phone = phone_match.group(1).strip()
+
+    # 如果在回函区域没找到电话，从回函地址之后找
+    if not phone:
+        addr_match = re.search(r"回函[地址]*\s*[:：]", raw)
+        if addr_match:
+            after_addr = raw[addr_match.end():]
+            phone_match = re.search(r"电话\s*[:：]\s*([\d\-]{7,20})", after_addr)
+            if phone_match:
+                phone = phone_match.group(1).strip()
+
+    # 回退到 AI 值（但只在没有回函区域结果时使用）
+    if not contact:
+        contact = (ai_contact or "").strip()
+    if not phone:
+        phone = (ai_phone or "").strip()
+
+    return contact, phone
+
+
+def _extract_date_range(text: str) -> tuple[str, str]:
+    """从 OCR 文本中提取起始日期和终止日期，优先表格上方描述"""
+    raw = text or ""
+    start_date = ""
+    end_date = ""
+
+    # 优先级1：表格上方的描述格式「自xxx起至xxx期间」（"日"可选，OCR 可能漏掉）
+    DATE_PAT = r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?"
+    table_patterns = [
+        # 自2025年1月1日起至2025年9月30日期间
+        rf"自\s*({DATE_PAT})\s*起?\s*至\s*({DATE_PAT})",
+        # 从2025年1月1日至2025年9月30日
+        rf"从\s*({DATE_PAT})\s*至\s*({DATE_PAT})",
+        # 2025年1月1日-2025年9月30日 或 2025年1月1日至2025年9月30日
+        rf"({DATE_PAT})\s*[-—~至到]\s*({DATE_PAT})",
+    ]
+    for pattern in table_patterns:
+        matches = re.findall(pattern, raw)
+        if matches:
+            # 取最后一个匹配（通常表格描述在正文之后）
+            start_date, end_date = matches[-1]
+            break
+
+    return start_date, end_date
+
+
 def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str, Any]:
     normalized = {field: (data.get(field, "") or "").strip() for field in ALL_FIELDS}
     normalized["confirmation_no"] = _parse_confirmation_no(text, normalized.get("confirmation_no", ""))
-    normalized["phone"] = _normalize_phone(normalized.get("phone", ""))
+    # 事务所名称：优先从 OCR 文本中提取（更准确），回退到 AI 返回值
+    normalized["accounting_firm"] = _extract_accounting_firm(text, normalized.get("accounting_firm", ""))
+    # 联系人和电话：优先取回函收件人，而非业务联系人
+    reply_contact, reply_phone = _extract_reply_contact(
+        text, normalized.get("contact_person", ""), normalized.get("phone", "")
+    )
+    normalized["contact_person"] = reply_contact
+    normalized["phone"] = _normalize_phone(reply_phone)
     normalized["postal_code"] = _normalize_postal_code(normalized.get("postal_code", ""))
     normalized["debit_account"] = _normalize_account(normalized.get("debit_account", ""))
     normalized["cutoff_date"] = _normalize_date(normalized.get("cutoff_date", ""))
-    normalized["start_date"] = _normalize_date(normalized.get("start_date", ""))
-    normalized["end_date"] = _normalize_date(normalized.get("end_date", ""))
+    # 起始/终止日期：优先从表格上方描述提取，回退到 AI 值
+    text_start, text_end = _extract_date_range(text)
+    normalized["start_date"] = _normalize_date(text_start) if text_start else _normalize_date(normalized.get("start_date", ""))
+    normalized["end_date"] = _normalize_date(text_end) if text_end else _normalize_date(normalized.get("end_date", ""))
     normalized["seal_date"] = _normalize_date(normalized.get("seal_date", ""))
+    # 印章名称：清理无关文字
+    normalized["seal_name"] = _normalize_seal_name(normalized.get("seal_name", ""))
     normalized["signature_name"] = _extract_signature_name(text, normalized.get("signature_name", ""))
     return normalized
 
