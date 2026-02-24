@@ -58,6 +58,21 @@
                         <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                     </div>
                 </router-link>
+
+                <!-- 询证函格式比对 -->
+                <router-link to="/format-compare" class="scenario-card group">
+                    <div class="scenario-card-icon icon-gradient-purple">
+                        <FileSearch class="w-8 h-8 text-white" />
+                    </div>
+                    <h3 class="scenario-card-title">询证函格式比对</h3>
+                    <p class="scenario-card-desc">
+                        上传询证函与标准模板比对，智能识别格式差异并标注不符处
+                    </p>
+                    <div class="scenario-card-link group-hover:text-purple-300">
+                        立即使用
+                        <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                    </div>
+                </router-link>
             </div>
         </main>
 
@@ -69,6 +84,6 @@
 </template>
 
 <script setup lang="ts">
-import { Scan, CreditCard, FileText, FileDiff, ArrowRight } from 'lucide-vue-next'
+import { Scan, CreditCard, FileText, FileDiff, FileSearch, ArrowRight } from 'lucide-vue-next'
 </script>
 

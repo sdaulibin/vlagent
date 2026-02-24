@@ -4,6 +4,7 @@ from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
 from src.contracts.router import router as contracts_router
 from src.confirmation_letter.router import router as confirmation_router
+from src.confirmation_compare.router import router as format_compare_router
 
 api_router = APIRouter()
 
@@ -19,3 +20,5 @@ api_router.include_router(contracts_router)
 # 询证函识别（独立模块）
 api_router.include_router(confirmation_router)
 
+# 询证函格式比对（独立模块）
+api_router.include_router(format_compare_router)

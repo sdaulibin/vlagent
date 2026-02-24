@@ -3,6 +3,7 @@ import Home from '../views/Home.vue'
 import BankStatement from '../views/BankStatement.vue'
 import ContractCompare from '../views/ContractCompare.vue'
 import ConfirmationLetter from '../views/ConfirmationLetter.vue'
+import FormatCompare from '../views/FormatCompare.vue'
 
 const routes = [
     {
@@ -24,6 +25,11 @@ const routes = [
         path: '/confirmation-letter',
         name: 'ConfirmationLetter',
         component: ConfirmationLetter
+    },
+    {
+        path: '/format-compare',
+        name: 'FormatCompare',
+        component: FormatCompare
     }
 ]
 

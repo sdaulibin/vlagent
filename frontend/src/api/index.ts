@@ -131,3 +131,44 @@ export const deleteConfirmationLetter = async (letterId: number) => {
   const response = await api.delete(`/confirmation/${letterId}`);
   return response.data;
 };
+
+// ===== 询证函格式比对 API =====
+
+export const uploadFormatCompare = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/format-compare/upload", formData);
+  return response.data;
+};
+
+export const getFormatCompareTasks = async () => {
+  const response = await api.get("/format-compare");
+  return response.data;
+};
+
+export const getFormatCompareTask = async (taskId: number) => {
+  const response = await api.get(`/format-compare/${taskId}`);
+  return response.data;
+};
+
+export const deleteFormatCompareTask = async (taskId: number) => {
+  const response = await api.delete(`/format-compare/${taskId}`);
+  return response.data;
+};
+
+export const getFormatCompareFileUrl = (taskId: number) => {
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  return `${baseUrl}/format-compare/${taskId}/file`;
+};
+
+export const getFormatCompareTemplateUrl = (formatKey: string) => {
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  return `${baseUrl}/format-compare/templates/${formatKey}/preview`;
+};
+
+export const getFormatCompareTemplates = async () => {
+  const response = await api.get("/format-compare/templates");
+  return response.data;
+};

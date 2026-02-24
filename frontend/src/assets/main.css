@@ -2,7 +2,6 @@
 @import "./contract.css";
 
 @layer components {
-
   /* ===== Common Containers ===== */
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-5;
@@ -157,6 +156,10 @@
 
   .icon-gradient-orange {
     background: linear-gradient(135deg, #f97316, #ea580c);
+  }
+
+  .icon-gradient-purple {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   }
 
   /* ===== Custom Scrollbar ===== */
