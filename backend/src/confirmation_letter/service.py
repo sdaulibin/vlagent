@@ -63,12 +63,26 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 【重要】优先从账户信息表格上方的文字描述中提取，如「至2025年9月30日期间」
    - 其次从正文中提取区间终止日期
 11. **seal_date (印章日期)**
-   - 仅提取印章中或印章附近的日期（可能是手写日期）
-   - 【注意】如果无法识别印章区域的日期，返回空字符串，不要从其他位置取日期
+   - 提取被询证单位（客户公司）落款处的日期
+   - 常见位置：在公司名称和「预留签章/采用电子授权」下方，格式通常为手写的「xxxx年x月x日」
+   - 也可能在「以下由被询证银行填列」上方的落款区域，或「资金归集」表的下方落款区域
+   - 【最重要】页面右上角的蓝色方形标记章（如"FS""2025-07-25"）是事务所的收发章，其中的日期绝对不是 seal_date！
+   - 【最重要】seal_date 必须是落款区域中手写或打印的「xxxx年x月x日」格式的日期，位于公司名称附近
+   - 【注意】如果落款区域的手写日期难以辨认，请尽力识别；实在无法辨认才返回空字符串
+   - 【注意】不要从正文抬头、页眉、编号区域取日期
 12. **seal_name (印章名称)**
-   - 仅提取印章/公章中或印章/公章附近的单位名称，即盖章中显示的文字
-   - 【注意】如果无法识别印章内容，返回空字符串，不要从其他位置取单位名称
+   - 提取落款区域打印/手写的公司名称文字，即「预留签章/采用电子授权」上方的那行公司名称
+   - 常见位置有两种格式：
+     - 格式一：在「以下由被询证银行填列」上方的落款区域，打印的公司名称文字后跟「（预留签章/采用电子授权）」
+     - 格式二：在「资金归集」表下方的落款区域，直接打印的公司名称文字
+   - 【最重要】请从打印/手写的文字中提取公司名称，不要从圆形红色印章图案中识别文字
+   - 【最重要】以「预留签章/采用电子授权」上方那行打印文字为准，那才是 seal_name
+   - 【重要】seal_name 要的是被询证的客户公司名称（如"xx有限公司"），不是印章类型
+   - 【重要】seal_name 不是会计师事务所/审计机构的名称，事务所名称应填入 accounting_firm 字段
+   - 【重要】不要将页面上出现的「毕马威」「安永」「德勤」「普华永道」等事务所名称作为 seal_name
+   - 【注意】不要返回「财务专用章」「公章」「合同专用章」等印章类型名称
    - 【注意】不要包含「预留签章」「采用电子授权」等非单位名称的文字
+   - 【注意】如果无法识别公司名称，返回空字符串
 13. **signature_name (落款名称)** - 落款处单位名称（如果没有则返回空字符串）
 
 ## 输出要求：
@@ -180,6 +194,49 @@ def _normalize_date(value: str) -> str:
     return ""
 
 
+def _normalize_seal_date(seal_date_raw: str, text: str) -> str:
+    """清理印章日期：排除事务所 FS 标记章的日期"""
+    seal_date = _normalize_date(seal_date_raw)
+    if not seal_date:
+        return ""
+
+    # 从 raw_text 中检测 FS 标记章的日期（右上角蓝色方章，格式如 "FS 2025 -07- 25"）
+    raw = text or ""
+    fs_patterns = [
+        r"FS\s*[\n]?\s*(\d{4})\s*[-–]\s*(\d{1,2})\s*[-–]\s*(\d{1,2})",
+        r"F\s*S\s*[\n]?\s*(\d{4})\s*[-–]\s*(\d{1,2})\s*[-–]\s*(\d{1,2})",
+    ]
+    fs_date = ""
+    for pattern in fs_patterns:
+        m = re.search(pattern, raw)
+        if m:
+            try:
+                y, mm, dd = m.groups()
+                fs_date = datetime(int(y), int(mm), int(dd)).strftime("%Y-%m-%d")
+                break
+            except ValueError:
+                pass
+
+    # 如果 seal_date 与 FS 标记章日期相同，说明 AI 取了错误的日期
+    if fs_date and seal_date == fs_date:
+        # 尝试从落款区域提取正确的手写日期
+        handwritten_patterns = [
+            r"预留签章.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
+            r"电子授权.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
+            r"有限公司.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
+        ]
+        for pattern in handwritten_patterns:
+            m = re.search(pattern, raw, flags=re.DOTALL)
+            if m:
+                candidate = _normalize_date(m.group(1))
+                if candidate and candidate != fs_date:
+                    return candidate
+        # 找不到替代日期，返回空字符串（不要返回错误的 FS 日期）
+        return ""
+
+    return seal_date
+
+
 def _normalize_phone(value: str) -> str:
     if not value:
         return ""
@@ -232,6 +289,16 @@ def _normalize_seal_name(value: str) -> str:
     ]
     for pattern in noise_patterns:
         name = re.sub(pattern, "", name)
+    # 如果结果是印章类型而非公司名称，返回空字符串
+    seal_type_words = ["财务专用章", "公章", "合同专用章", "发票专用章", "行政章", "业务专用章"]
+    cleaned_name = name.strip()
+    if cleaned_name in seal_type_words:
+        return ""
+    # 如果结果是会计师事务所/审计机构名称，返回空字符串（seal_name 应为客户公司名称）
+    audit_firm_keywords = ["会计师事务所", "毕马威", "安永", "德勤", "普华永道", "KPMG", "EY", "Deloitte", "PwC"]
+    for keyword in audit_firm_keywords:
+        if keyword in cleaned_name:
+            return ""
     # 清理多余符号和空格
     name = re.sub(r"[，。、；\s/／]+$", "", name)
     name = re.sub(r"^[，。、；\s/／]+", "", name)
@@ -395,7 +462,8 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     text_start, text_end = _extract_date_range(text)
     normalized["start_date"] = _normalize_date(text_start) if text_start else _normalize_date(normalized.get("start_date", ""))
     normalized["end_date"] = _normalize_date(text_end) if text_end else _normalize_date(normalized.get("end_date", ""))
-    normalized["seal_date"] = _normalize_date(normalized.get("seal_date", ""))
+    # 印章日期：排除 FS 标记章日期，优先取落款区域的手写日期
+    normalized["seal_date"] = _normalize_seal_date(normalized.get("seal_date", ""), text)
     # 印章名称：清理无关文字
     normalized["seal_name"] = _normalize_seal_name(normalized.get("seal_name", ""))
     normalized["signature_name"] = _extract_signature_name(text, normalized.get("signature_name", ""))

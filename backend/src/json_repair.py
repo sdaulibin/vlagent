@@ -51,7 +51,15 @@ def fix_json(json_str):
                 fixed_chars.append(char)
                 is_in_string = False
             else:
-                fixed_chars.append(char)
+                # 转义字符串内的控制字符（如 raw_text 中的换行符）
+                if char == '\n':
+                    fixed_chars.append('\\n')
+                elif char == '\r':
+                    fixed_chars.append('\\r')
+                elif char == '\t':
+                    fixed_chars.append('\\t')
+                else:
+                    fixed_chars.append(char)
         else:
             if char == '"':
                 fixed_chars.append(char)
