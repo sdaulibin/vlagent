@@ -24,9 +24,9 @@ from src.json_repair import fix_json
 from src.confirmation_letter.service import (
     FIELD_EXTRACTION_PROMPT,
     _validate_and_normalize_fields,
-    _extract_plain_text,
-    merge_recognition_results,
+    extract_fields_from_images,
     ALL_FIELDS,
+    _check_format,
 )
 
 # ========== 配置 ==========
@@ -57,6 +57,23 @@ FIELD_LABELS = {
     "error": "错误信息",
 }
 
+# 用于格式化打印的字段列表
+PRINT_FIELD_LABELS = {
+    "confirmation_no": "函证编号",
+    "accounting_firm": "事务所名称",
+    "reply_address": "回函地址",
+    "contact_person": "联系人",
+    "phone": "电话",
+    "postal_code": "邮编",
+    "debit_account": "扣费账号",
+    "cutoff_date": "截止日期",
+    "start_date": "起始日期",
+    "end_date": "终止日期",
+    "seal_date": "印章日期",
+    "seal_name": "印章名称",
+    "signature_name": "落款名称",
+}
+
 FIELD_KEYS = list(FIELD_LABELS.keys())
 
 
@@ -76,7 +93,7 @@ def _extract_fields_from_image(image_path: str) -> dict:
 
 
 def recognize_single_pdf(pdf_path: str) -> dict:
-    """识别单个 PDF 询证函（与 service.py 逻辑一致）"""
+    """识别单个 PDF 询证函（使用优化后的单次多图 AI 调用）"""
     filename = os.path.basename(pdf_path)
     result = {"filename": filename, "status": "failed", "error": "", "duration_s": 0}
 
@@ -91,27 +108,16 @@ def recognize_single_pdf(pdf_path: str) -> dict:
             result["error"] = "PDF 转图片失败"
             return result
 
-        # 2. 识别第一页
-        first_page = image_paths[0]
-        fields = _extract_fields_from_image(first_page)
-        text_pages = [_extract_plain_text(first_page)]
+        # 2. 所有页面一次性提交 AI
+        fields = extract_fields_from_images(image_paths)
+        merged_text = fields.pop("raw_text", "")
 
-        # 3. 多页合并
-        if len(image_paths) > 1:
-            pages_results = [fields]
-            for page_path in image_paths[1:]:
-                page_result = _extract_fields_from_image(page_path)
-                pages_results.append(page_result)
-                text_pages.append(_extract_plain_text(page_path))
-            fields = merge_recognition_results(pages_results)
-
-        # 4. 后处理（与 service.py 完全一致）
-        merged_text = "\n".join(text_pages)
+        # 3. 后处理
         normalized = _validate_and_normalize_fields(fields, merged_text)
         result.update(normalized)
         result["status"] = "success"
 
-        # 5. 清理临时图片
+        # 4. 清理临时图片
         for p in image_paths:
             if os.path.exists(p):
                 os.remove(p)
@@ -122,6 +128,24 @@ def recognize_single_pdf(pdf_path: str) -> dict:
 
     result["duration_s"] = round(time.time() - start, 1)
     return result
+
+
+def print_recognition_result(result: dict):
+    """格式化打印识别结果"""
+    filename = result.get("filename", "")
+    duration = result.get("duration_s", 0)
+    print(f"\n  {'=' * 50}")
+    print(f"  文件: {filename}  耗时: {duration}s")
+    print(f"  {'-' * 50}")
+    for key, label in PRINT_FIELD_LABELS.items():
+        value = result.get(key, "")
+        print(f"    {label}: {value}")
+    print(f"  {'-' * 50}")
+    print(f"  原始 JSON:")
+    # 只输出 13 个字段
+    fields_json = {k: result.get(k, "") for k in PRINT_FIELD_LABELS}
+    print(f"  {json.dumps(fields_json, ensure_ascii=False, indent=4)}")
+    print(f"  {'=' * 50}")
 
 
 def export_to_excel(results: list, output_path: str):
@@ -204,6 +228,7 @@ def main():
         if result["status"] == "success":
             success_count += 1
             print(f"✅ ({result['duration_s']}s)")
+            print_recognition_result(result)
         else:
             print(f"❌ {result['error']}")
 

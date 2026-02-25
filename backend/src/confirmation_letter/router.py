@@ -236,6 +236,24 @@ async def recognize_confirmation_file(
                 conf_file.file_path
             )
             
+            # 打印识别结果到服务端日志
+            duration_s = round(time.time() - start_time, 1)
+            print(f"\n{'=' * 50}")
+            print(f"  询证函识别完成: {conf_file.filename}  耗时: {duration_s}s")
+            print(f"{'-' * 50}")
+            _field_labels = {
+                "confirmation_no": "函证编号", "accounting_firm": "事务所名称",
+                "reply_address": "回函地址", "contact_person": "联系人",
+                "phone": "电话", "postal_code": "邮编",
+                "debit_account": "扣费账号", "cutoff_date": "截止日期",
+                "start_date": "起始日期", "end_date": "终止日期",
+                "seal_date": "印章日期", "seal_name": "印章名称",
+                "signature_name": "落款名称",
+            }
+            for key, label in _field_labels.items():
+                print(f"  {label}: {recognition_result.get(key, '')}")
+            print(f"{'=' * 50}")
+            
             # 删除旧的识别结果（如果有）
             old_result = await session.execute(
                 select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)

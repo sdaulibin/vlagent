@@ -21,7 +21,10 @@ from src.json_repair import fix_json
 FIELD_EXTRACTION_PROMPT = """
 Role: 银行询证函信息提取专家
 
-Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息。请仔细阅读整个文档，不要遗漏任何字段。
+Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，并输出文档的全部原文文字。
+
+【重要】函件可能有多页图片，请综合所有图片内容提取字段，不要遗漏任何页面的信息。
+例如：正文可能跨页，印章/盖章可能在最后一页，表格可能在中间页。
 
 ## 待提取字段及识别规则：
 
@@ -72,6 +75,7 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息。�
 - 返回 JSON 格式
 - 无法识别的字段返回空字符串 ""
 - 日期格式统一为 YYYY-MM-DD
+- raw_text 字段输出所有页面的全部原文文字，保持原文顺序，各页之间用换行分隔
 - 仅输出 JSON，无需解释
 
 ## JSON Schema:
@@ -88,7 +92,8 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息。�
     "end_date": "",
     "seal_date": "",
     "seal_name": "",
-    "signature_name": ""
+    "signature_name": "",
+    "raw_text": ""
 }
 """
 
@@ -102,12 +107,12 @@ ALL_FIELDS = [
 
 # 编号抓取优先级：函证编号 > 询证函编号 > 编号 > NO. > 索引号 > 项目编号
 CONFIRMATION_NO_PATTERNS = [
-    r"函证编号\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
-    r"询证函编号\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
-    r"\b编号\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
-    r"\bNO\.?\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
-    r"索引号\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
-    r"项目编号\s*[:：]?\s*([A-Za-z0-9\-_/]+)",
+    r"函证编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"询证函编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"\b编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"\bNO\.?\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"索引号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"项目编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
 ]
 
 FORMAT_TEMPLATES = {
@@ -117,18 +122,7 @@ FORMAT_TEMPLATES = {
 }
 
 
-def _extract_plain_text(image_path: str) -> str:
-    prompt = """
-请提取这张询证函图片的全部文字，保持原文顺序。
-只输出纯文本，不要解释。
-"""
-    text = request_stream(
-        question=prompt,
-        file_base=image_path,
-        model=MODEL_LOCAL,
-        show_request=False,
-    )
-    return (text or "").strip()
+
 
 
 def _clean_id_value(value: str) -> str:
@@ -452,22 +446,33 @@ def _check_format(text: str) -> dict[str, Any]:
     }
 
 
-def extract_fields_from_image(image_path: str) -> dict:
+def extract_fields_from_images(image_paths: list[str]) -> dict:
     """
-    从询证函图片中提取字段信息
+    从询证函图片中提取字段信息（支持多张图片一次性提交）
     
     Args:
-        image_path: 图片文件路径
+        image_paths: 图片文件路径列表（支持单张或多张）
         
     Returns:
-        dict: 提取的字段信息
+        dict: 提取的字段信息（含 raw_text）
     """
-    response = request_stream(
-        question=FIELD_EXTRACTION_PROMPT,
-        file_base=image_path,
-        model=MODEL_LOCAL,
-        show_request=False
-    ).strip()
+    if len(image_paths) == 1:
+        # 单张图片使用 file_base
+        response = request_stream(
+            question=FIELD_EXTRACTION_PROMPT,
+            file_base=image_paths[0],
+            model=MODEL_LOCAL,
+            show_request=False
+        ).strip()
+    else:
+        # 多张图片使用 file_ary
+        response = request_stream(
+            question=FIELD_EXTRACTION_PROMPT,
+            file_ary=image_paths,
+            model=MODEL_LOCAL,
+            show_request=False,
+            pic_tip=True,
+        ).strip()
     
     try:
         data = json.loads(fix_json(response))
@@ -481,8 +486,8 @@ def process_confirmation_letter(pdf_path: str, output_dir: str = None) -> dict:
     """
     处理询证函 PDF 文件
     
-    与测试脚本保持一致：使用 split_pdf_to_images 直接获取图片路径列表，
-    处理完成后自动清理临时文件。
+    优化流程：所有页面图片一次性提交 AI，合并字段提取与文本提取，
+    将原来的 2N 次 AI 调用减少为 1 次。
     
     Args:
         pdf_path: PDF 文件路径
@@ -495,27 +500,17 @@ def process_confirmation_letter(pdf_path: str, output_dir: str = None) -> dict:
     tmp_dir = tempfile.mkdtemp(prefix="confirmation_")
     
     try:
-        # 1. PDF 转图片（使用 split_pdf_to_images，与测试脚本一致）
+        # 1. PDF 转图片
         image_paths = split_pdf_to_images(pdf_path, tmp_dir, dpi=200)
         
         if not image_paths:
             raise ValueError("PDF 转换图片失败，未生成任何图片")
         
-        # 2. 识别第一页
-        first_page = image_paths[0]
-        result = extract_fields_from_image(first_page)
-        text_pages = [_extract_plain_text(first_page)]
+        # 2. 所有页面一次性提交 AI（合并字段提取 + 文本提取）
+        result = extract_fields_from_images(image_paths)
+        merged_text = result.pop("raw_text", "")
 
-        # 3. 如果有多页，合并结果（多页询证函场景）
-        if len(image_paths) > 1:
-            pages_results = [result]
-            for page_path in image_paths[1:]:
-                page_result = extract_fields_from_image(page_path)
-                pages_results.append(page_result)
-                text_pages.append(_extract_plain_text(page_path))
-            result = merge_recognition_results(pages_results)
-
-        merged_text = "\n".join(text_pages)
+        # 3. 后处理：正则校验与规范化
         normalized = _validate_and_normalize_fields(result, merged_text)
         normalized.update(_check_format(merged_text))
         return normalized
@@ -526,31 +521,4 @@ def process_confirmation_letter(pdf_path: str, output_dir: str = None) -> dict:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def merge_recognition_results(pages_results: list) -> dict:
-    """
-    合并多页识别结果（如果询证函有多页）
-    
-    Args:
-        pages_results: 各页识别结果列表
-        
-    Returns:
-        dict: 合并后的结果，优先取非空值
-    """
-    if not pages_results:
-        return {}
-    
-    if len(pages_results) == 1:
-        return pages_results[0]
-    
-    # 多页时，优先取非空值
-    merged = {}
-    for field in ALL_FIELDS:
-        for page_result in pages_results:
-            value = page_result.get(field, "")
-            if value:
-                merged[field] = value
-                break
-        if field not in merged:
-            merged[field] = ""
-    
-    return merged
+
