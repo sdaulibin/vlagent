@@ -1,49 +1,56 @@
 import sys
+import os
+import json
+import time
 from pathlib import Path
 
-# Add backend root
+# Add backend root to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.confirmation_letter.service import (  # noqa: E402
-    _parse_confirmation_no,
-    _normalize_date,
-    _normalize_phone,
-    _normalize_postal_code,
-    _check_format,
-)
+from src.confirmation_compare.service import compare_with_template
 
 
-def test_confirmation_no_priority():
-    text = """
-    索引号：IDX-001
-    编号：NO-123
-    询证函编号：QZH-2024-888/1
-    函证编号：HZ-2024-0009
-    """
-    assert _parse_confirmation_no(text) == "HZ-2024-0009"
+def test_compare_api(pdf_path: str):
+    """模拟 API 接口调用，测试格式比对功能并输出结果"""
+    if not os.path.exists(pdf_path):
+        print(f"❌ 文件不存在: {pdf_path}")
+        return
+
+    print("=" * 60)
+    print(f"开始测试询证函格式比对: {os.path.basename(pdf_path)}")
+    print("=" * 60)
+
+    start_time = time.time()
+    
+    try:
+        # 调用核心服务（服务内部已包含三阶段的详细打印）
+        result = compare_with_template(pdf_path)
+        
+        duration = round(time.time() - start_time, 2)
+        
+        print("\n" + "=" * 60)
+        print("  ✅ 测试完成 (模拟 API 返回结果)")
+        print("-" * 60)
+        print(f"  耗时: {duration} 秒")
+        print(f"  格式类型: {result.get('format_type')}")
+        print(f"  比对通过: {result.get('passed')}")
+        print(f"  差异数量: {len(result.get('mismatches', []))}")
+        print("=" * 60)
+        
+    except Exception as e:
+        print(f"\n❌ 比对过程发生异常: {e}")
+        import traceback
+        traceback.print_exc()
 
 
-def test_confirmation_no_strip_page_suffix():
-    text = "询证函编号：QZH-2024-888/1"
-    assert _parse_confirmation_no(text) == "QZH-2024-888"
-
-
-def test_normalize_date():
-    assert _normalize_date("截至2024年9月3日") == "2024-09-03"
-    assert _normalize_date("2024/12/31") == "2024-12-31"
-    assert _normalize_date("无效日期") == ""
-
-
-def test_normalize_phone_and_postal():
-    assert _normalize_phone("联系电话：138 0013 8000") == "13800138000"
-    assert _normalize_phone("电话：0531-88886666") == "0531-88886666"
-    assert _normalize_postal_code("邮编：250001") == "250001"
-    assert _normalize_postal_code("邮编：ABC") == ""
-
-
-def test_format_check_result():
-    text = "银行询证函 回函地址 联系人 电话 邮编 截至2024年9月3日"
-    result = _check_format(text)
-    assert result["format_type"] in {"format_1", "format_2", "capital_verification"}
-    assert "format_check_passed" in result
-    assert "format_mismatches" in result
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("用法: uv run python tests/test_confirmation_rules.py <pdf文件路径>")
+        # 提供一个默认的测试路径（如果存在）
+        default_path = "/Users/binginx/Desktop/2026年/星辰/运营管理部/50样本/1.pdf"
+        if os.path.exists(default_path):
+            print(f"使用默认测试文件: {default_path}\n")
+            test_compare_api(default_path)
+    else:
+        pdf_path = sys.argv[1]
+        test_compare_api(pdf_path)

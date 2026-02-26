@@ -3,17 +3,20 @@
 
 流程：
 1. 上传询证函 PDF → 转图片
-2. 通过关键词识别格式类型（格式一/格式二/验资）
-3. AI 提取文档结构（每页的询证事项、表格字段）
-4. 加载对应 JSON 模板，逐项比对
-5. 返回差异列表
+2. AI 一次性提取：格式类型识别 + 按模板结构输出内容
+3. 加载对应 JSON 模板，逐项比对 section 和 table_headers
+4. 返回差异列表
+
+三阶段日志输出：
+- 阶段一：类型识别结果
+- 阶段二：提取的 JSON 格式数据
+- 阶段三：比对结果
 """
 import os
-import re
 import json
 import tempfile
 import shutil
-from difflib import SequenceMatcher
+import re
 from typing import Any
 
 from services.pdf.pdf_utils import split_pdf_to_images
@@ -47,51 +50,81 @@ TEMPLATE_NAMES = {
     "capital_verification": "验资询证函",
 }
 
-# 格式识别关键词
-FORMAT_TYPE_KEYWORDS = {
-    "format_1": ["银行询证函", "回函地址", "联系人", "邮编", "截至"],
-    "format_2": ["银行询证函", "回函请寄", "收件人", "联系电话", "函证基准日", "以下由被询证银行填列"],
-    "capital_verification": ["验资", "询证函", "出资", "缴款"],
+# 模板 JSON 文件名映射（新版模板）
+TEMPLATE_JSON_FILES = {
+    "format_1": "template1.json",
+    "format_2": "template2.json",
+    "capital_verification": "template3.json",
 }
+
+# 格式中文标签
+FORMAT_LABELS = {
+    "format_1": "格式一",
+    "format_2": "格式二",
+    "capital_verification": "验资",
+    "unknown": "未知",
+}
+
 
 # ========== AI 提示词 ==========
 
-FORMAT_COMPARE_PROMPT = """
+FORMAT_EXTRACT_PROMPT = """
 Role: 询证函格式分析专家
 
-Task: 分析这份询证函图片，提取其中每个询证事项的结构信息。
+Task: 分析这份银行询证函图片，完成以下两项任务：
 
-## 提取规则：
-1. 找出文档中所有编号的询证事项（如 1、2、3... 或附表等）
-2. 对于每个事项，提取：
-   - section: 事项编号（如 "1", "2", "3", "6(1)", "6(2)", "附表"）
-   - title: 事项简短标题（如 "银行存款", "银行借款"）
-   - description: 事项的完整描述文字（将具体日期、金额用xxx代替）
-   - table_fields: 该事项下表格的所有列名（按从左到右顺序）
+## 任务一：识别格式类型
+根据文档内容判断属于以下哪种格式：
+- "format_1": 格式一银行询证函（特征："回函地址"、"联系人"、部分表格下方有补充描述文字等）
+- "format_2": 格式二银行询证函（特征："回函请寄"、"收件人"、"函证基准日"；通常在银行存款表格上方有“以下由被询证银行填列”字样；并且表格下方**没有**补充描述文字）
+- "capital_verification": 验资业务银行询证函（包含"验资"、"出资者缴入投资资金"等字段）
 
-## 输出格式：
-返回 JSON 数组：
-[
-  {
-    "section": "1",
-    "title": "银行存款",
-    "description": "截至xxxx年xx月xx日止，本公司在贵行的存款情况如下",
-    "table_fields": ["账户名称", "银行账号", "币种", "利率", "账户类型", "账户余额"]
-  }
-]
+## 任务二：提取文档结构
+找出文档中所有编号的询证事项（如 1、2、3... 或附表等），提取每个事项的：
+- section: 完整的节次标题（如 "1. 银行存款"、"附表 资金归集..."、"出资者缴入投资资金明细表"）
+- table_headers: 该事项下表格的所有列名（按从左到右顺序）。注意：如果是多级表头（例如“款项来源细分”下有“境内”和“境外”），请使用嵌套字典，如 {"款项来源细分": ["境内", "境外"]}
+- description: 提取表格下方的补充描述文字（如果没有则为空或不输出）
+- subsections: 如果某节有子节（如"担保"下的(1)(2)），用 subsections 数组包含，每个子节对应包含 subsection 标题、table_headers 和 description
 
-仅输出 JSON，不要解释。如果此页没有询证事项（如封面、签章页），返回空数组 []。
+## 输出 JSON 格式示例（务必严格遵循此结构）：
+{
+    "format_type": "format_1",
+    "highlighted_content": [
+        {
+            "section": "1. 银行存款",
+            "table_headers": ["账户名称", "银行账号", "币种"],
+            "description": "除上述列示的银行存款外..."
+        },
+        {
+            "section": "6. 担保",
+            "subsections": [
+                {
+                    "subsection": "（1）本公司为其他单位提供的、以贵行作为受益人的担保",
+                    "table_headers": ["被担保人", "担保方式"],
+                    "description": "除上述列示的担保外..."
+                }
+            ]
+        },
+        {
+            "section": "出资者缴入投资资金明细表",
+            "table_headers": [
+                "缴款人",
+                {
+                    "款项来源细分": ["境内", "境外"]
+                }
+            ]
+        }
+    ]
+}
+
+【重要】函件可能有多页图片，请综合所有图片内容提取，不要遗漏。
+仅输出 JSON，不要解释。
 """
 
 
-# ========== 工具函数 ==========
+# ========== 模板加载 ==========
 
-# 模板 JSON 文件名映射
-TEMPLATE_JSON_FILES = {
-    "format_1": "format1_template.json",
-    "format_2": "format2_template.json",
-    "capital_verification": "capital_verification_template.json",
-}
+_templates_cache: dict[str, dict] = {}
 
 
 def _load_template(format_key: str) -> dict | None:
@@ -101,146 +134,205 @@ def _load_template(format_key: str) -> dict | None:
         return None
     template_path = os.path.join(TEMPLATES_DIR, filename)
     if not os.path.exists(template_path):
+        print(f"⚠️ 模板文件不存在: {template_path}")
         return None
     with open(template_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _identify_format_type(text: str) -> str:
-    """通过关键词计分识别文件所属格式"""
-    # 1. 优先检查文档中是否有明确的格式标注
-    if "格式二" in text or "（格式二）" in text:
-        return "format_2"
-    if "格式一" in text or "（格式一）" in text:
-        return "format_1"
-
-    # 2. 检查验资询证函
-    capital_score = sum(1 for kw in FORMAT_TYPE_KEYWORDS["capital_verification"] if kw in text)
-    if capital_score >= 2:
-        return "capital_verification"
-
-    # 3. 检查格式二独有标志（格式一没有这些内容）
-    format2_exclusive = ["以下由被询证银行填列", "函证基准日", "回函请寄"]
-    if any(kw in text for kw in format2_exclusive):
-        return "format_2"
-
-    # 4. 关键词计分（回退方案）
-    best_format = "unknown"
-    best_score = 0
-    for fmt, keywords in FORMAT_TYPE_KEYWORDS.items():
-        score = sum(1 for kw in keywords if kw in text)
-        if score > best_score:
-            best_score = score
-            best_format = fmt
-    return best_format if best_score >= 2 else "unknown"
+def _load_all_templates() -> dict[str, dict]:
+    """加载所有模板文件，带缓存"""
+    global _templates_cache
+    if _templates_cache:
+        return _templates_cache
+    for fmt_key in TEMPLATE_JSON_FILES:
+        tpl = _load_template(fmt_key)
+        if tpl:
+            _templates_cache[fmt_key] = tpl
+    return _templates_cache
 
 
-def _fuzzy_match(a: str, b: str) -> float:
-    """计算两个字符串的相似度（0~1）"""
-    clean = lambda s: re.sub(r"[\s，。、；：""''（）\[\]【】]", "", s)
-    return SequenceMatcher(None, clean(a), clean(b)).ratio()
+# ========== 工具函数 ==========
+
+def _normalize_section_name(name: str) -> str:
+    """
+    标准化 section 名称用于比较：
+    - 去除编号前缀（如 "3. "）
+    - 将实际日期替换为占位符 "xxxx年x月x日"，使不同日期值可以匹配
+    - 去除多余空格
+    """
+    s = re.sub(r"^\d+\.\s*", "", name.strip())
+    # 将实际日期（如 2024年01月01日）替换为占位符 xxxx年x月x日
+    s = re.sub(r"\d{4}年\d{1,2}月\d{1,2}日", "xxxx年x月x日", s)
+    s = re.sub(r"\s+", "", s)
+    return s
 
 
-def _extract_plain_text(image_path: str) -> str:
-    """提取图片中的纯文本"""
-    prompt = "请提取这张询证函图片的全部文字，保持原文顺序。只输出纯文本，不要解释。"
-    text = request_stream(
-        question=prompt,
-        file_base=image_path,
-        model=MODEL_LOCAL,
-        show_request=False,
-    )
-    return (text or "").strip()
+def _normalize_text(text: str) -> str:
+    """标准化普通文本（特别是表头）：去空格、换行，全角转半角标点"""
+    s = str(text)
+    s = re.sub(r"\s+", "", s)
+    s = s.replace("（", "(").replace("）", ")")
+    s = s.replace("，", ",").replace("。", ".")
+    s = s.replace("：", ":").replace("；", ";")
+    return s
 
 
-def _extract_structure(image_path: str) -> list:
-    """从单张图片提取文档结构"""
-    try:
+def _collect_headers(item: dict) -> list[str]:
+    """从一个 section 项收集所有 table_headers（包括 subsections）"""
+    headers: list[str] = []
+    if "table_headers" in item:
+        for h in item["table_headers"]:
+            if isinstance(h, str):
+                # 去除 #[] 标记（模板中的可选标记）
+                headers.append(h.replace("#[", "").replace("]", ""))
+            elif isinstance(h, dict):
+                for k in h:
+                    headers.append(k)
+    if "subsections" in item:
+        for sub in item["subsections"]:
+            for h in sub.get("table_headers", []):
+                if isinstance(h, str):
+                    headers.append(h)
+    return headers
+
+
+# ========== AI 内容提取 ==========
+
+def _extract_content_from_images(image_paths: list[str]) -> dict:
+    """
+    从询证函图片中提取格式类型和结构化内容（一次 AI 调用）
+    
+    Returns:
+        dict: {"format_type": "...", "highlighted_content": [...]}
+    """
+    if len(image_paths) == 1:
         response = request_stream(
-            question=FORMAT_COMPARE_PROMPT,
-            file_base=image_path,
+            question=FORMAT_EXTRACT_PROMPT,
+            file_base=image_paths[0],
             model=MODEL_LOCAL,
             show_request=False,
         ).strip()
-        items = json.loads(fix_json(response))
-        return items if isinstance(items, list) else []
+    else:
+        response = request_stream(
+            question=FORMAT_EXTRACT_PROMPT,
+            file_ary=image_paths,
+            model=MODEL_LOCAL,
+            show_request=False,
+            pic_tip=True,
+        ).strip()
+
+    try:
+        data = json.loads(fix_json(response))
+        return data if isinstance(data, dict) else {}
     except Exception as e:
-        print(f"[FormatCompare] 结构提取失败: {e}")
-        return []
+        print(f"[FormatCompare] JSON 解析失败: {e}, 原始响应: {response[:300]}")
+        return {}
 
 
 # ========== 比对引擎 ==========
 
-def _compare_with_template(template: dict, doc_items: list) -> list:
-    """将文档提取的事项与模板比对，返回差异列表"""
-    mismatches = []
-    template_items = template.get("items", [])
+def _compare_with_template(
+    format_type: str, actual_content: list[dict],
+) -> list[dict]:
+    """将 AI 提取的结构化内容与模板逐项比对，返回差异列表"""
+    template = _load_template(format_type)
+    if not template:
+        return [{
+            "section": "",
+            "item": "模板文件",
+            "location": "format",
+            "expected": f"{TEMPLATE_JSON_FILES.get(format_type, '?')}",
+            "actual": "模板文件不存在",
+            "severity": "high",
+        }]
 
-    # 建立文档事项索引（按 section）
-    doc_index = {}
-    for item in doc_items:
-        section = item.get("section", "")
-        if section:
-            doc_index[section] = item
+    expected_sections = template.get("highlighted_content", [])
+    mismatches: list[dict] = []
 
-    for t_item in template_items:
-        section = t_item.get("section", "")
-        t_title = t_item.get("title", "")
-        t_desc = t_item.get("description", "")
-        t_fields = t_item.get("table_fields", [])
+    # 1. 节次数量比对
+    if len(actual_content) != len(expected_sections):
+        mismatches.append({
+            "section": "",
+            "item": "节次数量",
+            "location": "section",
+            "expected": f"{len(expected_sections)} 个节次",
+            "actual": f"{len(actual_content)} 个节次",
+            "severity": "medium",
+        })
 
-        d_item = doc_index.get(section)
+    # 2. 逐节比对
+    max_len = max(len(expected_sections), len(actual_content)) if expected_sections or actual_content else 0
+    for i in range(max_len):
+        exp = expected_sections[i] if i < len(expected_sections) else None
+        act = actual_content[i] if i < len(actual_content) else None
 
-        if not d_item:
-            # 整个事项缺失
+        if exp and not act:
             mismatches.append({
-                "section": section,
-                "item": f"第{section}项 {t_title}",
+                "section": exp.get("section", ""),
+                "item": f"节次 [{exp.get('section', '')}]",
                 "location": "section",
-                "expected": f"应包含第{section}项：{t_title}",
-                "actual": "未找到该事项",
+                "expected": "应存在",
+                "actual": "缺失",
                 "severity": "high",
             })
             continue
+        if act and not exp:
+            mismatches.append({
+                "section": act.get("section", ""),
+                "item": f"节次 [{act.get('section', '')}]",
+                "location": "section",
+                "expected": "不应存在",
+                "actual": "多余节次",
+                "severity": "medium",
+            })
+            continue
 
-        # 比对描述文字（模糊匹配）
-        d_desc = d_item.get("description", "")
-        if t_desc and d_desc:
-            similarity = _fuzzy_match(t_desc, d_desc)
-            if similarity < 0.8:
-                mismatches.append({
-                    "section": section,
-                    "item": f"第{section}项描述",
-                    "location": "description",
-                    "expected": t_desc,
-                    "actual": d_desc,
-                    "severity": "medium",
-                })
+        # 比较 section 名称（完全比对，但日期部分只需满足格式）
+        exp_name = _normalize_section_name(exp.get("section", ""))
+        act_name = _normalize_section_name(act.get("section", ""))
+        if exp_name != act_name:
+            mismatches.append({
+                "section": exp.get("section", ""),
+                "item": "节次名称",
+                "location": "section",
+                "expected": exp.get("section", ""),
+                "actual": act.get("section", ""),
+                "severity": "high",
+            })
 
-        # 比对表格字段
-        d_fields = d_item.get("table_fields", [])
-        if t_fields:
-            for t_field in t_fields:
-                found = any(_fuzzy_match(t_field, df) >= 0.7 for df in d_fields)
-                if not found:
+        # 比较 table_headers
+        exp_headers = _collect_headers(exp)
+        act_headers = _collect_headers(act)
+
+        if exp_headers or act_headers:
+            section_label = exp.get("section", act.get("section", ""))
+            
+            # 使用 normalize_text 对表头进行标准化（忽略空格换行和全半角括号差异）
+            norm_exp_headers = [_normalize_text(h) for h in exp_headers]
+            norm_act_headers = [_normalize_text(h) for h in act_headers]
+            
+            # 缺少的表头
+            for orig_eh, norm_eh in zip(exp_headers, norm_exp_headers):
+                if norm_eh not in norm_act_headers:
                     mismatches.append({
-                        "section": section,
-                        "item": f"第{section}项表格字段",
+                        "section": section_label,
+                        "item": f"{section_label} - 表头",
                         "location": "table_field",
-                        "expected": t_field,
-                        "actual": f"缺少字段：{t_field}",
+                        "expected": orig_eh,
+                        "actual": "缺失",
                         "severity": "high",
                     })
-
-            for d_field in d_fields:
-                found = any(_fuzzy_match(tf, d_field) >= 0.7 for tf in t_fields)
-                if not found:
+            
+            # 多余的表头
+            for orig_ah, norm_ah in zip(act_headers, norm_act_headers):
+                if norm_ah not in norm_exp_headers:
                     mismatches.append({
-                        "section": section,
-                        "item": f"第{section}项表格字段",
+                        "section": section_label,
+                        "item": f"{section_label} - 表头",
                         "location": "table_field",
                         "expected": "模板中无此字段",
-                        "actual": f"多出字段：{d_field}",
+                        "actual": orig_ah,
                         "severity": "low",
                     })
 
@@ -253,6 +345,9 @@ def compare_with_template(pdf_path: str) -> dict:
     """
     格式比对主函数
 
+    流程：PDF → 转图片 → AI 一次性提取(类型+结构) → 模板比对
+    三阶段日志输出：类型识别 → 提取的 JSON → 比对结果
+
     Args:
         pdf_path: 上传的询证函 PDF 文件路径
 
@@ -260,6 +355,7 @@ def compare_with_template(pdf_path: str) -> dict:
         dict: {format_type, passed, mismatches: [...]}
     """
     tmp_dir = tempfile.mkdtemp(prefix="format_compare_")
+    filename = os.path.basename(pdf_path)
 
     try:
         # 1. PDF 转图片
@@ -267,12 +363,17 @@ def compare_with_template(pdf_path: str) -> dict:
         if not image_paths:
             raise ValueError("PDF 转换图片失败")
 
-        # 2. 提取纯文本用于格式类型识别
-        text_pages = [_extract_plain_text(img) for img in image_paths]
-        merged_text = "\n".join(text_pages)
+        # 2. AI 一次性提取格式类型 + 结构化内容
+        extract_result = _extract_content_from_images(image_paths)
+        format_type = extract_result.get("format_type", "unknown")
+        highlighted_content = extract_result.get("highlighted_content", [])
 
-        # 3. 识别格式类型
-        format_type = _identify_format_type(merged_text)
+        # ===== 阶段一：类型识别 =====
+        print(f"\n{'=' * 60}")
+        print(f"  📋 [{filename}] 阶段一：类型识别")
+        print(f"  识别结果: {FORMAT_LABELS.get(format_type, format_type)} ({format_type})")
+        print(f"{'=' * 60}")
+
         if format_type == "unknown":
             return {
                 "format_type": "unknown",
@@ -287,50 +388,38 @@ def compare_with_template(pdf_path: str) -> dict:
                 }],
             }
 
-        # 4. 加载模板
-        template = _load_template(format_type)
-        if not template:
-            return {
-                "format_type": format_type,
-                "passed": False,
-                "mismatches": [{
-                    "section": "",
-                    "item": "模板文件",
-                    "location": "format",
-                    "expected": f"{format_type}_template.json",
-                    "actual": "模板文件不存在",
-                    "severity": "high",
-                }],
-            }
+        # ===== 阶段二：提取的 JSON 格式数据 =====
+        print(f"\n{'=' * 60}")
+        print(f"  📄 [{filename}] 阶段二：提取的 JSON 格式数据")
+        print(f"{'-' * 60}")
+        if extract_result:
+            print(json.dumps(extract_result, ensure_ascii=False, indent=2))
+        else:
+            print("  ⚠️ 未提取到任何数据 (AI 提取失败或无内容)")
+        print(f"{'=' * 60}")
 
-        # 5. AI 提取文档结构
-        all_items = []
-        for img_path in image_paths:
-            items = _extract_structure(img_path)
-            all_items.extend(items)
+        # 3. 模板比对
+        mismatches = _compare_with_template(format_type, highlighted_content)
+        passed = len(mismatches) == 0
 
-        # 去重合并（相同 section 的合并 table_fields）
-        merged_items = {}
-        for item in all_items:
-            section = item.get("section", "")
-            if not section:
-                continue
-            if section not in merged_items:
-                merged_items[section] = item
-            else:
-                existing = merged_items[section]
-                for f in item.get("table_fields", []):
-                    if f not in existing.get("table_fields", []):
-                        existing.setdefault("table_fields", []).append(f)
-
-        doc_items = list(merged_items.values())
-
-        # 6. 比对
-        mismatches = _compare_with_template(template, doc_items)
+        # ===== 阶段三：比对结果 =====
+        print(f"\n{'=' * 60}")
+        print(f"  🔍 [{filename}] 阶段三：模板比对结果")
+        print(f"{'-' * 60}")
+        print(f"  格式类型: {FORMAT_LABELS.get(format_type, format_type)}")
+        print(f"  比对通过: {'✅ 是' if passed else '❌ 否'}")
+        if mismatches:
+            print(f"  差异项 ({len(mismatches)} 个):")
+            for m in mismatches:
+                severity_icon = {"high": "🔴", "medium": "🟡", "low": "🔵"}.get(m.get("severity", ""), "⚪")
+                print(f"    {severity_icon} {m['item']}: 期望[{m['expected']}] 实际[{m['actual']}]")
+        else:
+            print("  ✅ 无差异")
+        print(f"{'=' * 60}")
 
         return {
             "format_type": format_type,
-            "passed": len(mismatches) == 0,
+            "passed": passed,
             "mismatches": mismatches,
         }
 
