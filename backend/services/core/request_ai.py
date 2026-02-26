@@ -203,6 +203,127 @@ def build_fewshot(file_base, explanation):
     ]
 
 
+def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
+                    multi_pic=None,
+                    video="",
+                    video_list="",
+                    system_content=None,
+                    show_filename=False,
+                    show_cost=False,
+                    is_stream=True,
+                    pic_tip=False,
+                    show_request=True, file_ary=None):
+    """
+    调用 Qwen3.5-122B 模型（非思考模式）
+
+    参数与 request_stream 完全一致，但使用 Qwen3.5 的 API 地址和密钥。
+    """
+    t1 = time.time()
+    client = OpenAI(
+        api_key=QWEN35_KEY,
+        base_url=QWEN35_URL,
+        timeout=600.0,  # 10分钟超时，处理多页图片
+    )
+    message = []
+    if system_content is not None:
+        message.append({"role": "system",
+                        "content": system_content
+                        })
+    content = []
+    if multi_pic is not None:
+        content.extend(multi_pic)
+    if file_ary is not None and len(file_ary) > 0:
+        for i, file in enumerate(file_ary):
+            if pic_tip:
+                content.append({"type": "text", "text": f"下面是图片{i}"})
+            content.append({
+                "type": "image_url",
+                "image_url": file,
+            })
+    elif len(file_base) > 0:
+        content.append({"type": "image_url",
+                        "image_url": file_base,
+                        })
+    if video is not None and len(video) > 0:
+        content.append({"type": "video_url",
+                        "video_url": video,
+                        })
+    if video_list is not None and len(video_list) > 0:
+        content.append({"type": "video_url",
+                        "video_url": video_list,
+                        })
+    if question is not None and len(question) > 0:
+        content.append({"type": "text", "text": question})
+    encode_content(content)
+    message.append({
+        "role": "user",
+        "content": content,
+    })
+
+    extra_body = {"chat_template_kwargs": {"enable_thinking": False}}
+
+    completion = client.chat.completions.create(
+        temperature=0.7,
+        top_p=0.8,
+        model=model,
+        messages=message,
+        seed=3407,
+        stream=is_stream,
+        extra_body=extra_body,
+        stream_options=ChatCompletionStreamOptionsParam(include_usage=show_cost),
+    )
+
+    resp = ""
+    t_arguments = []
+    t_name = []
+    first_cost = 0
+    flag = False
+    usage = None
+    if is_stream:
+        for chunk in completion:
+            try:
+                c = chunk.choices[0].delta.content
+                function = chunk.choices[0].delta.tool_calls[0].function if chunk.choices[0].delta.tool_calls else None
+            except Exception as e:
+                c = None
+                function = None
+
+            if function:
+                if function.name:
+                    t_name.append(function.name)
+                if function.arguments:
+                    t_arguments.append(function.arguments)
+            if c:
+                if show_cost:
+                    if not flag:
+                        flag = True
+                        first_cost = time.time() - t1
+                resp += c
+            if chunk.usage:
+                if show_cost:
+                    usage = chunk.usage
+    else:
+        resp = completion.choices[0].message.content
+    if show_cost:
+        total_cost = time.time() - t1
+        print(f"[Qwen3.5] first cost: {first_cost}")
+        print(f"[Qwen3.5] total cost: {total_cost}")
+        if not is_stream:
+            usage = completion.usage
+        if usage.prompt_tokens_details.cached_tokens:
+            print(f"cached_tokens:{usage.prompt_tokens_details.cached_tokens}")
+        print(
+            f"request:prompt_tokens={usage.prompt_tokens} image_token={usage.prompt_tokens_details.image_tokens} text_tokens={usage.prompt_tokens_details.text_tokens} ")
+        print(f"response:total_tokens={usage.total_tokens} completion_tokens={usage.completion_tokens}")
+        print(
+            f"token per:total_per={usage.total_tokens / total_cost} output_per={usage.completion_tokens / total_cost}")
+
+    if show_filename:
+        return (resp, file_base)
+    else:
+        return resp
+
+
 if __name__ == '__main__':
     prompt = """
     
