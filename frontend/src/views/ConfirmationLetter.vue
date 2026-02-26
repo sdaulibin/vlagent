@@ -124,6 +124,15 @@ const handleStartRecognition = async () => {
   if (retryableLetters.length === 0) return;
 
   isRecognizing.value = true;
+
+  // 立即更新列表状态为"识别中"
+  retryableLetters.forEach(letter => {
+    const idx = letters.value.findIndex(l => l.id === letter.id);
+    if (idx !== -1) {
+      letters.value[idx] = { ...letters.value[idx], status: 'processing' } as ConfirmationLetterItem;
+    }
+  });
+
   try {
     for (const letter of retryableLetters) {
       await recognizeConfirmationLetter(letter.id);
@@ -136,12 +145,18 @@ const handleStartRecognition = async () => {
     }
   } catch (e) {
     console.error("识别失败", e);
+    await loadLetters();
   } finally {
     isRecognizing.value = false;
   }
 };
 
 const handleRecognizeOne = async (id: number) => {
+  // 立即更新状态
+  const idx = letters.value.findIndex(l => l.id === id);
+  if (idx !== -1) {
+    letters.value[idx] = { ...letters.value[idx], status: 'processing' } as ConfirmationLetterItem;
+  }
   try {
     await recognizeConfirmationLetter(id);
     await loadLetters();
@@ -150,6 +165,7 @@ const handleRecognizeOne = async (id: number) => {
     }
   } catch (e) {
     console.error("单条识别失败", e);
+    await loadLetters();
   }
 };
 

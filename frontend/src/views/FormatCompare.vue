@@ -111,12 +111,24 @@ const handleFileUpload = async (event: Event) => {
 
 const handleCompare = async () => {
   if (!selectedTask.value) return;
+  const taskId = selectedTask.value.id;
   isComparing.value = true;
+
+  // 立即更新界面状态为"比对中"
+  selectedTask.value = { ...selectedTask.value, status: "processing" };
+  const idx = tasks.value.findIndex((t) => t.id === taskId);
+  if (idx !== -1) {
+    tasks.value[idx] = { ...tasks.value[idx], status: "processing" } as CompareTask;
+  }
+
   try {
-    selectedTask.value = await runFormatCompare(selectedTask.value.id);
+    selectedTask.value = await runFormatCompare(taskId);
     await loadTasks();
   } catch (e) {
     console.error("比对失败", e);
+    // 失败时刷新真实状态
+    await loadTasks();
+    selectedTask.value = await getFormatCompareTask(taskId);
   } finally {
     isComparing.value = false;
   }

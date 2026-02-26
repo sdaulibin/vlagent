@@ -74,15 +74,19 @@ Role: 询证函格式分析专家
 Task: 分析这份银行询证函图片，完成以下两项任务：
 
 ## 任务一：识别格式类型
-根据文档内容判断属于以下哪种格式：
-- "format_1": 格式一银行询证函（特征："回函地址"、"联系人"、部分表格下方有补充描述文字等）
-- "format_2": 格式二银行询证函（特征："回函请寄"、"收件人"、"函证基准日"；通常在银行存款表格上方有“以下由被询证银行填列”字样；并且表格下方**没有**补充描述文字）
-- "capital_verification": 验资业务银行询证函（包含"验资"、"出资者缴入投资资金"等字段）
+根据文档的**内容结构**判断格式（⚠️ 不要依据标题中印刷的"格式一"或"格式二"字样判断，必须根据实际内容结构）：
+
+判断规则（按优先级）：
+1. 包含"验资"、"出资者缴入投资资金" → "capital_verification"
+2. 各事项表格下方有补充描述文字（如"除上述列示的银行存款外，本公司并无在贵行的其他存款。"） → "format_1"
+3. 表格下方**没有**补充描述文字 → "format_2"
+
+辅助特征（仅参考）：format_1通常有"回函地址"、"联系人"；format_2通常有"回函请寄"、"收件人"
 
 ## 任务二：提取文档结构
 找出文档中所有编号的询证事项（如 1、2、3... 或附表等），提取每个事项的：
 - section: 完整的节次标题（如 "1. 银行存款"、"附表 资金归集..."、"出资者缴入投资资金明细表"）
-- table_headers: 该事项下表格的所有列名（按从左到右顺序）。注意：如果是多级表头（例如“款项来源细分”下有“境内”和“境外”），请使用嵌套字典，如 {"款项来源细分": ["境内", "境外"]}
+- table_headers: 该事项下表格的所有列名（按从左到右顺序）。⚠️ 某些列可能很窄（如"币种"、"备注"仅两字宽），请逐列仔细检查不要遗漏，可通过数据行的列数验证表头数量。注意：如果是多级表头（例如“款项来源细分”下有“境内”和“境外”），请使用嵌套字典，如 {"款项来源细分": ["境内", "境外"]}
 - description: 提取表格下方的补充描述文字（如果没有则为空或不输出）
 - subsections: 如果某节有子节（如"担保"下的(1)(2)），用 subsections 数组包含，每个子节对应包含 subsection 标题、table_headers 和 description
 
@@ -120,6 +124,7 @@ Task: 分析这份银行询证函图片，完成以下两项任务：
 【重要】函件可能有多页图片，请综合所有图片内容提取，不要遗漏。
 【重要】必须保持原文中的标点符号不变，特别是中文括号（）不要转换为英文括号()。
 【重要】某些节次的标题可能出现在一页的底部，而其表格出现在下一页的顶部（跨页分割）。请务必将它们合并为同一个 section，并完整提取该 section 的 table_headers。例如"附表"的标题在第3页底部，其表格在第4页顶部，应合并为一个完整的 section。
+【重要】"附表"是一个独立的 section，与编号节次（如"14. 其他"）无关，即使它们出现在同一页上也必须分为两个不同的 section。不要将附表的 table_headers 放到其他编号节次下。
 仅输出 JSON，不要解释。
 """
 
@@ -167,8 +172,10 @@ def _normalize_section_name(name: str) -> str:
     s = re.sub(r"^\d+\.\s*", "", name.strip())
     # 去除日期周围的方括号 [2022年01月01日] → 2022年01月01日
     s = re.sub(r"\[(\d{4}年\d{1,2}月\d{1,2}日)\]", r"\1", s)
-    # 将实际日期（如 2024年01月01日）替换为占位符 xxxx年x月x日
+    # 将中文日期（如 2024年01月01日）替换为占位符
     s = re.sub(r"\d{4}年\d{1,2}月\d{1,2}日", "xxxx年x月x日", s)
+    # 将斜杠日期（如 2025/1/1）替换为同一占位符
+    s = re.sub(r"\d{4}/\d{1,2}/\d{1,2}", "xxxx年x月x日", s)
     s = re.sub(r"\s+", "", s)
     return s
 
@@ -229,10 +236,61 @@ def _extract_content_from_images(image_paths: list[str]) -> dict:
 
     try:
         data = json.loads(fix_json(response))
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            # 后处理：修复 AI 常见的 section 合并错误
+            data["highlighted_content"] = _post_process_sections(
+                data.get("highlighted_content", [])
+            )
+            return data
+        return {}
     except Exception as e:
         print(f"[FormatCompare] JSON 解析失败: {e}, 原始响应: {response[:300]}")
         return {}
+
+
+def _post_process_sections(sections: list[dict]) -> list[dict]:
+    """
+    后处理 AI 提取的 sections，修复常见错误：
+    1. "其他" section 只保留 section 名称，清除 table_headers 和 description
+    2. 如果编号节次的 table_headers 与附表完全相同，清除该编号节次的 headers
+    """
+    if not sections:
+        return sections
+
+    # 1. 清理"其他" section（只有一个输入框，无表格无描述）
+    for s in sections:
+        sec_name = s.get("section", "")
+        # 匹配 "14. 其他" / "14.其他" 等
+        if re.search(r"\d+\.?\s*其他$", sec_name.strip()):
+            if s.get("table_headers"):
+                print(f'  [后处理] 修正: "{sec_name}" 不应有 table_headers，已清除')
+                s["table_headers"] = []
+            if s.get("description"):
+                print(f'  [后处理] 修正: "{sec_name}" 不应有 description，已清除')
+                s["description"] = ""
+
+    # 2. 找到附表的 table_headers
+    appendix_headers = None
+    for s in sections:
+        sec_name = s.get("section", "")
+        if sec_name.startswith("附表"):
+            appendix_headers = s.get("table_headers", [])
+            break
+
+    if not appendix_headers:
+        return sections
+
+    # 检查编号节次是否错误地复制了附表的 headers
+    for s in sections:
+        sec_name = s.get("section", "")
+        if sec_name.startswith("附表"):
+            continue
+        sec_headers = s.get("table_headers", [])
+        if sec_headers and sec_headers == appendix_headers:
+            print(f'  [后处理] 修正: "{sec_name}" 的 table_headers 与附表重复，已清除')
+            s["table_headers"] = []
+
+    return sections
 
 
 # ========== 比对引擎 ==========
