@@ -15,7 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.database import get_session
 from .models import FormatCompareTask, FormatCompareTaskDTO, FormatMismatchItem, TemplateInfo
-from .service import compare_with_template, get_template_list, get_template_pdf_path
+from .service import compare_with_template, get_template_list, get_template_pdf_path, _load_template
 
 router = APIRouter(prefix="/format-compare", tags=["格式比对"])
 
@@ -37,7 +37,26 @@ def _parse_mismatches(raw_json: str | None) -> list[FormatMismatchItem]:
         return []
 
 
+def _parse_json_list(raw_json: str | None) -> list | None:
+    if not raw_json:
+        return None
+    try:
+        return json.loads(raw_json)
+    except Exception:
+        return None
+
+
 def _to_dto(task: FormatCompareTask) -> FormatCompareTaskDTO:
+    # 解析 extracted_content
+    extracted_content = _parse_json_list(task.extracted_content_json)
+    
+    # 加载对应模板的 template_content
+    template_content = None
+    if task.format_type and task.format_type != "unknown":
+        template = _load_template(task.format_type)
+        if template:
+            template_content = template.get("highlighted_content", [])
+    
     return FormatCompareTaskDTO(
         id=task.id,
         filename=task.filename,
@@ -45,6 +64,8 @@ def _to_dto(task: FormatCompareTask) -> FormatCompareTaskDTO:
         status=task.status,
         passed=task.passed,
         mismatches=_parse_mismatches(task.mismatches_json),
+        extracted_content=extracted_content,
+        template_content=template_content,
         error_msg=task.error_msg,
         duration_ms=task.duration_ms,
         created_at=task.created_at,
@@ -100,6 +121,7 @@ async def upload_and_compare(
         task.format_type = result.get("format_type", "unknown")
         task.passed = result.get("passed", False)
         task.mismatches_json = json.dumps(result.get("mismatches", []), ensure_ascii=False)
+        task.extracted_content_json = json.dumps(result.get("extracted_content", []), ensure_ascii=False)
         task.status = "done"
     except Exception as e:
         task.status = "failed"

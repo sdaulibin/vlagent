@@ -3,7 +3,7 @@
 """
 from sqlmodel import SQLModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class FormatCompareTask(SQLModel, table=True):
@@ -17,6 +17,7 @@ class FormatCompareTask(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, processing, done, failed
     passed: Optional[bool] = Field(default=None, description="比对是否通过")
     mismatches_json: Optional[str] = Field(default=None, description="差异JSON")
+    extracted_content_json: Optional[str] = Field(default=None, description="AI提取的结构化内容JSON")
     error_msg: Optional[str] = None
     duration_ms: Optional[float] = Field(default=None, description="比对耗时(ms)")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -40,6 +41,8 @@ class FormatCompareTaskDTO(SQLModel):
     status: str
     passed: Optional[bool] = None
     mismatches: List[FormatMismatchItem] = Field(default_factory=list)
+    extracted_content: Optional[List[Any]] = Field(default=None, description="AI提取的结构化内容")
+    template_content: Optional[List[Any]] = Field(default=None, description="模板的结构化内容")
     error_msg: Optional[str] = None
     duration_ms: Optional[float] = None
     created_at: datetime

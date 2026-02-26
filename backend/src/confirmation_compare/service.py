@@ -403,6 +403,10 @@ def compare_with_template(pdf_path: str) -> dict:
         mismatches = _compare_with_template(format_type, highlighted_content)
         passed = len(mismatches) == 0
 
+        # 加载模板内容
+        template = _load_template(format_type)
+        template_content = template.get("highlighted_content", []) if template else []
+
         # ===== 阶段三：比对结果 =====
         print(f"\n{'=' * 60}")
         print(f"  🔍 [{filename}] 阶段三：模板比对结果")
@@ -422,6 +426,8 @@ def compare_with_template(pdf_path: str) -> dict:
             "format_type": format_type,
             "passed": passed,
             "mismatches": mismatches,
+            "extracted_content": highlighted_content,
+            "template_content": template_content,
         }
 
     finally:

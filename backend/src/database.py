@@ -57,6 +57,11 @@ async def init_db():
             "ALTER TABLE confirmation_results "
             "ADD COLUMN IF NOT EXISTS format_mismatches_json TEXT"
         ))
+        # 格式比对：补充 AI 提取内容字段
+        await conn.execute(text(
+            "ALTER TABLE format_compare_tasks "
+            "ADD COLUMN IF NOT EXISTS extracted_content_json TEXT"
+        ))
 
 
 async def get_session() -> AsyncSession:
