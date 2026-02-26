@@ -172,3 +172,8 @@ export const getFormatCompareTemplates = async () => {
   const response = await api.get("/format-compare/templates");
   return response.data;
 };
+
+export const runFormatCompare = async (taskId: number) => {
+  const response = await api.post(`/format-compare/${taskId}/compare`);
+  return response.data;
+};

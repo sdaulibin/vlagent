@@ -89,11 +89,11 @@ async def preview_template(format_key: str):
 
 
 @router.post("/upload")
-async def upload_and_compare(
+async def upload_file(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
 ):
-    """上传询证函并执行格式比对"""
+    """上传询证函（仅保存文件，不立即比对）"""
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "仅支持 PDF 文件")
 
@@ -104,12 +104,32 @@ async def upload_and_compare(
         content = await file.read()
         f.write(content)
 
-    # 创建任务记录
+    # 创建任务记录（状态为 pending）
     task = FormatCompareTask(
         filename=file.filename,
         file_path=file_path,
-        status="processing",
+        status="pending",
     )
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+
+    return _to_dto(task)
+
+
+@router.post("/{task_id}/compare")
+async def run_compare(
+    task_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """对已上传的文件执行格式比对"""
+    task = await session.get(FormatCompareTask, task_id)
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    if task.status == "processing":
+        raise HTTPException(400, "比对正在进行中")
+
+    task.status = "processing"
     session.add(task)
     await session.commit()
     await session.refresh(task)
@@ -117,7 +137,7 @@ async def upload_and_compare(
     # 执行比对
     start_time = time.time()
     try:
-        result = await asyncio.to_thread(compare_with_template, file_path)
+        result = await asyncio.to_thread(compare_with_template, task.file_path)
         task.format_type = result.get("format_type", "unknown")
         task.passed = result.get("passed", False)
         task.mismatches_json = json.dumps(result.get("mismatches", []), ensure_ascii=False)

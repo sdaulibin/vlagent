@@ -9,8 +9,6 @@ import {
   XCircle,
   AlertTriangle,
   Eye,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import {
@@ -21,6 +19,7 @@ import {
   getFormatCompareFileUrl,
   getFormatCompareTemplateUrl,
   getFormatCompareTemplates,
+  runFormatCompare,
 } from "../api";
 
 interface MismatchItem {
@@ -57,6 +56,7 @@ const tasks = ref<CompareTask[]>([]);
 const selectedTask = ref<CompareTask | null>(null);
 const templates = ref<TemplateInfo[]>([]);
 const isUploading = ref(false);
+const isComparing = ref(false);
 
 const formatTypeLabels: Record<string, string> = {
   format_1: "格式一（银行询证函）",
@@ -102,10 +102,23 @@ const handleFileUpload = async (event: Event) => {
     }
     await loadTasks();
   } catch (e) {
-    console.error("上传比对失败", e);
+    console.error("上传失败", e);
   } finally {
     isUploading.value = false;
     target.value = "";
+  }
+};
+
+const handleCompare = async () => {
+  if (!selectedTask.value) return;
+  isComparing.value = true;
+  try {
+    selectedTask.value = await runFormatCompare(selectedTask.value.id);
+    await loadTasks();
+  } catch (e) {
+    console.error("比对失败", e);
+  } finally {
+    isComparing.value = false;
   }
 };
 
@@ -355,9 +368,39 @@ onMounted(() => {
       <!-- Right: Compare Result -->
       <div class="md:col-span-10 flex flex-col gap-4">
         <template v-if="selectedTask">
+          <!-- Status Banner: Pending (未比对) -->
+          <div
+            v-if="selectedTask.status === 'pending' || selectedTask.status === 'processing'"
+            class="rounded-xl p-4 border bg-slate-50 border-slate-200"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <FileSearch class="w-5 h-5 text-slate-500" />
+                <span class="font-medium text-slate-700">
+                  {{ selectedTask.status === 'processing' ? '比对中...' : '待比对' }}
+                </span>
+                <span class="text-sm text-slate-400">{{ selectedTask.filename }}</span>
+              </div>
+              <button
+                v-if="selectedTask.status === 'pending'"
+                @click="handleCompare"
+                :disabled="isComparing"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                开始比对
+              </button>
+              <span
+                v-else
+                class="text-sm text-indigo-600 animate-pulse"
+              >
+                正在分析中，请稍候...
+              </span>
+            </div>
+          </div>
+
           <!-- Status Banner: Failed -->
           <div
-            v-if="selectedTask.status === 'failed'"
+            v-else-if="selectedTask.status === 'failed'"
             class="rounded-xl p-4 border bg-amber-50 border-amber-200"
           >
             <div class="flex items-center justify-between">
