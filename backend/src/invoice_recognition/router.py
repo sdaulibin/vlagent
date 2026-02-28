@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Backgro
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc
 import os
-import aiofiles
 from datetime import datetime
 from typing import List
 
@@ -38,10 +37,10 @@ async def upload_invoice_pdf(
     unique_filename = f"{timestamp}_{safe_filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
-    # 1. 异步保存文件
-    async with aiofiles.open(file_path, 'wb') as out_file:
-        content = await file.read()
-        await out_file.write(content)
+    # 1. 保存文件 (无需额外引入 aiofiles，直接使用同步保存)
+    content = await file.read()
+    with open(file_path, 'wb') as out_file:
+        out_file.write(content)
 
     # 2. 插入 InvoiceFile
     db_file = InvoiceFile(
