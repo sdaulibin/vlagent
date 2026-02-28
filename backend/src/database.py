@@ -36,6 +36,7 @@ async def init_db():
     from src.contracts.models import CompareTask, DiffRecord
     from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult
     from src.confirmation_compare.models import FormatCompareTask
+    from src.invoice_recognition.models import InvoiceFile, InvoiceResult
     
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
