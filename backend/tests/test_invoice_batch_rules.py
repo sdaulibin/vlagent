@@ -31,7 +31,7 @@ def process_invoice_file(file_path: str, tmp_dir: str):
         for i, img_path in enumerate(image_paths):
             page_data = _extract_invoice_info(img_path)
             
-            print(f"  => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')} | 金额(价税合计): {page_data.get('invoice_amount')} | 耗时: {page_data.get('duration')}s")
+            print(f"  => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')} | 号码: {page_data.get('invoice_no')} | 日期: {page_data.get('invoice_date')} | 金额(价税合计): {page_data.get('invoice_amount')} | 购买方: {page_data.get('buyer_name')} | 耗时: {page_data.get('duration')}s")
             if page_data.get("error_msg"):
                 print(f"     ❌ 错误: {page_data.get('error_msg')}")
                 

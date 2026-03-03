@@ -51,7 +51,13 @@ def test_invoice_api(file_path: str):
             
             print(f"  => [第 {i + 1} 页识别结果]:")
             print(f"     发票类型: {page_data.get('invoice_type')}")
+            print(f"     发票号码: {page_data.get('invoice_no')}")
+            print(f"     开票日期: {page_data.get('invoice_date')}")
             print(f"     金额(价税合计): {page_data.get('invoice_amount')}")
+            print(f"     购买方名称: {page_data.get('buyer_name')}")
+            print(f"     购买方信用代码: {page_data.get('buyer_tax_id')}")
+            print(f"     销售方名称: {page_data.get('seller_name')}")
+            print(f"     销售方信用代码: {page_data.get('seller_tax_id')}")
             print(f"     AI 提取耗时: {page_data.get('duration')} 秒")
             if page_data.get("error_msg"):
                 print(f"     错误信息: {page_data.get('error_msg')}")

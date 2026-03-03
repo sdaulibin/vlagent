@@ -34,7 +34,14 @@ class InvoiceResult(SQLModel, table=True):
     page_number: int = Field(description="PDF页码(1-indexed)")
     
     invoice_type: Optional[str] = Field(default=None, description="发票类型")
+    invoice_no: Optional[str] = Field(default=None, description="发票号码")
+    invoice_date: Optional[str] = Field(default=None, description="开票日期")
     invoice_amount: Optional[str] = Field(default=None, description="发票金额(价税合计)")
+    buyer_name: Optional[str] = Field(default=None, description="购买方名称")
+    buyer_tax_id: Optional[str] = Field(default=None, description="购买方同一社会信用代码/纳税人识别号")
+    seller_name: Optional[str] = Field(default=None, description="销售方名称")
+    seller_tax_id: Optional[str] = Field(default=None, description="销售方同一社会信用代码/纳税人识别号")
+    
     raw_text: Optional[str] = Field(default=None, description="当前页提取的原文本（可选存储备用）")
     error_msg: Optional[str] = Field(default=None, description="单页识别错误信息")
     
@@ -46,7 +53,13 @@ class InvoiceRecognitionResult(SQLModel):
     """Pydantic / API 返回结构 - 单页"""
     page_number: int
     invoice_type: Optional[str] = None
+    invoice_no: Optional[str] = None
+    invoice_date: Optional[str] = None
     invoice_amount: Optional[str] = None
+    buyer_name: Optional[str] = None
+    buyer_tax_id: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_tax_id: Optional[str] = None
     raw_text: Optional[str] = None
 
 

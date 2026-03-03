@@ -25,15 +25,28 @@ Task: 从发票扫描图片中精确提取以下字段信息。
 ## 待提取字段及识别规则：
 
 1. **invoice_type (发票类型)**
-   - 提取图片中的发票类型全称，常见如：
-     - 电子发票（增值税专用发票）
-     - 电子发票（普通发票）
-     - 增值税电子专用发票
-     - 增值税普通发票
-     - 全电发票
-   - 请保持原文原样提取。如果图片中不包含发票类型，返回空字符串。
+   - 提取图片中的发票类型全称，常见如：电子发票（增值税专用发票）、增值税普通发票、全电发票等。
+   - 保持原文原样提取。如果不包含发票类型，返回空字符串。
 
-2. **invoice_amount (发票金额)**
+2. **invoice_no (发票号码)**
+   - 提取发票上的「发票号码」。如果不存在则返回空字符串。
+
+3. **invoice_date (开票日期)**
+   - 提取发票上的「开票日期」，格式尽量统一为 YYYY-MM-DD，如 2024-05-12。如果不存在返回空字符串。
+
+4. **buyer_name (购买方名称)**
+   - 提取购买方（抬头）名称。
+
+5. **buyer_tax_id (购买方统一社会信用代码/纳税人识别号)**
+   - 提取购买方的纳税人识别号或统一社会信用代码。
+
+6. **seller_name (销售方名称)**
+   - 提取销售方名称。
+
+7. **seller_tax_id (销售方统一社会信用代码/纳税人识别号)**
+   - 提取销售方的纳税人识别号或统一社会信用代码。
+
+8. **invoice_amount (发票金额)**
    - 提取发票上的「价税合计（小写）」金额数值。
    - 仅返回数字和可能存在的小数点，例如：42889.40，不要带"¥"符号或其他中文字符。
    - 如果不存在价税合计，请返回空字符串。
@@ -47,6 +60,12 @@ Task: 从发票扫描图片中精确提取以下字段信息。
 ## JSON Schema:
 {
     "invoice_type": "",
+    "invoice_no": "",
+    "invoice_date": "",
+    "buyer_name": "",
+    "buyer_tax_id": "",
+    "seller_name": "",
+    "seller_tax_id": "",
     "invoice_amount": "",
     "raw_text": ""
 }
@@ -83,6 +102,12 @@ def _extract_invoice_info(image_path: str) -> dict:
         data["invoice_amount"] = _normalize_amount(data.get("invoice_amount", ""))
         return dict(
             invoice_type=(data.get("invoice_type", "") or "").strip(),
+            invoice_no=(data.get("invoice_no", "") or "").strip(),
+            invoice_date=(data.get("invoice_date", "") or "").strip(),
+            buyer_name=(data.get("buyer_name", "") or "").strip(),
+            buyer_tax_id=(data.get("buyer_tax_id", "") or "").strip(),
+            seller_name=(data.get("seller_name", "") or "").strip(),
+            seller_tax_id=(data.get("seller_tax_id", "") or "").strip(),
             invoice_amount=data["invoice_amount"],
             raw_text=data.get("raw_text", ""),
             duration=round(duration, 2),
@@ -91,7 +116,9 @@ def _extract_invoice_info(image_path: str) -> dict:
     except Exception as e:
         print(f"JSON 解析失败: {e}, 原始响应: {response[:200]}")
         return dict(
-            invoice_type="", invoice_amount="", raw_text="", 
+            invoice_type="", invoice_no="", invoice_date="",
+            buyer_name="", buyer_tax_id="", seller_name="", seller_tax_id="",
+            invoice_amount="", raw_text="", 
             duration=round(duration, 2), error_msg=f"解析失败: {str(e)}"
         )
 
@@ -127,6 +154,12 @@ async def process_invoice_recognitions(db: AsyncSession, file_record: InvoiceFil
                 file_id=file_record.id,
                 page_number=i + 1,
                 invoice_type=page_data.get("invoice_type"),
+                invoice_no=page_data.get("invoice_no"),
+                invoice_date=page_data.get("invoice_date"),
+                buyer_name=page_data.get("buyer_name"),
+                buyer_tax_id=page_data.get("buyer_tax_id"),
+                seller_name=page_data.get("seller_name"),
+                seller_tax_id=page_data.get("seller_tax_id"),
                 invoice_amount=page_data.get("invoice_amount"),
                 raw_text=page_data.get("raw_text"),
                 error_msg=page_data.get("error_msg")
