@@ -34,7 +34,7 @@ def save_to_excel(transactions: list, summary: dict, bank_type: str, pdf_path: s
         headers = list(transactions[0].keys())
         ws_tx.append(headers)
         for tx in transactions:
-            ws_tx.append([tx.get(h, "") for h in headers])
+            ws_tx.append([str(tx.get(h, "")).replace("\n", "").replace("\r", "") for h in headers])
     else:
         ws_tx.append(["（无交易数据）"])
     
