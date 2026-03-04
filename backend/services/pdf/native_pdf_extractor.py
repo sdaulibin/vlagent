@@ -172,7 +172,7 @@ def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]
             record = {}
             for col_idx, field_name in column_map.items():
                 if col_idx < len(row):
-                    value = str(row[col_idx] or "").strip().replace("\n", " ")
+                    value = str(row[col_idx] or "").replace("\n", "").replace("\r", "").strip()
                     record[field_name] = value
             
             # 确保记录至少有一些有效数据
