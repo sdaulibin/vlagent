@@ -208,9 +208,118 @@ def extract_summary_from_text(full_text: str, summary_schema: dict) -> dict:
     return summary
 
 
+def _extract_tables_standard(pdf) -> tuple:
+    """策略1: 使用 pdfplumber 标准表格提取（适用于有明确表格线条的 PDF）"""
+    all_tables = []
+    for page in pdf.pages:
+        tables = page.extract_tables()
+        if tables:
+            for table in tables:
+                if table and len(table) > 1:
+                    all_tables.append(table)
+    return all_tables
+
+
+def _extract_tables_text_strategy(pdf) -> tuple:
+    """策略2: 使用 text 策略提取表格（适用于无明确线条但文字对齐的 PDF）"""
+    all_tables = []
+    settings = {
+        "vertical_strategy": "text",
+        "horizontal_strategy": "text",
+        "min_words_vertical": 3,
+        "min_words_horizontal": 1,
+    }
+    for page in pdf.pages:
+        tables = page.extract_tables(settings)
+        if tables:
+            for table in tables:
+                if table and len(table) > 1:
+                    all_tables.append(table)
+    return all_tables
+
+
+def _extract_via_char_clustering(pdf, transaction_schema: list, aliases: dict = None) -> list:
+    """
+    策略3: 基于字符坐标聚类提取（适用于旋转文字的 PDF）。
+    
+    原理：通过 rect 元素或固定间距将页面分割为若干行区域，
+    再按 x0 坐标将每行中的字符分组到各列。
+    """
+    if not transaction_schema:
+        return []
+    
+    schema_keys = list(transaction_schema[0].keys()) if isinstance(transaction_schema, list) else list(transaction_schema.keys())
+    transactions = []
+    
+    for page in pdf.pages:
+        # 获取所有 rect 的 y 坐标作为行分隔
+        rects = sorted(page.rects, key=lambda r: r['top'])
+        if not rects:
+            continue
+        
+        # 提取行区域（每个 rect 代表一个行背景）
+        row_bands = []
+        for rect in rects:
+            row_bands.append((rect['top'], rect['bottom']))
+        
+        chars = page.chars
+        if not chars:
+            continue
+        
+        for band_top, band_bottom in row_bands:
+            # 收集落在该行区域内的所有字符
+            band_chars = [c for c in chars if band_top <= c['top'] <= band_bottom]
+            if not band_chars:
+                continue
+            
+            # 按 x0 排序，然后拼接成文本
+            band_chars.sort(key=lambda c: c['x0'])
+            
+            # 通过 x 间距分组到不同列
+            columns = []
+            current_col_chars = [band_chars[0]]
+            
+            for i in range(1, len(band_chars)):
+                prev_char = band_chars[i - 1]
+                curr_char = band_chars[i]
+                # 如果 x 间距大于阈值，认为是新列
+                gap = curr_char['x0'] - (prev_char['x0'] + prev_char.get('width', 6))
+                if gap > 15:  # 列间距阈值
+                    columns.append(''.join(c['text'] for c in current_col_chars).strip())
+                    current_col_chars = [curr_char]
+                else:
+                    current_col_chars.append(curr_char)
+            
+            if current_col_chars:
+                columns.append(''.join(c['text'] for c in current_col_chars).strip())
+            
+            # 尝试把 columns 作为一行数据，映射到 schema
+            if len(columns) >= 3:
+                transactions.append(columns)
+    
+    return transactions
+
+
+def _validate_tables(tables: list) -> bool:
+    """检查提取的表格是否有效（每行至少有 3 个非空单元格）"""
+    if not tables:
+        return False
+    for table in tables:
+        for row in table:
+            non_empty = [c for c in row if c and str(c).strip()]
+            if len(non_empty) >= 3:
+                return True
+    return False
+
+
 def process_native_pdf(pdf_path: str, bank_type_hint: str = None) -> dict:
     """
     使用 pdfplumber 处理原生 PDF 银行流水文件，直接提取表格数据。
+    
+    自动尝试多种提取策略：
+    1. 标准表格提取（有线条的 PDF）
+    2. Text 策略提取（无线条但文字对齐的 PDF）
+    3. 字符坐标聚类（旋转文字的 PDF）
     
     Args:
         pdf_path: PDF 文件路径
@@ -228,7 +337,6 @@ def process_native_pdf(pdf_path: str, bank_type_hint: str = None) -> dict:
         # 2. 检测银行类型
         bank_type = bank_type_hint or detect_bank_from_text(full_text)
         if not bank_type:
-            # 尝试从文件名检测
             from services.pdf.bank_detector import detect_bank_from_filename
             bank_type = detect_bank_from_filename(os.path.basename(pdf_path))
         if not bank_type:
@@ -242,51 +350,63 @@ def process_native_pdf(pdf_path: str, bank_type_hint: str = None) -> dict:
         summary_schema = template.get("summary_schema", {})
         aliases = template.get("column_aliases", {})
         
-        # 4. 逐页提取表格
-        all_tables = []
-        column_map = {}
-        header_found = False
+        # 4. 尝试多种策略提取表格
+        all_tables = None
+        strategy_used = ""
         
-        for page_idx, page in enumerate(pdf.pages):
-            tables = page.extract_tables()
-            if not tables:
-                continue
+        # 策略1: 标准表格提取
+        tables = _extract_tables_standard(pdf)
+        if _validate_tables(tables):
+            all_tables = tables
+            strategy_used = "标准表格提取"
+        
+        # 策略2: text 策略
+        if not all_tables:
+            tables = _extract_tables_text_strategy(pdf)
+            if _validate_tables(tables):
+                all_tables = tables
+                strategy_used = "Text策略提取"
+        
+        print(f"  [原生PDF] 提取策略: {strategy_used if strategy_used else '所有表格策略均未成功，将回退到 VL 模型'}")
+        
+        # 5. 匹配表头 + 解析交易
+        transactions = []
+        column_map = {}
+        
+        if all_tables and transaction_schema:
+            header_found = False
+            data_tables = []
             
-            for table in tables:
-                if not table or len(table) < 1:
+            for table in all_tables:
+                if not table:
                     continue
                 
-                # 如果还没找到表头，尝试从当前表格第一行匹配
-                if not header_found and transaction_schema:
+                if not header_found:
                     candidate_map = map_columns_by_header(table[0], transaction_schema, aliases)
-                    # 如果匹配到至少 3 个字段，认为找到了表头
                     if len(candidate_map) >= 3:
                         column_map = candidate_map
                         header_found = True
-                        print(f"  [原生PDF] 在第 {page_idx + 1} 页找到表头，匹配 {len(column_map)} 个字段: {list(column_map.values())}")
-                        # 当前表格去掉表头行
-                        all_tables.append(table[1:])
+                        print(f"  [原生PDF] 匹配到 {len(column_map)} 个字段: {list(column_map.values())}")
+                        data_tables.append(table[1:])
                         continue
                 
-                # 后续页的表格可能重复表头，跳过重复的表头行
-                if header_found and table and len(table) > 0:
-                    first_row = table[0]
-                    # 检查是否是重复的表头
-                    test_map = map_columns_by_header(first_row, transaction_schema, aliases)
+                if header_found:
+                    # 跳过重复表头
+                    test_map = map_columns_by_header(table[0], transaction_schema, aliases)
                     if len(test_map) >= 3:
-                        all_tables.append(table[1:])  # 跳过重复表头
+                        data_tables.append(table[1:])
                     else:
-                        all_tables.append(table)
+                        data_tables.append(table)
                 else:
-                    all_tables.append(table)
+                    data_tables.append(table)
+            
+            if column_map:
+                transactions = parse_transactions(data_tables, column_map)
         
-        # 5. 解析交易数据
-        transactions = []
-        if column_map:
-            transactions = parse_transactions(all_tables, column_map)
-            print(f"  [原生PDF] 提取到 {len(transactions)} 条交易记录")
+        if transactions:
+            print(f"  [原生PDF] ✅ 提取到 {len(transactions)} 条交易记录")
         else:
-            print(f"  [原生PDF] ⚠️ 未能匹配表头，无法解析交易数据")
+            print(f"  [原生PDF] ⚠️ 未能通过原生解析提取交易数据，建议回退到 VL 模型")
         
         # 6. 提取汇总信息
         summary_data = None
@@ -298,3 +418,4 @@ def process_native_pdf(pdf_path: str, bank_type_hint: str = None) -> dict:
             "summary": summary_data,
             "bank_type": bank_type
         }
+
