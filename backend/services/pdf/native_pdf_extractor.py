@@ -135,38 +135,49 @@ def map_columns_by_header(header_row: List[str], schema: List[Dict], aliases: di
 
 
 def _clean_cell(value) -> str:
-    """清理单元格值：移除换行符并去除首尾空白"""
-    return str(value or "").replace("\n", "").replace("\r", "").strip()
+    """清理单元格值：换行符替换为空格，去除首尾空白"""
+    return str(value or "").replace("\r", "").replace("\n", " ").strip()
 
 
-def _is_date_prefix_row(row: List[str]) -> bool:
-    """判断是否为日期前缀行（只有交易时间列有日期值，其余列为空）"""
+def _looks_like_date(val: str) -> bool:
+    """判断值是否看起来像日期"""
     import re
-    non_empty = [(i, _clean_cell(c)) for i, c in enumerate(row) if _clean_cell(c)]
-    if len(non_empty) != 1:
-        return False
-    _, val = non_empty[0]
-    # 匹配日期格式: 2024-01-19, 2024/01/19, 2024.01.19
-    return bool(re.match(r'^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$', val))
+    return bool(re.match(r'^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$', val.strip()))
 
 
 def _is_main_data_row(row: List[str], seq_col_idx: int = 0) -> bool:
-    """判断是否为主数据行（序号列有数字）"""
+    """判断是否为主数据行（序号列以数字开头）"""
     if not row:
         return False
     seq_val = _clean_cell(row[seq_col_idx]) if seq_col_idx < len(row) else ""
-    return seq_val.isdigit()
+    import re
+    return bool(re.match(r'^\d+', seq_val))
 
 
-def _is_continuation_row(row: List[str], seq_col_idx: int = 0) -> bool:
-    """判断是否为续行（序号列为空，但其他列有数据）"""
-    if not row:
-        return False
-    seq_val = _clean_cell(row[seq_col_idx]) if seq_col_idx < len(row) else ""
-    if seq_val:
-        return False
-    non_empty = [c for c in row if _clean_cell(c)]
-    return len(non_empty) >= 1
+def _merge_continuation_value(existing: str, continuation: str) -> str:
+    """
+    智能合并续行值到已有值。
+    
+    处理对方户名等字段被拆分的情况，例如：
+    - existing: "山东玉金经贸有限公 转账支取|往来款"  (公司名被截断 + 摘要)
+    - continuation: "司"  (截断的后半部分)
+    - 结果: "山东玉金经贸有限公司 转账支取|往来款"
+    
+    规则：如果 existing 中有空格分隔（表示 名称+摘要），续行文本插入到第一个空格前。
+    """
+    if not existing:
+        return continuation
+    if not continuation:
+        return existing
+    
+    # 如果 existing 包含空格（如 "有限公 转账支取|往来款"），
+    # 把 continuation 插入到第一个空格前
+    space_idx = existing.find(' ')
+    if space_idx > 0:
+        return existing[:space_idx] + continuation + existing[space_idx:]
+    
+    # 否则直接追加
+    return existing + continuation
 
 
 def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]) -> List[Dict[str, str]]:
@@ -176,6 +187,7 @@ def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]
     自动合并被拆分的行：
     - 日期前缀行（如 "2024-01-19"）→ 合并到下一条主数据行的交易时间字段
     - 续行（序号列为空但有数据）→ 追加到上一条主数据行的对应字段
+    - 混合行（日期 + 其他列数据）→ 保存日期 + 合并其他列数据到上一条
     
     Args:
         tables: 所有表格数据（页→表→行→单元格）
@@ -193,70 +205,181 @@ def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]
         if field_name in ("交易时间", "交易日期"):
             time_col_idx = col_idx
     if seq_col_idx is None:
-        seq_col_idx = 0  # 默认第 0 列为序号
+        seq_col_idx = 0
     
-    # 先把所有表格的行展平
+    # 展平所有表格行
     all_rows = []
     for table in tables:
         for row in table:
             all_rows.append(row)
     
     transactions = []
-    pending_date = ""  # 暂存日期前缀
+    pending_date = ""
+    pending_continuation = []
+    
+    # NEW STATE: are we visually in the block of the NEXT transaction?
+    # True if we have passed a date line, False if we just passed a main data line
+    in_next_block = False
+    
+    # 提取是否有明显属于页眉/页脚的垃圾文本（莱商等银行合并时会产生）
+    garbage_kws = ["账(卡", "序号", "收入序号", "收入", "支出", "交易渠道", "交易时间", "收入总笔数", "支出总笔数", "账户名:", "起止日期:", "收入总金额", "支出总金额", "对方账号", "对方户名"]
     
     for row in all_rows:
         # 跳过全空行
-        non_empty = [c for c in row if _clean_cell(c)]
-        if not non_empty:
+        non_empty_cells = [(i, _clean_cell(c)) for i, c in enumerate(row) if _clean_cell(c)]
+        if not non_empty_cells:
             continue
         
-        # 跳过合计/统计行
+        # 跳过合计/统计行及分页表头产生的特殊垃圾行
         first_val = _clean_cell(row[0]) if row else ""
         skip_keywords = ["合计", "小计", "总计", "本页合计", "累计", "页码", "打印"]
         if any(kw in first_val for kw in skip_keywords):
             continue
+            
+        row_text = "".join([_clean_cell(c) for c in row])
         
-        # 情况1: 日期前缀行
-        if _is_date_prefix_row(row):
-            # 提取日期值
-            for c in row:
-                val = _clean_cell(c)
-                if val:
-                    pending_date = val
-                    break
+        # 如果行内容包含多列表头关键字，这明显是由于跨页导致的内容重复表头
+        header_kws = ["交易时间", "交易渠道", "收入", "支出", "账户余额", "对方账号", "对方户名"]
+        if sum(1 for kw in header_kws if kw in row_text) >= 2:
             continue
+            
+        # 跳过莱商银行特有的首行账户信息及尾行汇总信息，防止干扰解析
+        if any(kw in row_text for kw in ["起止日期", "起始日期", "结束日志", "账户名:", "总笔数", "总金额", "账(卡", "收入序号"]):
+            continue
+            
         
-        # 情况2: 主数据行（有序号）
+        # 情况1: 主数据行（有序号）
         if _is_main_data_row(row, seq_col_idx):
+            in_next_block = False
             record = {}
             for col_idx, field_name in column_map.items():
                 if col_idx < len(row):
                     record[field_name] = _clean_cell(row[col_idx])
             
-            # 如果有暂存的日期，合并到交易时间字段前面
+            # 1. 组合暂存的日期
             if pending_date and time_col_idx is not None:
                 time_field = column_map.get(time_col_idx, "交易时间")
                 current_time = record.get(time_field, "")
                 record[time_field] = f"{pending_date} {current_time}".strip()
                 pending_date = ""
             
+            # 2. 合并悬空的续行数据（针对拆分到了主行上方的续行）
+            for p_dict in pending_continuation:
+                for f_name, val in p_dict.items():
+                    existing = record.get(f_name, "")
+                    if f_name in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额"]:
+                        if not existing:
+                            record[f_name] = val
+                    else:
+                        record[f_name] = _merge_continuation_value(val, existing)  # 前置
+            pending_continuation = []
+            
+            # --- 数据清理 (清理由于表格线缺失导致的页眉文本合并) ---
+            
+            # 清理序号
+            seq_field = column_map.get(seq_col_idx, "序号")
+            if seq_field in record and record[seq_field]:
+                import re
+                m = re.search(r"(\d+)", record[seq_field])
+                if m:
+                    record[seq_field] = m.group(1)
+            
+            # 清理金额字段
+            for f_name in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额"]:
+                val = record.get(f_name, "")
+                if val:
+                    import re
+                    m = re.search(r"(-?\d+(?:\.\d+)?)", val)
+                    if m:
+                        record[f_name] = m.group(1)
+            
+            # 清理时间字段
+            for f_name in ["交易时间", "交易日期"]:
+                val = record.get(f_name, "")
+                if val:
+                    import re
+                    m = re.search(r"(\d{4}[-/.]\d{2}[-/.]\d{2}(?:\s+\d{2}:\d{2}:\d{2})?)", val)
+                    if m: 
+                        record[f_name] = m.group(1)
+            
+            # 清理文本字段
+            for f_name in column_map.values():
+                if f_name not in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额", "交易时间", "交易日期", seq_field]:
+                    val = record.get(f_name, "")
+                    if val:
+                        for kw in garbage_kws:
+                            if kw in val:
+                                val = val.split(kw)[0]
+                        record[f_name] = val.strip()
+                        
+                        # 币种特判
+                        if f_name == "币种" and "人民币" in val:
+                            record[f_name] = "人民币"
+            
             if any(v for v in record.values()):
                 transactions.append(record)
             continue
         
-        # 情况3: 续行（序号为空但有数据）→ 追加到上一条记录
-        if transactions and _is_continuation_row(row, seq_col_idx):
-            last_record = transactions[-1]
-            for col_idx, field_name in column_map.items():
-                if col_idx < len(row):
-                    val = _clean_cell(row[col_idx])
-                    if val:
-                        existing = last_record.get(field_name, "")
-                        if existing:
-                            last_record[field_name] = existing + val
-                        else:
-                            last_record[field_name] = val
+        # 非主数据行：检查是否包含日期值（在 time 列位置）
+        has_date = False
+        if time_col_idx is not None and time_col_idx < len(row):
+            time_val = _clean_cell(row[time_col_idx])
+            if _looks_like_date(time_val):
+                pending_date = time_val
+                has_date = True
+                in_next_block = True
+        
+        # 检查除了日期列外是否还有其他数据（续行数据）
+        other_data = {}
+        for col_idx, field_name in column_map.items():
+            if col_idx < len(row) and col_idx != time_col_idx:
+                val = _clean_cell(row[col_idx])
+                # 同步清理金额和文本中的垃圾
+                if field_name in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额"]:
+                    import re
+                    m = re.search(r"(-?\d+(?:\.\d+)?)", val)
+                    if m: val = m.group(1)
+                else:
+                    for kw in garbage_kws:
+                        if kw in val: val = val.split(kw)[0]
+                    val = val.strip()
+                    if field_name == "币种" and "人民币" in val: val = "人民币"
+                    
+                if val:
+                    other_data[field_name] = val
+        
+        # 情况2: 纯日期行（只有日期，无其他数据）
+        if has_date and not other_data:
             continue
+        
+        # 情况3: 混合行（日期 + 续行数据）或纯续行
+        if other_data:
+            belongs_to_next = in_next_block
+            
+            # 如果不是因为在下一个区块中，但金额字段冲突了，则被迫推迟到下一条记录
+            if not belongs_to_next:
+                if transactions:
+                    last_record = transactions[-1]
+                    for f_name in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额"]:
+                        if other_data.get(f_name) and last_record.get(f_name):
+                            belongs_to_next = True
+                            break
+                else:
+                    belongs_to_next = True
+                
+            if belongs_to_next:
+                pending_continuation.append(other_data)
+                continue
+            
+            # 将非日期列的数据合并到上一条记录
+            last_record = transactions[-1]
+            for field_name, val in other_data.items():
+                existing = last_record.get(field_name, "")
+                if field_name in ["收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额", "交易渠道", "币种"]:
+                    if not existing:
+                        last_record[field_name] = val
+                else:
+                    last_record[field_name] = _merge_continuation_value(existing, val)
     
     return transactions
 
