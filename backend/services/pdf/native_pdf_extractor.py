@@ -134,26 +134,48 @@ def map_columns_by_header(header_row: List[str], schema: List[Dict], aliases: di
     return column_map
 
 
-def _is_data_row(row: List[str]) -> bool:
-    """判断一行是否为有效数据行（而非表头、合计行或空行）"""
+def _clean_cell(value) -> str:
+    """清理单元格值：移除换行符并去除首尾空白"""
+    return str(value or "").replace("\n", "").replace("\r", "").strip()
+
+
+def _is_date_prefix_row(row: List[str]) -> bool:
+    """判断是否为日期前缀行（只有交易时间列有日期值，其余列为空）"""
+    import re
+    non_empty = [(i, _clean_cell(c)) for i, c in enumerate(row) if _clean_cell(c)]
+    if len(non_empty) != 1:
+        return False
+    _, val = non_empty[0]
+    # 匹配日期格式: 2024-01-19, 2024/01/19, 2024.01.19
+    return bool(re.match(r'^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$', val))
+
+
+def _is_main_data_row(row: List[str], seq_col_idx: int = 0) -> bool:
+    """判断是否为主数据行（序号列有数字）"""
     if not row:
         return False
-    # 过滤全空行
-    non_empty = [c for c in row if c and str(c).strip()]
-    if len(non_empty) < 2:
+    seq_val = _clean_cell(row[seq_col_idx]) if seq_col_idx < len(row) else ""
+    return seq_val.isdigit()
+
+
+def _is_continuation_row(row: List[str], seq_col_idx: int = 0) -> bool:
+    """判断是否为续行（序号列为空，但其他列有数据）"""
+    if not row:
         return False
-    # 过滤合计/小计行
-    first_cell = str(row[0] or "").strip()
-    skip_keywords = ["合计", "小计", "总计", "本页合计", "累计", "页码", "打印"]
-    for kw in skip_keywords:
-        if kw in first_cell:
-            return False
-    return True
+    seq_val = _clean_cell(row[seq_col_idx]) if seq_col_idx < len(row) else ""
+    if seq_val:
+        return False
+    non_empty = [c for c in row if _clean_cell(c)]
+    return len(non_empty) >= 1
 
 
 def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]) -> List[Dict[str, str]]:
     """
     根据列映射，将提取的表格数据解析为字典列表。
+    
+    自动合并被拆分的行：
+    - 日期前缀行（如 "2024-01-19"）→ 合并到下一条主数据行的交易时间字段
+    - 续行（序号列为空但有数据）→ 追加到上一条主数据行的对应字段
     
     Args:
         tables: 所有表格数据（页→表→行→单元格）
@@ -162,22 +184,79 @@ def parse_transactions(tables: List[List[List[str]]], column_map: Dict[int, str]
     Returns:
         交易记录字典列表
     """
-    transactions = []
+    # 找到序号列和交易时间列的索引
+    seq_col_idx = None
+    time_col_idx = None
+    for col_idx, field_name in column_map.items():
+        if field_name == "序号":
+            seq_col_idx = col_idx
+        if field_name in ("交易时间", "交易日期"):
+            time_col_idx = col_idx
+    if seq_col_idx is None:
+        seq_col_idx = 0  # 默认第 0 列为序号
     
+    # 先把所有表格的行展平
+    all_rows = []
     for table in tables:
         for row in table:
-            if not _is_data_row(row):
-                continue
-            
+            all_rows.append(row)
+    
+    transactions = []
+    pending_date = ""  # 暂存日期前缀
+    
+    for row in all_rows:
+        # 跳过全空行
+        non_empty = [c for c in row if _clean_cell(c)]
+        if not non_empty:
+            continue
+        
+        # 跳过合计/统计行
+        first_val = _clean_cell(row[0]) if row else ""
+        skip_keywords = ["合计", "小计", "总计", "本页合计", "累计", "页码", "打印"]
+        if any(kw in first_val for kw in skip_keywords):
+            continue
+        
+        # 情况1: 日期前缀行
+        if _is_date_prefix_row(row):
+            # 提取日期值
+            for c in row:
+                val = _clean_cell(c)
+                if val:
+                    pending_date = val
+                    break
+            continue
+        
+        # 情况2: 主数据行（有序号）
+        if _is_main_data_row(row, seq_col_idx):
             record = {}
             for col_idx, field_name in column_map.items():
                 if col_idx < len(row):
-                    value = str(row[col_idx] or "").replace("\n", "").replace("\r", "").strip()
-                    record[field_name] = value
+                    record[field_name] = _clean_cell(row[col_idx])
             
-            # 确保记录至少有一些有效数据
+            # 如果有暂存的日期，合并到交易时间字段前面
+            if pending_date and time_col_idx is not None:
+                time_field = column_map.get(time_col_idx, "交易时间")
+                current_time = record.get(time_field, "")
+                record[time_field] = f"{pending_date} {current_time}".strip()
+                pending_date = ""
+            
             if any(v for v in record.values()):
                 transactions.append(record)
+            continue
+        
+        # 情况3: 续行（序号为空但有数据）→ 追加到上一条记录
+        if transactions and _is_continuation_row(row, seq_col_idx):
+            last_record = transactions[-1]
+            for col_idx, field_name in column_map.items():
+                if col_idx < len(row):
+                    val = _clean_cell(row[col_idx])
+                    if val:
+                        existing = last_record.get(field_name, "")
+                        if existing:
+                            last_record[field_name] = existing + val
+                        else:
+                            last_record[field_name] = val
+            continue
     
     return transactions
 
