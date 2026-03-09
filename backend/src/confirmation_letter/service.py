@@ -54,7 +54,13 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 通常紧跟回函收件人之后
    - 优先级：回函收件人旁的电话 > 业务联系电话
 6. **postal_code (邮编)** - 6位数字格式
-7. **debit_account (扣费账号)** - 银行账号格式
+7. **debit_account (扣费账号)**
+   - 常见位置：正文第一页，通常在「截至」日期附近
+   - 常见句式：「本公司谨授权贵行可从本公司 xxx 号支取办理本询证函回函服务的费用」
+   - 也可能出现为：「扣费账号：xxx」「付款账号：xxx」「费用从账号 xxx 扣除」
+   - 账号可能以字母开头（如 NRA、OSA、FT、FTE），后跟数字，请完整提取包含字母前缀的账号
+   - 纯数字账号通常为 10~30 位
+   - 如果找不到任何扣费/授权支付相关的账号，返回空字符串
 8. **cutoff_date (截止日期)** - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
 9. **start_date (起始日期)**
    - 【重要】优先从账户信息表格上方的文字描述中提取，如「自2025年1月1日起至」
@@ -266,9 +272,14 @@ def _normalize_postal_code(value: str) -> str:
 def _normalize_account(value: str) -> str:
     if not value:
         return ""
-    compact = re.sub(r"[^\d]", "", value)
-    if 10 <= len(compact) <= 30:
-        return compact
+    cleaned = value.strip()
+    # 保留常见账号字母前缀（NRA、OSA、FT、FTE 等）+ 数字
+    prefix_match = re.match(r"^([A-Za-z]{2,5})", cleaned)
+    digits = re.sub(r"[^\d]", "", cleaned)
+    if 10 <= len(digits) <= 30:
+        if prefix_match:
+            return prefix_match.group(1).upper() + digits
+        return digits
     return ""
 
 
@@ -303,6 +314,33 @@ def _normalize_seal_name(value: str) -> str:
     name = re.sub(r"[，。、；\s/／]+$", "", name)
     name = re.sub(r"^[，。、；\s/／]+", "", name)
     return name.strip()
+
+
+def _extract_debit_account(text: str, ai_value: str = "") -> str:
+    """从 OCR 文本中提取扣费账号，回退到 AI 返回值"""
+    raw = text or ""
+    # 常见句式正则模式（按优先级排列）
+    patterns = [
+        # 「从本公司 NRA812011200002 号支取」
+        r"从本公司\s*([A-Za-z]*\d{10,30})\s*号?\s*支取",
+        # 「扣费账号：xxx」
+        r"扣费账号\s*[:：]?\s*([A-Za-z]*\d{10,30})",
+        # 「付款账号：xxx」
+        r"付款账号\s*[:：]?\s*([A-Za-z]*\d{10,30})",
+        # 「授权...从...xxx号支取」
+        r"授权.*?从.*?([A-Za-z]*\d{10,30})\s*号?\s*支取",
+        # 「从...账号 xxx 扣除/支付」
+        r"从.*?账号?\s*([A-Za-z]*\d{10,30})\s*(?:扣除|支付|扣取)",
+        # 「账号 xxx 支取/扣费」
+        r"账号\s*([A-Za-z]*\d{10,30})\s*(?:支取|扣费)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, raw)
+        if match:
+            return _normalize_account(match.group(1))
+
+    # 回退到 AI 返回值
+    return _normalize_account(ai_value)
 
 
 def _extract_signature_name(text: str, ai_value: str = "") -> str:
@@ -456,7 +494,7 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     normalized["contact_person"] = reply_contact
     normalized["phone"] = _normalize_phone(reply_phone)
     normalized["postal_code"] = _normalize_postal_code(normalized.get("postal_code", ""))
-    normalized["debit_account"] = _normalize_account(normalized.get("debit_account", ""))
+    normalized["debit_account"] = _extract_debit_account(text, normalized.get("debit_account", ""))
     normalized["cutoff_date"] = _normalize_date(normalized.get("cutoff_date", ""))
     # 起始/终止日期：优先从表格上方描述提取，回退到 AI 值
     text_start, text_end = _extract_date_range(text)
