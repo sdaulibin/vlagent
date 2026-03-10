@@ -31,6 +31,7 @@ def request_stream(question="", file_base="", model=MODEL_QWEN_VLMAX,
         api_key=api_key,
         base_url=base_url,
         timeout=300.0,  # 5分钟超时，处理大图片
+        max_retries=3,  # ← 新增：遇到 502/503/429 自动重试
     )
     message = []
     if system_content is not None:

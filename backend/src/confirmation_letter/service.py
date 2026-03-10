@@ -244,21 +244,17 @@ def _normalize_seal_date(seal_date_raw: str, text: str) -> str:
 
 
 def _normalize_phone(value: str) -> str:
+    """规范化电话号码，保留区号、国际前缀和复合格式（手机/固话）"""
     if not value:
         return ""
-    compact = re.sub(r"\s+", "", value)
-    # 优先匹配标准 11 位手机号
-    mobile = re.search(r"1[3-9]\d{9}", compact)
-    if mobile:
-        return mobile.group(0)
-    # 匹配座机（带区号）
-    landline = re.search(r"(0\d{2,3}-?\d{7,8})", compact)
-    if landline:
-        return landline.group(1)
-    # 兜底：接受 7 位以上的数字串（OCR 可能漏识部分数字）
-    fallback = re.search(r"([\d\-]{7,20})", compact)
-    if fallback:
-        return fallback.group(1)
+    # 轻量清理：去首尾空白，压缩连续空格
+    cleaned = value.strip()
+    cleaned = re.sub(r"[，。、；]+$", "", cleaned)  # 去尾部中文标点
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)       # 压缩连续空格
+    # 验证至少包含 7 位数字
+    digits_only = re.sub(r"[^\d]", "", cleaned)
+    if len(digits_only) >= 7:
+        return cleaned
     return ""
 
 
@@ -400,11 +396,17 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
     contact = ""
     phone = ""
 
+    # 电话/手机号的统一正则（匹配「电话」「手机号」等关键字）
+    # 支持：+86(757) 8620 4251、(852) 98624135、18624282945/0411-39724212
+    PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*([+\d\(\)（）\s\-/]{7,40})"
+
     # 优先提取「回函收件人」
+    # 只匹配中文字符（含 · 用于少数民族姓名），避免 OCR 噪音字符混入
+    NAME_CAPTURE = r"([\u4e00-\u9fff·]{1,10})"
     contact_patterns = [
-        r"回函\s*收件人\s*[:：]\s*([^\n，。电]{1,20})",
-        r"回函\s*联系人\s*[:：]\s*([^\n，。电]{1,20})",
-        r"回函.*?收件人\s*[:：]\s*([^\n，。电]{1,20})",
+        r"回函\s*收件人\s*[:：]\s*" + NAME_CAPTURE,
+        r"回函\s*联系人\s*[:：]\s*" + NAME_CAPTURE,
+        r"回函.*?收件人\s*[:：]\s*" + NAME_CAPTURE,
     ]
     for pattern in contact_patterns:
         match = re.search(pattern, raw)
@@ -419,8 +421,8 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
         if addr_match:
             after_addr = raw[addr_match.end():]
             general_patterns = [
-                r"收件人\s*[:：]\s*([^\n，。电]{1,20})",
-                r"联系人\s*[:：]\s*([^\n，。电]{1,20})",
+                r"收件人\s*[:：]\s*" + NAME_CAPTURE,
+                r"联系人\s*[:：]\s*" + NAME_CAPTURE,
             ]
             for pattern in general_patterns:
                 match = re.search(pattern, after_addr)
@@ -433,8 +435,8 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
         # 在联系人出现位置之后找电话
         contact_pos = raw.find(contact)
         if contact_pos >= 0:
-            nearby_text = raw[contact_pos:contact_pos + 100]
-            phone_match = re.search(r"电话\s*[:：]\s*([\d\-]{7,20})", nearby_text)
+            nearby_text = raw[contact_pos:contact_pos + 150]
+            phone_match = re.search(PHONE_PATTERN, nearby_text)
             if phone_match:
                 phone = phone_match.group(1).strip()
 
@@ -443,7 +445,7 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
         addr_match = re.search(r"回函[地址]*\s*[:：]", raw)
         if addr_match:
             after_addr = raw[addr_match.end():]
-            phone_match = re.search(r"电话\s*[:：]\s*([\d\-]{7,20})", after_addr)
+            phone_match = re.search(PHONE_PATTERN, after_addr)
             if phone_match:
                 phone = phone_match.group(1).strip()
 
@@ -552,6 +554,34 @@ def _check_format(text: str) -> dict[str, Any]:
     }
 
 
+def _compress_images_for_ai(image_paths: list[str], max_size=1600, quality=85) -> list[str]:
+    """
+    压缩图片以减小 API payload 大小，避免网关 502 错误。
+    将 PNG 转为 JPEG 并限制最大尺寸。
+    
+    Returns:
+        list[str]: 压缩后的图片路径列表（存放在临时目录）
+    """
+    from services.pdf.pdf_utils import resize_image_high_quality
+    
+    compressed_dir = tempfile.mkdtemp(prefix="compressed_")
+    compressed_paths = []
+    
+    for i, path in enumerate(image_paths):
+        out_path = os.path.join(compressed_dir, f"page_{i:03d}.jpg")
+        success = resize_image_high_quality(
+            path, out_path,
+            max_width=max_size, max_height=max_size, quality=quality
+        )
+        if success:
+            compressed_paths.append(out_path)
+        else:
+            # 压缩失败时使用原图
+            compressed_paths.append(path)
+    
+    return compressed_paths
+
+
 def extract_fields_from_images(image_paths: list[str]) -> dict:
     """
     从询证函图片中提取字段信息（支持多张图片一次性提交）
@@ -562,30 +592,39 @@ def extract_fields_from_images(image_paths: list[str]) -> dict:
     Returns:
         dict: 提取的字段信息（含 raw_text）
     """
-    if len(image_paths) == 1:
-        # 单张图片使用 file_base
-        response = request_stream(
-            question=FIELD_EXTRACTION_PROMPT,
-            file_base=image_paths[0],
-            model=MODEL_LOCAL,
-            show_request=False
-        ).strip()
-    else:
-        # 多张图片使用 file_ary
-        response = request_stream(
-            question=FIELD_EXTRACTION_PROMPT,
-            file_ary=image_paths,
-            model=MODEL_LOCAL,
-            show_request=False,
-            pic_tip=True,
-        ).strip()
+    # 压缩图片以减小 payload，避免大图导致网关 502
+    compressed_paths = _compress_images_for_ai(image_paths)
     
     try:
-        data = json.loads(fix_json(response))
-        return data
-    except Exception as e:
-        print(f"JSON 解析失败: {e}, 原始响应: {response[:200]}")
-        return {}
+        if len(compressed_paths) == 1:
+            # 单张图片使用 file_base
+            response = request_stream(
+                question=FIELD_EXTRACTION_PROMPT,
+                file_base=compressed_paths[0],
+                model=MODEL_LOCAL,
+                show_request=False
+            ).strip()
+        else:
+            # 多张图片使用 file_ary
+            response = request_stream(
+                question=FIELD_EXTRACTION_PROMPT,
+                file_ary=compressed_paths,
+                model=MODEL_LOCAL,
+                show_request=False,
+                pic_tip=True,
+            ).strip()
+        
+        try:
+            data = json.loads(fix_json(response))
+            return data
+        except Exception as e:
+            print(f"JSON 解析失败: {e}, 原始响应: {response[:200]}")
+            return {}
+    finally:
+        # 清理压缩临时文件
+        compressed_dir = os.path.dirname(compressed_paths[0]) if compressed_paths else None
+        if compressed_dir and compressed_dir.startswith(tempfile.gettempdir()):
+            shutil.rmtree(compressed_dir, ignore_errors=True)
 
 
 def process_confirmation_letter(pdf_path: str, output_dir: str = None) -> dict:
