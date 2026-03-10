@@ -187,7 +187,6 @@ def export_to_excel(results: list, output_path: str):
         ws.column_dimensions[col_letter].width = min(max_len + 4, 50)
 
     wb.save(output_path)
-    print(f"\n✅ Excel 已导出: {output_path}")
 
 
 def main():
@@ -214,7 +213,9 @@ def main():
     # 逐个处理
     results = []
     success_count = 0
-    total_start = time.time()
+    # 提前生成输出路径
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    excel_path = os.path.join(OUTPUT_DIR, f"询证函识别结果_{timestamp}.xlsx")
 
     for idx, pdf_path in enumerate(pdf_files, 1):
         filename = os.path.basename(pdf_path)
@@ -229,13 +230,11 @@ def main():
             print_recognition_result(result)
         else:
             print(f"❌ {result['error']}")
+            
+        # 实时保存到 Excel
+        export_to_excel(results, excel_path)
 
     total_duration = round(time.time() - total_start, 1)
-
-    # 导出 Excel
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    excel_path = os.path.join(OUTPUT_DIR, f"询证函识别结果_{timestamp}.xlsx")
-    export_to_excel(results, excel_path)
 
     # 统计
     print(f"\n{'=' * 60}")
