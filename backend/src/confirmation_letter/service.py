@@ -456,12 +456,12 @@ def _extract_date_range(text: str) -> tuple[str, str]:
     end_date = ""
     DATE_PAT = r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?"
 
-    # 优先级1：表格上方的描述格式「自xxx起至xxx期间」（"日"可选，OCR 可能漏掉）
+    # 优先级1：表格上方的描述格式「自xxx起至xxx期间」（OCR 极易把括号识别错，或错加换行符，用 [^\d]*? 略过其中的非数字干扰字符）
     table_patterns_high = [
-        # 自2025年1月1日起至2025年9月30日期间
-        rf"自\s*\[?({DATE_PAT})\]?\s*起?\s*至\s*\[?({DATE_PAT})\]?",
+        # 自[2025年1月1日]起至[2025年9月30日]期间 (兼容各种括号、换行、及"白/目"混杂)
+        rf"[自白目][^\d]*?({DATE_PAT})[^\d]*?至[^\d]*?({DATE_PAT})",
         # 从2025年1月1日至2025年9月30日
-        rf"从\s*\[?({DATE_PAT})\]?\s*至\s*\[?({DATE_PAT})\]?",
+        rf"从[^\d]*?({DATE_PAT})[^\d]*?至[^\d]*?({DATE_PAT})",
     ]
     for pattern in table_patterns_high:
         matches = re.findall(pattern, raw)
