@@ -66,7 +66,6 @@ class ConfirmationResultUpdate(SQLModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     seal_date: Optional[str] = None
-    seal_name: Optional[str] = None
     signature_name: Optional[str] = None
 
 
@@ -91,7 +90,6 @@ class ConfirmationRecognitionDTO(SQLModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     seal_date: Optional[str] = None
-    seal_name: Optional[str] = None
     signature_name: Optional[str] = None
     format_type: Optional[str] = None
     format_check_passed: Optional[bool] = None

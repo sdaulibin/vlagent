@@ -50,7 +50,6 @@ FIELD_LABELS = {
     "start_date": "起始日期",
     "end_date": "终止日期",
     "seal_date": "印章日期",
-    "seal_name": "印章名称",
     "signature_name": "落款名称",
     "status": "识别状态",
     "duration_s": "耗时(秒)",
@@ -70,7 +69,6 @@ PRINT_FIELD_LABELS = {
     "start_date": "起始日期",
     "end_date": "终止日期",
     "seal_date": "印章日期",
-    "seal_name": "印章名称",
     "signature_name": "落款名称",
 }
 

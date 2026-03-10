@@ -83,7 +83,6 @@ def _to_recognition_dto(recognition: ConfirmationResult | None) -> ConfirmationR
         start_date=recognition.start_date,
         end_date=recognition.end_date,
         seal_date=recognition.seal_date,
-        seal_name=recognition.seal_name,
         signature_name=recognition.signature_name,
         format_type=recognition.format_type,
         format_check_passed=recognition.format_check_passed,
@@ -247,7 +246,7 @@ async def recognize_confirmation_file(
                 "phone": "电话", "postal_code": "邮编",
                 "debit_account": "扣费账号", "cutoff_date": "截止日期",
                 "start_date": "起始日期", "end_date": "终止日期",
-                "seal_date": "印章日期", "seal_name": "印章名称",
+                "seal_date": "印章日期",
                 "signature_name": "落款名称",
             }
             for key, label in _field_labels.items():
@@ -276,7 +275,6 @@ async def recognize_confirmation_file(
                 start_date=recognition_result.get("start_date", ""),
                 end_date=recognition_result.get("end_date", ""),
                 seal_date=recognition_result.get("seal_date", ""),
-                seal_name=recognition_result.get("seal_name", ""),
                 signature_name=recognition_result.get("signature_name", ""),
                 format_type=recognition_result.get("format_type", "unknown"),
                 format_check_passed=recognition_result.get("format_check_passed", False),
