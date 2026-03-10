@@ -455,24 +455,35 @@ def _extract_date_range(text: str) -> tuple[str, str]:
     start_date = ""
     end_date = ""
 
-    # 优先级1：表格上方的描述格式「自xxx起至xxx期间」（"日"可选，OCR 可能漏掉）
-    DATE_PAT = r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?"
+    # 优先级1：抬头描述中的审计期间（例如：「正在对[本公司][2025年1月1日-2025年10月31日]的财务报表进行审计」）
+    # 匹配「对」...「的财务报表」之间的日期段
+    preamble_patterns = [
+        rf"对.*?\[?({DATE_PAT})\s*[-—~至到]\s*({DATE_PAT})\]?.*?的?财务报表进行审计",
+        rf"正在对.*?({DATE_PAT})\s*[-—~至到]\s*({DATE_PAT}).*?的财务报表",
+    ]
+    for pattern in preamble_patterns:
+        match = re.search(pattern, raw)
+        if match:
+            return match.group(1), match.group(2)
+
+    # 优先级2：表格上方的描述格式「自xxx起至xxx期间」（"日"可选，OCR 可能漏掉）
     table_patterns = [
         # 自2025年1月1日起至2025年9月30日期间
-        rf"自\s*({DATE_PAT})\s*起?\s*至\s*({DATE_PAT})",
+        rf"自\s*\[?({DATE_PAT})\]?\s*起?\s*至\s*\[?({DATE_PAT})\]?",
         # 从2025年1月1日至2025年9月30日
-        rf"从\s*({DATE_PAT})\s*至\s*({DATE_PAT})",
+        rf"从\s*\[?({DATE_PAT})\]?\s*至\s*\[?({DATE_PAT})\]?",
         # 2025年1月1日-2025年9月30日 或 2025年1月1日至2025年9月30日
         rf"({DATE_PAT})\s*[-—~至到]\s*({DATE_PAT})",
     ]
     for pattern in table_patterns:
         matches = re.findall(pattern, raw)
         if matches:
-            # 取最后一个匹配（通常表格描述在正文之后）
+            # 这里的匹配通常很多（各个表格都有），目前回退策略是取倒数第一个以兼容旧逻辑
+            # 但是如果有明确的自...起至...格式，通常更准
             start_date, end_date = matches[-1]
-            break
+            return start_date, end_date
 
-    return start_date, end_date
+    return "", ""
 
 
 def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str, Any]:
