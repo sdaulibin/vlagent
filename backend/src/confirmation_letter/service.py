@@ -76,20 +76,19 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 【最重要】seal_date 必须是落款区域中手写或打印的「xxxx年x月x日」格式的日期，位于公司名称附近
    - 【注意】如果落款区域的手写日期难以辨认，请尽力识别；实在无法辨认才返回空字符串
    - 【注意】不要从正文抬头、页眉、编号区域取日期
-12. **seal_name (印章名称)**
+12. **signature_name (落款名称)**
    - 提取落款区域打印/手写的公司名称文字，即「预留签章/采用电子授权」上方的那行公司名称
    - 常见位置有两种格式：
      - 格式一：在「以下由被询证银行填列」上方的落款区域，打印的公司名称文字后跟「（预留签章/采用电子授权）」
      - 格式二：在「资金归集」表下方的落款区域，直接打印的公司名称文字
    - 【最重要】请从打印/手写的文字中提取公司名称，不要从圆形红色印章图案中识别文字
-   - 【最重要】以「预留签章/采用电子授权」上方那行打印文字为准，那才是 seal_name
-   - 【重要】seal_name 要的是被询证的客户公司名称（如"xx有限公司"），不是印章类型
-   - 【重要】seal_name 不是会计师事务所/审计机构的名称，事务所名称应填入 accounting_firm 字段
-   - 【重要】不要将页面上出现的「毕马威」「安永」「德勤」「普华永道」等事务所名称作为 seal_name
+   - 【最重要】以「预留签章/采用电子授权」上方那行打印文字为准，那才是 signature_name
+   - 【重要】signature_name 要的是被询证的客户公司名称（如"xx有限公司"），不是印章类型
+   - 【重要】signature_name 不是会计师事务所/审计机构的名称，事务所名称应填入 accounting_firm 字段
+   - 【重要】不要将页面上出现的「毕马威」「安永」「德勤」「普华永道」等事务所名称作为 signature_name
    - 【注意】不要返回「财务专用章」「公章」「合同专用章」等印章类型名称
    - 【注意】不要包含「预留签章」「采用电子授权」等非单位名称的文字
    - 【注意】如果无法识别公司名称，返回空字符串
-13. **signature_name (落款名称)** - 落款处单位名称（如果没有则返回空字符串）
 
 ## 输出要求：
 - 返回 JSON 格式
@@ -111,7 +110,6 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
     "start_date": "",
     "end_date": "",
     "seal_date": "",
-    "seal_name": "",
     "signature_name": "",
     "raw_text": ""
 }
@@ -121,18 +119,18 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
 ALL_FIELDS = [
     "confirmation_no", "accounting_firm", "reply_address",
     "contact_person", "phone", "postal_code", "debit_account",
-    "cutoff_date", "start_date", "end_date", "seal_date", "seal_name",
+    "cutoff_date", "start_date", "end_date", "seal_date",
     "signature_name"
 ]
 
 # 编号抓取优先级：函证编号 > 询证函编号 > 编号 > NO. > 索引号 > 项目编号
 CONFIRMATION_NO_PATTERNS = [
-    r"函证编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
-    r"询证函编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
-    r"\b编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
-    r"\bNO\.?\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
-    r"索引号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
-    r"项目编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/]+)",
+    r"函证编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
+    r"询证函编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
+    r"\b编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
+    r"\bNO\.?\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
+    r"索引号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
+    r"项目编号\s*[:：]?\s*([A-Za-z0-9\u4e00-\u9fff\-_/，,（）() ]+)",
 ]
 
 FORMAT_TEMPLATES = {
@@ -149,8 +147,10 @@ def _clean_id_value(value: str) -> str:
     if not value:
         return ""
     cleaned = value.strip().strip("：:.。")
-    # 去除页码后缀，如 2024-001/1 或 2024-001 第1页
-    cleaned = re.sub(r"[/\\]\d+$", "", cleaned)
+    # OCR 纠错
+    cleaned = cleaned.replace("材库", "林泉")
+    # 去除页码后缀，如 2024-001/1，但不截断长后缀（如 /1638999）
+    cleaned = re.sub(r"[/\\][1-9]\d?$", "", cleaned)
     cleaned = re.sub(r"\s*第?\d+\s*页$", "", cleaned)
     cleaned = re.sub(r"^NO\.?\s*[:：]?", "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip()
@@ -251,9 +251,9 @@ def _normalize_phone(value: str) -> str:
     cleaned = value.strip()
     cleaned = re.sub(r"[，。、；]+$", "", cleaned)  # 去尾部中文标点
     cleaned = re.sub(r"\s{2,}", " ", cleaned)       # 压缩连续空格
-    # 验证至少包含 7 位数字
+    # 验证至少包含 5 位数字（OCR 可能导致部分数字乱码丢失）
     digits_only = re.sub(r"[^\d]", "", cleaned)
-    if len(digits_only) >= 7:
+    if len(digits_only) >= 5:
         return cleaned
     return ""
 
@@ -339,16 +339,7 @@ def _extract_debit_account(text: str, ai_value: str = "") -> str:
     return _normalize_account(ai_value)
 
 
-def _extract_signature_name(text: str, ai_value: str = "") -> str:
-    patterns = [
-        r"(?:落款|单位名称|公司名称)\s*[:：]?\s*([^\n，。]{2,60})",
-        r"(?:盖章单位|印章名称)\s*[:：]?\s*([^\n，。]{2,60})",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text or "")
-        if match:
-            return match.group(1).strip()
-    return (ai_value or "").strip()
+
 
 
 def _extract_accounting_firm(text: str, ai_value: str = "") -> str:
@@ -398,7 +389,7 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
 
     # 电话/手机号的统一正则（匹配「电话」「手机号」等关键字）
     # 支持：+86(757) 8620 4251、(852) 98624135、18624282945/0411-39724212
-    PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*([+\d\(\)（）\s\-/]{7,40})"
+    PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*([+\d\(\)（）\s\-/]{5,40})"
 
     # 优先提取「回函收件人」
     # 只匹配中文字符（含 · 用于少数民族姓名），避免 OCR 噪音字符混入
@@ -504,9 +495,8 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     normalized["end_date"] = _normalize_date(text_end) if text_end else _normalize_date(normalized.get("end_date", ""))
     # 印章日期：排除 FS 标记章日期，优先取落款区域的手写日期
     normalized["seal_date"] = _normalize_seal_date(normalized.get("seal_date", ""), text)
-    # 印章名称：清理无关文字
-    normalized["seal_name"] = _normalize_seal_name(normalized.get("seal_name", ""))
-    normalized["signature_name"] = _extract_signature_name(text, normalized.get("signature_name", ""))
+    # 落款名称：使用印章名称清理逻辑（去除签章类型、事务所名称等噪音）
+    normalized["signature_name"] = _normalize_seal_name(normalized.get("signature_name", ""))
     return normalized
 
 
