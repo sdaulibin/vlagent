@@ -454,6 +454,7 @@ def _extract_date_range(text: str) -> tuple[str, str]:
     raw = text or ""
     start_date = ""
     end_date = ""
+    DATE_PAT = r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?"
 
     # 优先级1：抬头描述中的审计期间（例如：「正在对[本公司][2025年1月1日-2025年10月31日]的财务报表进行审计」）
     # 匹配「对」...「的财务报表」之间的日期段
