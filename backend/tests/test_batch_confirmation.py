@@ -30,7 +30,8 @@ from src.confirmation_letter.service import (
 )
 
 # ========== 配置 ==========
-INPUT_DIR = "/Users/binginx/Desktop/2026年/星辰/运营管理部/50样本"
+# INPUT_DIR = "/Users/binginx/Desktop/2026年/星辰/运营管理部/50样本"
+INPUT_DIR = "/Users/binginx/Desktop/2026年/星辰/运营管理部/50样本2"
 OUTPUT_DIR = INPUT_DIR  # Excel 输出到同目录
 MAX_WORKERS = 1  # 串行处理，避免 AI 服务过载
 DPI = 200
