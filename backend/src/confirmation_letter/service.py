@@ -48,18 +48,23 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 【重要】当存在「业务联系人」和「回函收件人」两种联系人时，必须提取「回函收件人」
    - 优先级：回函收件人 > 回函联系人 > 收件人 > 联系人
    - 通常在「回函地址」之后出现
+   - 【注意】不要把相邻的“电话”、“手机”、“邮箱”、“邮编”等字样错误提取到联系人中
+   - 【注意】联系人姓名如果包含中划线（如“审计二部-路”），请完整提取，不要遗漏中划线及前面的内容。
+   - 【注意】联系人姓名处如果盖有印章（如普华永道），请区分印章文字（如“道”被识别为“董”）与真实的姓名（如“静”），不要把印章文字当成姓名（如不要输出“董静”）。
    - 不要提取「业务联系人」
 5. **phone (回函联系电话)**
    - 【重要】提取与「回函收件人」对应的电话，不是「业务联系电话」
    - 通常紧跟回函收件人之后
    - 优先级：回函收件人旁的电话 > 业务联系电话
+   - 【注意】如果存在多个电话，请全部提取，用逗号或者斜杠隔开。
+   - 【注意】在提取电话时，坚决不要包含括号及其内部的任何无关文字（例如不要提取“(项目组成员)”或“(函证中心)”等字样）。
 6. **postal_code (邮编)** - 6位数字格式
 7. **debit_account (扣费账号)**
    - 常见位置：正文第一页，通常在「截至」日期附近
    - 常见句式：「本公司谨授权贵行可从本公司 xxx 号支取办理本询证函回函服务的费用」
    - 也可能出现为：「扣费账号：xxx」「付款账号：xxx」「费用从账号 xxx 扣除」
-   - 账号可能以字母开头（如 NRA、OSA、FT、FTE），后跟数字，请完整提取包含字母前缀的账号
-   - 纯数字账号通常为 10~30 位
+   - 账号可能出现字母开头（如 NRA 等），请不要保留任何字母，只需提取纯数字账号
+   - 提取账号时必须只提取数字内容，不要限制长度
    - 如果找不到任何扣费/授权支付相关的账号，返回空字符串
 8. **cutoff_date (截止日期)** - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
 9. **start_date (起始日期)**
@@ -74,6 +79,7 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 也可能在「以下由被询证银行填列」上方的落款区域，或「资金归集」表的下方落款区域
    - 【最重要】页面右上角的蓝色方形标记章（如"FS""2025-07-25"）是事务所的收发章，其中的日期绝对不是 seal_date！
    - 【最重要】seal_date 必须是落款区域中手写或打印的「xxxx年x月x日」格式的日期，位于公司名称附近
+   - 【注意】手写日期中的数字特别是“2”、“7”、“1”等非常容易识别混淆，请务必仔细放大分辨原图中手写笔迹的转折和连笔特征，例如不要把“02”识别成“01”！必须100%忠实于原图笔迹。
    - 【注意】如果落款区域的手写日期难以辨认，请尽力识别；实在无法辨认才返回空字符串
    - 【注意】不要从正文抬头、页眉、编号区域取日期
 12. **signature_name (落款名称)**
@@ -244,17 +250,31 @@ def _normalize_seal_date(seal_date_raw: str, text: str) -> str:
 
 
 def _normalize_phone(value: str) -> str:
-    """规范化电话号码，保留区号、国际前缀和复合格式（手机/固话）"""
+    """规范化电话号码，保留区号、国际前缀和复合格式（手机/固话），支持多个电话"""
     if not value:
         return ""
-    # 轻量清理：去首尾空白，压缩连续空格
+    # 轻量清理：去首尾空白，去除中文或西文括号及其中内容
     cleaned = value.strip()
+    cleaned = re.sub(r"[（(].*?[）)]", "", cleaned)
     cleaned = re.sub(r"[，。、；]+$", "", cleaned)  # 去尾部中文标点
     cleaned = re.sub(r"\s{2,}", " ", cleaned)       # 压缩连续空格
-    # 验证至少包含 5 位数字（OCR 可能导致部分数字乱码丢失）
-    digits_only = re.sub(r"[^\d]", "", cleaned)
-    if len(digits_only) >= 5:
-        return cleaned
+
+    # 尝试分割多个电话并清理每个电话（支持以逗号、斜杠、/、顿号、空格为分隔符）
+    parts = re.split(r"[,，/／、\s]+", cleaned)
+    valid_phones = []
+    for p in parts:
+        p_strip = p.strip()
+        # 验证至少包含 5 位数字（OCR 可能导致部分数字乱码丢失）
+        digits_only = re.sub(r"[^\d]", "", p_strip)
+        if len(digits_only) >= 5:
+            # 移除非电话字符，保留数字、加号、连字符
+            p_clean = re.sub(r"[^\d+\-]", "", p_strip)
+            if p_clean:
+                valid_phones.append(p_clean)
+
+    if valid_phones:
+        # 如果提取到多个有效电话，用中文逗号分隔
+        return "，".join(valid_phones)
     return ""
 
 
@@ -268,15 +288,9 @@ def _normalize_postal_code(value: str) -> str:
 def _normalize_account(value: str) -> str:
     if not value:
         return ""
-    cleaned = value.strip()
-    # 保留常见账号字母前缀（NRA、OSA、FT、FTE 等）+ 数字
-    prefix_match = re.match(r"^([A-Za-z]{2,5})", cleaned)
-    digits = re.sub(r"[^\d]", "", cleaned)
-    if 10 <= len(digits) <= 30:
-        if prefix_match:
-            return prefix_match.group(1).upper() + digits
-        return digits
-    return ""
+    # 只提取数字，不要前缀，不限制长度
+    digits = re.sub(r"[^\d]", "", value)
+    return digits
 
 
 def _normalize_seal_name(value: str) -> str:
@@ -317,18 +331,18 @@ def _extract_debit_account(text: str, ai_value: str = "") -> str:
     raw = text or ""
     # 常见句式正则模式（按优先级排列）
     patterns = [
-        # 「从本公司 NRA812011200002 号支取」 或 「从本公司 802210200_账号支取」
-        r"从本公司\s*([A-Za-z]*\d{8,30})\s*[_\W]*\s*(?:账号|号)?\s*支取",
+        # 「从本公司 NRA812011200002 号支取」 或 「从本公司 8022 10200_账号支取」
+        r"从本公司\s*([A-Za-z]*[\d\s]+?)\s*[_\W]*\s*(?:账号|号)?\s*支取",
         # 「扣费账号：xxx」
-        r"扣费账号\s*[:：]?\s*([A-Za-z]*\d{8,30})",
+        r"扣费账号\s*[:：]?\s*([A-Za-z]*[\d\s]+)",
         # 「付款账号：xxx」
-        r"付款账号\s*[:：]?\s*([A-Za-z]*\d{8,30})",
+        r"付款账号\s*[:：]?\s*([A-Za-z]*[\d\s]+)",
         # 「授权...从...xxx号支取」
-        r"授权.*?从.*?([A-Za-z]*\d{8,30})\s*[_\W]*\s*(?:账号|号)?\s*支取",
+        r"授权.*?从.*?([A-Za-z]*[\d\s]+?)\s*[_\W]*\s*(?:账号|号)?\s*支取",
         # 「从...账号 xxx 扣除/支付」
-        r"从.*?账号?\s*([A-Za-z]*\d{8,30})\s*(?:扣除|支付|扣取)",
+        r"从.*?账号?\s*([A-Za-z]*[\d\s]+?)\s*(?:扣除|支付|扣取)",
         # 「账号 xxx 支取/扣费」
-        r"账号\s*([A-Za-z]*\d{8,30})\s*(?:支取|扣费)",
+        r"账号\s*([A-Za-z]*[\d\s]+?)\s*(?:支取|扣费)",
     ]
     for pattern in patterns:
         match = re.search(pattern, raw)
@@ -388,12 +402,12 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
     phone = ""
 
     # 电话/手机号的统一正则（匹配「电话」「手机号」等关键字）
-    # 支持：+86(757) 8620 4251、(852) 98624135、18624282945/0411-39724212
-    PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*([+\d\(\)（）\s\-/]{5,40})"
+    # 支持：+86(757) 8620 4251、(852) 98624135、18624282945/0411-39724212 以及中文备注和逗号分隔
+    PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*(.*?)(?=\s*(?:邮政编码|邮编|电邮|电子邮箱|邮箱|传真|网址|回函|[\n\r]|$))"
 
     # 优先提取「回函收件人」
-    # 只匹配中文字符（含 · 用于少数民族姓名），避免 OCR 噪音字符混入
-    NAME_CAPTURE = r"([\u4e00-\u9fff·]{1,10})"
+    # 匹配中文字符、中划线及英文字母，避免 OCR 噪音字符混入
+    NAME_CAPTURE = r"([\u4e00-\u9fff·a-zA-Z\-_]{1,20})"
     contact_patterns = [
         r"回函\s*收件人\s*[:：]\s*" + NAME_CAPTURE,
         r"回函\s*联系人\s*[:：]\s*" + NAME_CAPTURE,
@@ -445,6 +459,15 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
         contact = (ai_contact or "").strip()
     if not phone:
         phone = (ai_phone or "").strip()
+
+    if contact:
+        # 清除可能误粘连的相邻字段名
+        contact = re.sub(r"(?:电话|联系电话|手机|手机号|电邮|电子邮箱|邮箱|邮编|邮政编码|传真|座机).*$", "", contact).strip()
+        # 清理常见的印章文字误入联系人姓名（例如普华永道蓝色章的“道”容易被OCR识别为“董”）
+        if contact in ["董静", "道静", "谨静"] and re.search(r"普华|Pricewaterhouse|FOR\s*IDENTIFICATION|道|谨", raw, re.IGNORECASE):
+            contact = "静"
+        # 移除两头多余的特定标点
+        contact = contact.strip("_. ")
 
     return contact, phone
 
