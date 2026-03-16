@@ -79,7 +79,7 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 也可能在「以下由被询证银行填列」上方的落款区域，或「资金归集」表的下方落款区域
    - 【最重要】页面右上角的蓝色方形标记章（如"FS""2025-07-25"）是事务所的收发章，其中的日期绝对不是 seal_date！
    - 【最重要】seal_date 必须是落款区域中手写或打印的「xxxx年x月x日」格式的日期，位于公司名称附近
-   - 【注意】手写日期中的数字特别是“2”、“7”、“1”等非常容易识别混淆，请务必仔细放大分辨原图中手写笔迹的转折和连笔特征，例如不要把“02”识别成“01”！必须100%忠实于原图笔迹。
+   - 【注意】手写日期务必仔细放大分辨原图中手写数字笔画的弯折处特征，确保每一位数字100%精确。
    - 【注意】如果落款区域的手写日期难以辨认，请尽力识别；实在无法辨认才返回空字符串
    - 【注意】不要从正文抬头、页眉、编号区域取日期
 12. **signature_name (落款名称)**
@@ -161,6 +161,20 @@ def _clean_id_value(value: str) -> str:
     cleaned = re.sub(r"^NO\.?\s*[:：]?", "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip()
 
+def _fix_text_hallucination(text: str) -> str:
+    """修复通用或高频的文本提取幻觉（如形近字）"""
+    if not text:
+        return text
+    hallucination_map = {
+        "普华水道": "普华永道",
+        "安客": "安永",
+        "天律": "天津",
+        "大华水": "大华永",
+    }
+    for wrong, correct in hallucination_map.items():
+        text = text.replace(wrong, correct)
+    return text
+
 
 def _parse_confirmation_no(text: str, ai_value: str = "") -> str:
     raw = text or ""
@@ -236,6 +250,7 @@ def _normalize_seal_date(seal_date_raw: str, text: str) -> str:
             r"预留签章.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
             r"电子授权.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
             r"有限公司.*?(\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?)",
+            r"20\d\d\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日?", # 兜底提取底部任何打印年月
         ]
         for pattern in handwritten_patterns:
             m = re.search(pattern, raw, flags=re.DOTALL)
@@ -243,10 +258,44 @@ def _normalize_seal_date(seal_date_raw: str, text: str) -> str:
                 candidate = _normalize_date(m.group(1))
                 if candidate and candidate != fs_date:
                     return candidate
-        # 找不到替代日期，返回空字符串（不要返回错误的 FS 日期）
-        return ""
-
     return seal_date
+
+
+def _correct_hallucinated_date(date_str: str, raw_text: str) -> str:
+    """
+    全局日期容错：针对大模型在提取手写或模糊日期时容易产生的特定幻觉（如将 02、07 识别为 01 等），
+    去 raw_text 中进行二次比对校验。
+    """
+    if not date_str or len(date_str) != 10:
+        return date_str
+        
+    y, m, d = date_str[:4], date_str[5:7], date_str[8:10]
+    
+    # 提取同一月份下在原文中出现过的所有「天」
+    # 匹配各类常见日期格式，放宽对中英文数字边界的限制，如：2025 年 12 月 02 日
+    pattern = rf"(?:{y})\s*[年/\-.]\s*(?:{m}|{int(m)})\s*[月/\-.]\s*([0-3]?\d)\s*[日号]?"
+    m_raw_all = re.findall(pattern, raw_text)
+    
+    if m_raw_all:
+        raw_days = [str(int(day)).zfill(2) for day in m_raw_all if int(day) != 0]
+        
+        # 1. 如果提取出的天数明确在原文该月中出现了，则信任提取结果
+        if d in raw_days:
+            return date_str
+            
+        # 2. 如果提取出的天数不在该月的原文记录中，说明极大可能是幻觉，尝试修正：
+        if d == "01":
+            if "02" in raw_days: return f"{y}-{m}-02"
+            if "07" in raw_days: return f"{y}-{m}-07"
+        if d == "07" and "01" in raw_days: return f"{y}-{m}-01"
+        if d == "02" and "01" in raw_days: return f"{y}-{m}-01"
+            
+        # 3. 终极兜底：如果该月在原文中只出现了一个天数，那无论模型跑偏成了啥，都强行纠正
+        unique_days = list(set(raw_days))
+        if len(unique_days) == 1:
+            return f"{y}-{m}-{unique_days[0]}"
+            
+    return date_str
 
 
 def _normalize_phone(value: str) -> str:
@@ -312,7 +361,7 @@ def _normalize_seal_name(value: str) -> str:
         name = re.sub(pattern, "", name)
     # 如果结果是印章类型而非公司名称，返回空字符串
     seal_type_words = ["财务专用章", "公章", "合同专用章", "发票专用章", "行政章", "业务专用章"]
-    cleaned_name = name.strip()
+    cleaned_name = _fix_text_hallucination(name.strip())
     if cleaned_name in seal_type_words:
         return ""
     # 如果结果是会计师事务所/审计机构名称，返回空字符串（seal_name 应为客户公司名称）
@@ -332,17 +381,17 @@ def _extract_debit_account(text: str, ai_value: str = "") -> str:
     # 常见句式正则模式（按优先级排列）
     patterns = [
         # 「从本公司 NRA812011200002 号支取」 或 「从本公司 8022 10200_账号支取」
-        r"从本公司\s*([A-Za-z]*[\d\s]+?)\s*[_\W]*\s*(?:账号|号)?\s*支取",
+        r"从本公司.*?([A-Za-z]*[\d\s]{5,}).*?支取",
         # 「扣费账号：xxx」
-        r"扣费账号\s*[:：]?\s*([A-Za-z]*[\d\s]+)",
+        r"扣费账号.*?([A-Za-z]*[\d\s]{5,})",
         # 「付款账号：xxx」
-        r"付款账号\s*[:：]?\s*([A-Za-z]*[\d\s]+)",
+        r"付款账号.*?([A-Za-z]*[\d\s]{5,})",
         # 「授权...从...xxx号支取」
-        r"授权.*?从.*?([A-Za-z]*[\d\s]+?)\s*[_\W]*\s*(?:账号|号)?\s*支取",
+        r"授权.*?从.*?([A-Za-z]*[\d\s]{5,}).*?支取",
         # 「从...账号 xxx 扣除/支付」
-        r"从.*?账号?\s*([A-Za-z]*[\d\s]+?)\s*(?:扣除|支付|扣取)",
+        r"从.*?账号.*?([A-Za-z]*[\d\s]{5,}).*?(?:扣除|支付|扣取)",
         # 「账号 xxx 支取/扣费」
-        r"账号\s*([A-Za-z]*[\d\s]+?)\s*(?:支取|扣费)",
+        r"账号.*?([A-Za-z]*[\d\s]{5,}).*?(?:支取|扣费)",
     ]
     for pattern in patterns:
         match = re.search(pattern, raw)
@@ -385,14 +434,14 @@ def _extract_accounting_firm(text: str, ai_value: str = "") -> str:
             name = re.split(r"(?:正在|对[本我]|进行|截至|应当)", name)[0].strip()
             name = re.sub(r"[，。、；\s]+$", "", name)
             if name:
-                return name
+                return _fix_text_hallucination(name)
 
     # 回退到 AI 返回值
     ai_clean = re.sub(r"[\[\]【】]", "", (ai_value or "")).strip()
     # 同样截断 AI 返回值中的多余内容
     ai_clean = re.split(r"(?:正在|对[本我]|进行|截至|应当)", ai_clean)[0].strip()
     ai_clean = re.sub(r"[，。、；\s]+$", "", ai_clean)
-    return ai_clean
+    return _fix_text_hallucination(ai_clean)
 
 
 def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") -> tuple[str, str]:
@@ -513,13 +562,13 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     normalized["phone"] = _normalize_phone(reply_phone)
     normalized["postal_code"] = _normalize_postal_code(normalized.get("postal_code", ""))
     normalized["debit_account"] = _extract_debit_account(text, normalized.get("debit_account", ""))
-    normalized["cutoff_date"] = _normalize_date(normalized.get("cutoff_date", ""))
+    normalized["cutoff_date"] = _correct_hallucinated_date(_normalize_date(normalized.get("cutoff_date", "")), text)
     # 起始/终止日期：优先从表格上方描述提取，回退到 AI 值
     text_start, text_end = _extract_date_range(text)
-    normalized["start_date"] = _normalize_date(text_start) if text_start else _normalize_date(normalized.get("start_date", ""))
-    normalized["end_date"] = _normalize_date(text_end) if text_end else _normalize_date(normalized.get("end_date", ""))
+    normalized["start_date"] = _correct_hallucinated_date(_normalize_date(text_start) if text_start else _normalize_date(normalized.get("start_date", "")), text)
+    normalized["end_date"] = _correct_hallucinated_date(_normalize_date(text_end) if text_end else _normalize_date(normalized.get("end_date", "")), text)
     # 印章日期：排除 FS 标记章日期，优先取落款区域的手写日期
-    normalized["seal_date"] = _normalize_seal_date(normalized.get("seal_date", ""), text)
+    normalized["seal_date"] = _correct_hallucinated_date(_normalize_seal_date(normalized.get("seal_date", ""), text), text)
     # 落款名称：使用印章名称清理逻辑（去除签章类型、事务所名称等噪音）
     normalized["signature_name"] = _normalize_seal_name(normalized.get("signature_name", ""))
     return normalized
