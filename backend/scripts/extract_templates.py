@@ -17,7 +17,7 @@ import shutil
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 
@@ -83,10 +83,9 @@ def extract_template(pdf_path: str, template_name: str) -> list:
         all_items = []
         for i, img_path in enumerate(image_paths):
             print(f"  🔍 正在分析第 {i + 1} 页...")
-            response = request_stream(
+            response = request_qwen35(
                 question=EXTRACT_PROMPT,
                 file_base=img_path,
-                model=MODEL_LOCAL,
                 show_request=False,
             ).strip()
 

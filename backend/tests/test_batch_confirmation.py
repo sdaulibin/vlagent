@@ -18,7 +18,6 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_stream
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 from src.confirmation_letter.service import (
@@ -74,21 +73,6 @@ PRINT_FIELD_LABELS = {
 }
 
 FIELD_KEYS = list(FIELD_LABELS.keys())
-
-
-def _extract_fields_from_image(image_path: str) -> dict:
-    """从单张图片提取字段"""
-    response = request_stream(
-        question=FIELD_EXTRACTION_PROMPT,
-        file_base=image_path,
-        model=MODEL_LOCAL,
-        show_request=False,
-    ).strip()
-    try:
-        return json.loads(fix_json(response))
-    except Exception as e:
-        print(f"JSON 解析失败: {e}, 原始响应: {response[:200]}")
-        return {}
 
 
 def recognize_single_pdf(pdf_path: str) -> dict:

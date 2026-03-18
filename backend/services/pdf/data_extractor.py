@@ -2,7 +2,7 @@ import os
 import json
 import concurrent.futures
 from src.config import MODEL_LOCAL
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_stream, request_qwen35
 from src.json_repair import fix_json
 
 # Schema 配置文件路径
@@ -181,7 +181,7 @@ def get_summary_column_x(file_path):
         Return only JSON: {"x": "coordinate_value"} (0-1000 range). No other text.
         """
     
-    response = request_stream(question=prompt, file_base=file_path, model=MODEL_LOCAL).strip()
+    response = request_qwen35(question=prompt, file_base=file_path).strip()
     try:
         data = json.loads(fix_json(response))
         return data
@@ -232,10 +232,9 @@ def read_data_with_schema(file_path, schema: list, bank_type: str = "shandong_lo
         {result_schema}
         """
     
-    rest = request_stream(question=prompt,
+    rest = request_qwen35(question=prompt,
                           show_request=False,
-                          file_base=file_path,
-                          model=MODEL_LOCAL)
+                          file_base=file_path)
     return rest
 
 def read_data(file_path, schema_name: str = "bank_transaction"):
@@ -265,10 +264,9 @@ def read_data(file_path, schema_name: str = "bank_transaction"):
         JSON Schema to fill:
         {result_schema}
         """
-    rest = request_stream(question=prompt,
+    rest = request_qwen35(question=prompt,
                           show_request=False,
-                          file_base=file_path,
-                          model=MODEL_LOCAL)
+                          file_base=file_path)
 
     return rest
 
@@ -373,7 +371,7 @@ def read_summary_data_with_schema(file_path, schema: dict, bank_type: str):
         {result_schema}
         """
         
-    response = request_stream(question=prompt, file_base=file_path, model=MODEL_LOCAL).strip()
+    response = request_qwen35(question=prompt, file_base=file_path).strip()
     return response
 
 def read_summary_data(file_path, schema_name: str = "bank_summary"):
@@ -389,5 +387,5 @@ def read_summary_data(file_path, schema_name: str = "bank_summary"):
         prompt = build_prompt_from_config(default_config, schema_str)
     else:
         prompt = f"Role: Information extraction expert. Task: Extract data from image. Schema: {schema_str}"
-    response = request_stream(question=prompt, file_base=file_path, model=MODEL_LOCAL).strip()
+    response = request_qwen35(question=prompt, file_base=file_path).strip()
     return response

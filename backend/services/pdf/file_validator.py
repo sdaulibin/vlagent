@@ -7,7 +7,7 @@
 """
 import json
 from src.config import MODEL_LOCAL
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 
 
@@ -69,10 +69,9 @@ def validate_bank_statement(image_path: str) -> tuple[bool, str, float]:
 """
     
     try:
-        response = request_stream(
+        response = request_qwen35(
             question=prompt,
-            file_base=image_path,
-            model=MODEL_LOCAL
+            file_base=image_path
         ).strip()
         
         # 解析 AI 返回的 JSON

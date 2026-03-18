@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
+from decimal import Decimal
+from sqlalchemy import Column, DECIMAL
 
 if TYPE_CHECKING:
     from src.files.models import FileRecord
@@ -15,11 +17,11 @@ class CgbSummary(SQLModel, table=True):
     date_range: Optional[str] = None         # 起止日期
     currency: Optional[str] = None           # 币种
     unit: Optional[str] = None               # 单位
-    expense_total: Optional[str] = None      # 支出总金额
+    expense_total: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))      # 支出总金额
     expense_count: Optional[str] = None      # 支出总笔数
-    income_total: Optional[str] = None       # 收入总金额
+    income_total: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))       # 收入总金额
     income_count: Optional[str] = None       # 收入总笔数
-    current_balance: Optional[str] = None    # 账户当前余额
+    current_balance: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))    # 账户当前余额
     record_count: Optional[str] = None       # 记录数
     bank_name: str = "广发银行"              # 开户行
     
@@ -36,9 +38,9 @@ class CgbTransaction(SQLModel, table=True):
     
     serial_no: Optional[str] = None              # 流水号
     transaction_time: Optional[str] = None       # 交易时间
-    income: Optional[str] = None                 # 收入
-    expense: Optional[str] = None                # 支出
-    balance: Optional[str] = None                # 余额
+    income: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))                 # 收入
+    expense: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))                # 支出
+    balance: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))                # 余额
     currency: Optional[str] = None               # 币种
     counterparty_account: Optional[str] = None   # 对方账号
     counterparty_name: Optional[str] = None      # 对方户名

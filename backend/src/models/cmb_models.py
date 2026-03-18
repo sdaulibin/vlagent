@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
+from decimal import Decimal
+from sqlalchemy import Column, DECIMAL
 
 if TYPE_CHECKING:
     from src.files.models import FileRecord
@@ -16,8 +18,8 @@ class CmbSummary(SQLModel, table=True):
     end_date: Optional[str] = None           # 结束日期
     debit_count: Optional[str] = None        # 出账总笔数
     credit_count: Optional[str] = None       # 入账总笔数
-    debit_total: Optional[str] = None        # 出账总金额
-    credit_total: Optional[str] = None       # 入账总金额
+    debit_total: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))        # 出账总金额
+    credit_total: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))       # 入账总金额
     total_count: Optional[str] = None        # 笔数
     bank_name: str = "招商银行"              # 开户行
     
@@ -31,9 +33,9 @@ class CmbTransaction(SQLModel, table=True):
     
     serial_no: Optional[str] = None          # 交易流水号
     transaction_date: Optional[str] = None   # 交易日期
-    debit_amount: Optional[str] = None       # 借方出账
-    credit_amount: Optional[str] = None      # 贷方入账
-    balance: Optional[str] = None            # 余额
+    debit_amount: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))       # 借方出账
+    credit_amount: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))      # 贷方入账
+    balance: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))            # 余额
     counterparty_name: Optional[str] = None  # 收付方名称
     counterparty_account: Optional[str] = None  # 收付方账号
     description: Optional[str] = None        # 摘要

@@ -10,7 +10,7 @@ import tempfile
 from typing import Any
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 
@@ -86,17 +86,15 @@ def extract_fields_from_images(image_paths: list[str]) -> dict:
     
     try:
         if len(compressed_paths) == 1:
-            response = request_stream(
+            response = request_qwen35(
                 question=FIELD_EXTRACTION_PROMPT,
                 file_base=compressed_paths[0],
-                model=MODEL_LOCAL,
                 show_request=False
             ).strip()
         else:
-            response = request_stream(
+            response = request_qwen35(
                 question=FIELD_EXTRACTION_PROMPT,
                 file_ary=compressed_paths,
-                model=MODEL_LOCAL,
                 show_request=False,
                 pic_tip=True,
             ).strip()

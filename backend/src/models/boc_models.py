@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
+from decimal import Decimal
+from sqlalchemy import Column, DECIMAL
 
 if TYPE_CHECKING:
     from src.files.models import FileRecord
@@ -33,9 +35,9 @@ class BocTransaction(SQLModel, table=True):
     transaction_type: Optional[str] = None       # 交易类型 Type
     voucher: Optional[str] = None                # 凭证 Vou.
     transaction_details: Optional[str] = None    # 凭证号/业务号/用途/摘要
-    debit_amount: Optional[str] = None           # 借方发生额 Debit Amount
-    credit_amount: Optional[str] = None          # 贷方发生额 Credit Amount
-    balance: Optional[str] = None                # 余额 Balance
+    debit_amount: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))           # 借方发生额 Debit Amount
+    credit_amount: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))          # 贷方发生额 Credit Amount
+    balance: Optional[Decimal] = Field(default=None, sa_column=Column(DECIMAL(11, 2)))                # 余额 Balance
     reference_no: Optional[str] = None           # 机构/柜员/流水 Reference No.
     notes: Optional[str] = None                  # 备注 Notes (对方信息)
     

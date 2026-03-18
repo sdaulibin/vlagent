@@ -20,7 +20,7 @@ import re
 from typing import Any
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 
@@ -220,17 +220,15 @@ def _extract_content_from_images(image_paths: list[str]) -> dict:
         dict: {"format_type": "...", "highlighted_content": [...]}
     """
     if len(image_paths) == 1:
-        response = request_stream(
+        response = request_qwen35(
             question=FORMAT_EXTRACT_PROMPT,
             file_base=image_paths[0],
-            model=MODEL_LOCAL,
             show_request=False,
         ).strip()
     else:
-        response = request_stream(
+        response = request_qwen35(
             question=FORMAT_EXTRACT_PROMPT,
             file_ary=image_paths,
-            model=MODEL_LOCAL,
             show_request=False,
             pic_tip=True,
         ).strip()

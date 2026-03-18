@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from pdf2image import convert_from_path
 from src.config import MODEL_LOCAL, RES_DIR
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 from services.pdf_processor import load_schema
 
@@ -49,11 +49,10 @@ def extract_text_from_image(image_path: str) -> str:
     直接输出提取的文本内容，不需要任何解释。
     """
     
-    result = request_stream(
+    result = request_qwen35(
         question=prompt,
         show_request=False,
-        file_base=image_path,
-        model=MODEL_LOCAL
+        file_base=image_path
     )
     
     # 清理无效的 OCR 结果

@@ -45,19 +45,9 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     Returns:
         dict: 包含 transactions, summary, bank_type 的结果字典
     """
-    # 0. 检测 PDF 类型（原生 or 扫描件）
-    from .pdf.pdf_type_detector import detect_pdf_type, get_pdf_info
-    pdf_type = detect_pdf_type(pdf_path)
-    pdf_info = get_pdf_info(pdf_path)
-    print(f"PDF 类型检测: {pdf_type} (平均每页 {pdf_info['avg_chars']} 字符)")
-    
-    if pdf_type == "native":
-        # 原生 PDF 快速路径：直接提取表格，无需 AI
-        print("✅ 检测到原生 PDF，使用 pdfplumber 直接提取表格数据...")
-        from .pdf.native_pdf_extractor import process_native_pdf
-        return process_native_pdf(pdf_path)
-    
-    print("检测到扫描件 PDF，使用 VL 模型识别流程...")
+    # 1. 准备任务目录
+    pdf_filename = os.path.splitext(os.path.basename(pdf_path))[0]
+    print(f"开始处理 PDF，使用 VL 模型识别流程: {pdf_filename}")
     
     # 1. 准备任务目录
     pdf_filename = os.path.splitext(os.path.basename(pdf_path))[0]
@@ -112,7 +102,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
             try:
                 # 先检查页脚是否包含"第1页"或"第 1 页"
                 # 使用简单的提示词检测页码
-                from .pdf.data_extractor import request_stream
+                from .pdf.data_extractor import request_qwen35
                 from src.config import MODEL_LOCAL
                 
                 page_check_prompt = """
@@ -126,7 +116,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
                 No explanation, only JSON.
                 """
                 
-                page_check_response = request_stream(question=page_check_prompt, file_base=img_path, model=MODEL_LOCAL).strip()
+                page_check_response = request_qwen35(question=page_check_prompt, file_base=img_path).strip()
                 page_info = json.loads(fix_json(page_check_response))
                 
                 is_first_page = page_info.get("is_first_page", False)

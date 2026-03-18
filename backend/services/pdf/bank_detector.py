@@ -1,7 +1,7 @@
 import os
 import json
 from src.config import MODEL_LOCAL
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 
 # 多银行 Schema 目录
 BANK_SCHEMAS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "bank_schemas")
@@ -79,9 +79,8 @@ def detect_bank_from_image(image_path: str):
     只需返回模板ID（如 cmb, everbright, jining, cgb, psbc, icbc, shandong_local）。严禁输出其他文字。
     """
     
-    response = request_stream(question=prompt, 
-                             file_base=image_path, 
-                             model=MODEL_LOCAL).strip().lower()
+    response = request_qwen35(question=prompt, 
+                             file_base=image_path).strip().lower()
     
     # 清理AI返回的可能含有的markdown或额外空格
     if "icbc" in response: return "icbc"

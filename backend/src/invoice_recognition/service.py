@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, List
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_stream
+from services.core.request_ai import request_qwen35
 from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -88,10 +88,9 @@ import time
 def _extract_invoice_info(image_path: str) -> dict:
     """对单张发票图片调用 AI 提取数据"""
     start_time = time.time()
-    response = request_stream(
+    response = request_qwen35(
         question=INVOICE_EXTRACTION_PROMPT,
         file_base=image_path,
-        model=MODEL_LOCAL,
         show_request=False
     ).strip()
     duration = time.time() - start_time
