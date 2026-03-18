@@ -134,11 +134,18 @@ async def process_invoice_recognitions(db: AsyncSession, file_record: InvoiceFil
         db.add(file_record)
         await db.commit()
         
-        # 1. 切分PDF
-        image_paths = split_pdf_to_images(file_record.file_path, tmp_dir, dpi=200)
+        # 判断文件类型：图片直接识别，PDF 先拆分为图片
+        file_ext = os.path.splitext(file_record.file_path)[1].lower()
+        is_image = file_ext in ('.jpg', '.jpeg', '.png')
         
-        if not image_paths:
-            raise ValueError("PDF 转换图片失败，未产生文件。")
+        if is_image:
+            # 图片文件直接作为单页处理
+            image_paths = [file_record.file_path]
+        else:
+            # PDF 拆分为图片
+            image_paths = split_pdf_to_images(file_record.file_path, tmp_dir, dpi=200)
+            if not image_paths:
+                raise ValueError("PDF 转换图片失败，未产生文件。")
             
         file_record.page_count = len(image_paths)
         

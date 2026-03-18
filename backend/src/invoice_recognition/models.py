@@ -49,6 +49,17 @@ class InvoiceResult(SQLModel, table=True):
     updated_at: Optional[datetime] = None
 
 
+class InvoiceFileListItem(SQLModel):
+    """Pydantic / API 返回结构 - 文件列表项"""
+    id: int
+    filename: str
+    status: str
+    page_count: Optional[int] = None
+    recognition_duration: Optional[float] = None
+    error_msg: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
 class InvoiceRecognitionResult(SQLModel):
     """Pydantic / API 返回结构 - 单页"""
     page_number: int
@@ -61,6 +72,7 @@ class InvoiceRecognitionResult(SQLModel):
     seller_name: Optional[str] = None
     seller_tax_id: Optional[str] = None
     raw_text: Optional[str] = None
+    error_msg: Optional[str] = None
 
 
 class InvoiceRecognitionResponse(SQLModel):
@@ -68,5 +80,7 @@ class InvoiceRecognitionResponse(SQLModel):
     file_id: int
     filename: str
     status: str
+    page_count: Optional[int] = None
+    recognition_duration: Optional[float] = None
     results: List[InvoiceRecognitionResult] = []
     error_msg: Optional[str] = None

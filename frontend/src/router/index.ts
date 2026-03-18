@@ -4,6 +4,7 @@ import BankStatement from '../views/BankStatement.vue'
 import ContractCompare from '../views/ContractCompare.vue'
 import ConfirmationLetter from '../views/ConfirmationLetter.vue'
 import FormatCompare from '../views/FormatCompare.vue'
+import InvoiceRecognition from '../views/InvoiceRecognition.vue'
 
 const routes = [
     {
@@ -30,6 +31,11 @@ const routes = [
         path: '/format-compare',
         name: 'FormatCompare',
         component: FormatCompare
+    },
+    {
+        path: '/invoice-recognition',
+        name: 'InvoiceRecognition',
+        component: InvoiceRecognition
     }
 ]
 

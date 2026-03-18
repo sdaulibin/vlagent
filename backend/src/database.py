@@ -63,6 +63,20 @@ async def init_db():
             "ALTER TABLE format_compare_tasks "
             "ADD COLUMN IF NOT EXISTS extracted_content_json TEXT"
         ))
+        # 发票识别：补充 invoice_results 缺失字段（幂等）
+        for col in [
+            ("invoice_no", "VARCHAR"),
+            ("invoice_date", "VARCHAR"),
+            ("buyer_name", "VARCHAR"),
+            ("buyer_tax_id", "VARCHAR"),
+            ("seller_name", "VARCHAR"),
+            ("seller_tax_id", "VARCHAR"),
+            ("error_msg", "VARCHAR"),
+        ]:
+            await conn.execute(text(
+                f"ALTER TABLE invoice_results "
+                f"ADD COLUMN IF NOT EXISTS {col[0]} {col[1]}"
+            ))
 
 
 async def get_session() -> AsyncSession:

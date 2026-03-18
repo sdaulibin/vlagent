@@ -177,3 +177,27 @@ export const runFormatCompare = async (taskId: number) => {
   const response = await api.post(`/format-compare/${taskId}/compare`);
   return response.data;
 };
+
+// ===== 发票识别 API =====
+
+export const uploadInvoice = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await api.post("/invoice_recognition/upload", formData);
+  return response.data;
+};
+
+export const getInvoiceFiles = async () => {
+  const response = await api.get("/invoice_recognition/list");
+  return response.data;
+};
+
+export const getInvoiceResult = async (fileId: number) => {
+  const response = await api.get(`/invoice_recognition/list/${fileId}`);
+  return response.data;
+};
+
+export const deleteInvoiceFile = async (fileId: number) => {
+  const response = await api.delete(`/invoice_recognition/${fileId}`);
+  return response.data;
+};
