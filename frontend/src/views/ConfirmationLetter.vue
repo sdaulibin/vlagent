@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { FileText, ArrowLeft, Play, Save, Trash2, Upload, RefreshCcw, ExternalLink } from 'lucide-vue-next';
+import { FileText, ArrowLeft, Play, Trash2, Upload, RefreshCcw, ExternalLink } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
   uploadConfirmationLetter,
   getConfirmationLetters,
   getConfirmationLetter,
   recognizeConfirmationLetter,
-  updateConfirmationLetter,
   deleteConfirmationLetter,
   getConfirmationPreviewUrl
 } from '../api';
@@ -51,10 +50,9 @@ const letters = ref<ConfirmationLetterItem[]>([]);
 const selectedLetter = ref<ConfirmationLetterItem | null>(null);
 const isUploading = ref(false);
 const isRecognizing = ref(false);
-const isSaving = ref(false);
 
-// 表单字段定义
-const formFields = [
+// 字段定义（用于展示）
+const displayFields = [
   { key: 'confirmation_no', label: '函证编号' },
   { key: 'accounting_firm', label: '事务所名称' },
   { key: 'reply_address', label: '回函地址' },
@@ -70,9 +68,6 @@ const formFields = [
   { key: 'signature_name', label: '落款名称' },
 ];
 
-// 编辑表单数据
-const formData = ref<Record<string, string>>({});
-
 const hasRetryableLetters = computed(() => {
   return letters.value.some(l => l.status === 'pending' || l.status === 'failed');
 });
@@ -87,14 +82,7 @@ const loadLetters = async () => {
 
 const selectLetter = async (id: number) => {
   try {
-    const letter = await getConfirmationLetter(id);
-    selectedLetter.value = letter;
-    // 初始化表单数据（从嵌套的 recognition 对象中读取）
-    formData.value = {};
-    const recognition = letter.recognition;
-    formFields.forEach(f => {
-      formData.value[f.key] = recognition?.[f.key as keyof RecognitionData] || '';
-    });
+    selectedLetter.value = await getConfirmationLetter(id);
   } catch (e) {
     console.error("加载询证函详情失败", e);
   }
@@ -115,7 +103,7 @@ const handleFileUpload = async (event: Event) => {
     console.error("上传失败", e);
   } finally {
     isUploading.value = false;
-    target.value = ''; // 重置 input
+    target.value = '';
   }
 };
 
@@ -125,7 +113,6 @@ const handleStartRecognition = async () => {
 
   isRecognizing.value = true;
 
-  // 立即更新列表状态为"识别中"
   retryableLetters.forEach(letter => {
     const idx = letters.value.findIndex(l => l.id === letter.id);
     if (idx !== -1) {
@@ -138,7 +125,6 @@ const handleStartRecognition = async () => {
       await recognizeConfirmationLetter(letter.id);
     }
     await loadLetters();
-    // 自动选中第一个已完成的
     const doneLetter = letters.value.find(l => l.status === 'done');
     if (doneLetter) {
       await selectLetter(doneLetter.id);
@@ -152,7 +138,6 @@ const handleStartRecognition = async () => {
 };
 
 const handleRecognizeOne = async (id: number) => {
-  // 立即更新状态
   const idx = letters.value.findIndex(l => l.id === id);
   if (idx !== -1) {
     letters.value[idx] = { ...letters.value[idx], status: 'processing' } as ConfirmationLetterItem;
@@ -169,20 +154,6 @@ const handleRecognizeOne = async (id: number) => {
   }
 };
 
-const handleSave = async () => {
-  if (!selectedLetter.value) return;
-
-  isSaving.value = true;
-  try {
-    await updateConfirmationLetter(selectedLetter.value.id, formData.value);
-    await selectLetter(selectedLetter.value.id);
-  } catch (e) {
-    console.error("保存失败", e);
-  } finally {
-    isSaving.value = false;
-  }
-};
-
 const handleDelete = async (id: number) => {
   if (!confirm('确定要删除这条询证函记录吗？')) return;
 
@@ -190,7 +161,6 @@ const handleDelete = async (id: number) => {
     await deleteConfirmationLetter(id);
     if (selectedLetter.value?.id === id) {
       selectedLetter.value = null;
-      formData.value = {};
     }
     await loadLetters();
   } catch (e) {
@@ -228,6 +198,12 @@ const getStatusClass = (status: string) => {
   }
 };
 
+const getFieldValue = (key: string): string => {
+  const recognition = selectedLetter.value?.recognition;
+  if (!recognition) return '-';
+  return (recognition as any)[key] || '-';
+};
+
 onMounted(() => {
   loadLetters();
 });
@@ -247,7 +223,7 @@ onMounted(() => {
         </div>
         <div>
           <h1 class="text-2xl font-bold text-slate-900">询证函智能识别</h1>
-          <p class="text-sm text-slate-500">智能识别银行询证函关键字段，支持人工修正</p>
+          <p class="text-sm text-slate-500">智能识别银行询证函关键字段</p>
         </div>
       </div>
     </header>
@@ -315,11 +291,14 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Right: Recognition Result Form -->
+      <!-- Right: Recognition Result -->
       <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="font-medium text-slate-700">识别结果</h3>
           <div v-if="selectedLetter" class="flex items-center gap-2">
+            <span :class="['text-xs px-2 py-0.5 rounded-full', getStatusClass(selectedLetter.status)]">
+              {{ getStatusText(selectedLetter.status) }}
+            </span>
             <button
               @click="openPreview"
               class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg transition-colors"
@@ -327,20 +306,12 @@ onMounted(() => {
               <ExternalLink class="w-4 h-4" />
               预览原文
             </button>
-            <button
-              @click="handleSave"
-              :disabled="isSaving"
-              class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <Save class="w-4 h-4" />
-              {{ isSaving ? '保存中...' : '保存修改' }}
-            </button>
           </div>
         </div>
 
-        <div v-if="selectedLetter" class="p-4 flex-1 overflow-auto">
+        <div v-if="selectedLetter && selectedLetter.recognition" class="p-4 flex-1 overflow-auto">
+          <!-- Format Check Banner -->
           <div
-            v-if="selectedLetter.recognition"
             class="mb-4 p-3 rounded-lg border"
             :class="selectedLetter.recognition.format_check_passed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'"
           >
@@ -359,19 +330,30 @@ onMounted(() => {
               </li>
             </ul>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="field in formFields" :key="field.key" class="flex flex-col gap-1">
-              <label class="text-sm font-medium text-slate-600">{{ field.label }}</label>
-              <input
-                v-model="formData[field.key]"
-                type="text"
-                class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                :placeholder="`请输入${field.label}`"
-              />
+
+          <!-- Summary Card -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-4">
+              <FileText class="w-5 h-5 text-emerald-500" />
+              <h3 class="font-semibold text-gray-700">询证函信息</h3>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div v-for="field in displayFields" :key="field.key" class="py-2 px-3 bg-gray-50 rounded-lg">
+                <p class="text-xs text-gray-400 mb-1">{{ field.label }}</p>
+                <p class="text-sm font-medium text-gray-700">{{ getFieldValue(field.key) }}</p>
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- Pending/Processing State -->
+        <div v-else-if="selectedLetter && (selectedLetter.status === 'processing' || selectedLetter.status === 'pending')" class="flex-1 flex items-center justify-center text-slate-400">
+          <p v-if="selectedLetter.status === 'processing'" class="animate-pulse">正在识别中，请稍候...</p>
+          <p v-else>待识别，请点击"开始识别"按钮</p>
+        </div>
+
+        <!-- No File Selected -->
         <div v-else class="flex-1 flex items-center justify-center text-slate-400">
           请选择一个询证函查看识别结果
         </div>
