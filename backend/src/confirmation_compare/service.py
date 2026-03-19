@@ -26,15 +26,9 @@ from src.json_repair import fix_json
 
 # ========== 配置 ==========
 
-TEMPLATES_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-    "docs", "templates"
-)
-
-TEMPLATE_PDF_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-    "docs"
-)
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TEMPLATES_DIR = os.path.join(BACKEND_DIR, "config", "confirmation_compare_templates")
+TEMPLATE_PDF_DIR = TEMPLATES_DIR
 
 # 模板 PDF 文件名映射
 TEMPLATE_PDFS = {
