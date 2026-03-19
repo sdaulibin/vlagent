@@ -2,6 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# 使用阿里云镜像源加速 apt
+RUN rm -f /etc/apt/sources.list.d/debian.sources \
+    && echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list \
+    && echo "deb https://mirrors.aliyun.com/debian-security bookworm-security main" >> /etc/apt/sources.list
+
 # 安装系统依赖 (poppler 用于 PDF 处理, 中文字体和 CID 映射用于正确渲染 PDF)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \

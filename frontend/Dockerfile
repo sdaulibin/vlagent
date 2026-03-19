@@ -6,12 +6,15 @@
 # 生产阶段 - 只需要 nginx 和构建产物
 FROM nginx:alpine
 
+# 使用阿里云镜像源加速 apk
+RUN sed -i 's|https\?://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/alpine|g' /etc/apk/repositories
+
 # 复制本地构建好的静态文件
 COPY dist /usr/share/nginx/html
 
 # 复制 Nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 8080
+EXPOSE 8001
 
 CMD ["nginx", "-g", "daemon off;"]
