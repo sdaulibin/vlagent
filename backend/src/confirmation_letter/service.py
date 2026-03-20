@@ -20,6 +20,13 @@ from src.json_repair import fix_json
 FIELD_EXTRACTION_PROMPT = """
 Role: 银行询证函信息提取专家
 
+【核心原则 - 所见即所得】
+- 你是一个纯粹的信息提取工具，只负责提取图片中已经存在、肉眼可见的文字内容
+- 绝对禁止推理、猜测、补全或联想任何图片中看不到的内容
+- 如果某个字段在图片中找不到明确可见的文字，必须返回空字符串 ""
+- 宁可漏提也不要错提——误报比漏报严重得多
+- 不要根据上下文语义去"推断"可能的值，只提取你能在图片中明确看到的文字
+
 Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，并输出文档的全部原文文字。
 
 【重要】函件可能有多页图片，请综合所有图片内容提取字段，不要遗漏任何页面的信息。
@@ -100,6 +107,7 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
 - 无法识别的字段返回空字符串 ""
 - 日期格式统一为 YYYY-MM-DD
 - raw_text 字段输出所有页面的全部原文文字，保持原文顺序，各页之间用换行分隔
+- 【最重要】raw_text 必须是对图片中文字的逐字逐句忠实抄录，绝对不允许添加、删除、修改、补全任何文字，每个字都必须与图片中的原文完全一致。例如原文是"有限责任会计师事务所"就不要写成"有限责任公司会计师事务所"
 - 仅输出 JSON，无需解释
 
 ## JSON Schema:
@@ -144,8 +152,24 @@ FORMAT_TEMPLATES = {
     "capital_verification": ["验资", "询证函", "出资", "截止日期"],
 }
 
+# 需要做原文交叉验证的字段（防止模型幻觉）
+FIELDS_TO_VALIDATE = [
+    "accounting_firm", "reply_address", "contact_person",
+    "postal_code", "debit_account", "signature_name",
+]
 
 
+def _validate_field_in_raw_text(field_name: str, value: str, raw_text: str) -> str:
+    """验证 AI 提取的字段值是否真的存在于原文中（防幻觉）"""
+    if not value or not raw_text:
+        return value
+    # 去除空格后在 raw_text 中搜索
+    normalized_value = re.sub(r'\s+', '', value)
+    normalized_text = re.sub(r'\s+', '', raw_text)
+    if normalized_value not in normalized_text:
+        print(f"  ⚠️ [幻觉检测] {field_name}='{value}' 在原文中未找到，疑似模型幻觉，已清除")
+        return ""
+    return value
 
 
 def _clean_id_value(value: str) -> str:
@@ -155,6 +179,7 @@ def _clean_id_value(value: str) -> str:
     # OCR 纠错
     cleaned = cleaned.replace("材库", "林泉")
     # 去除页码后缀，如 2024-001/1，但不截断长后缀（如 /1638999）
+    cleaned = re.sub(r"\s*第\s*\d+\s*/.*$", "", cleaned)  # 「第 1/4 页」或截断的「第 1/」
     cleaned = re.sub(r"[/\\][1-9]\d?$", "", cleaned)
     cleaned = re.sub(r"\s*第?\d+\s*页$", "", cleaned)
     cleaned = re.sub(r"^NO\.?\s*[:：]?", "", cleaned, flags=re.IGNORECASE)
@@ -550,6 +575,9 @@ def _extract_date_range(text: str) -> tuple[str, str]:
 
 def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str, Any]:
     normalized = {field: (data.get(field, "") or "").strip() for field in ALL_FIELDS}
+    # 原文交叉验证：检查关键字段是否真的存在于 raw_text 中
+    for field in FIELDS_TO_VALIDATE:
+        normalized[field] = _validate_field_in_raw_text(field, normalized[field], text)
     normalized["confirmation_no"] = _parse_confirmation_no(text, normalized.get("confirmation_no", ""))
     # 事务所名称：优先从 OCR 文本中提取（更准确），回退到 AI 返回值
     normalized["accounting_firm"] = _extract_accounting_firm(text, normalized.get("accounting_firm", ""))
@@ -664,7 +692,9 @@ def extract_fields_from_images(image_paths: list[str]) -> dict:
             response = request_qwen35(
                 question=FIELD_EXTRACTION_PROMPT,
                 file_base=compressed_paths[0],
-                show_request=False
+                show_request=False,
+                temperature=0.01,
+                top_p=0.1,
             ).strip()
         else:
             # 多张图片使用 file_ary
@@ -673,6 +703,8 @@ def extract_fields_from_images(image_paths: list[str]) -> dict:
                 file_ary=compressed_paths,
                 show_request=False,
                 pic_tip=True,
+                temperature=0.01,
+                top_p=0.1,
             ).strip()
         
         try:

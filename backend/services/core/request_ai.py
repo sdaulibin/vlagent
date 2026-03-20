@@ -213,7 +213,8 @@ def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
                     show_cost=False,
                     is_stream=True,
                     pic_tip=False,
-                    show_request=True, file_ary=None):
+                    show_request=True, file_ary=None,
+                    temperature=0.7, top_p=0.8):
     """
     调用 Qwen3.5-122B 模型（非思考模式）
 
@@ -264,8 +265,8 @@ def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
     extra_body = {"chat_template_kwargs": {"enable_thinking": False}}
 
     completion = client.chat.completions.create(
-        temperature=0.7,
-        top_p=0.8,
+        temperature=temperature,
+        top_p=top_p,
         model=model,
         messages=message,
         max_tokens=40960,
