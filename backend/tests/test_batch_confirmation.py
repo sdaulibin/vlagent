@@ -40,6 +40,7 @@ DPI = 200
 FIELD_LABELS = {
     "filename": "文件名",
     "confirmation_no": "函证编号",
+    "recipient_bank": "询证函抬头",
     "accounting_firm": "事务所名称",
     "reply_address": "回函地址",
     "contact_person": "联系人",
@@ -59,6 +60,7 @@ FIELD_LABELS = {
 # 用于格式化打印的字段列表
 PRINT_FIELD_LABELS = {
     "confirmation_no": "函证编号",
+    "recipient_bank": "询证函抬头",
     "accounting_firm": "事务所名称",
     "reply_address": "回函地址",
     "contact_person": "联系人",
@@ -198,6 +200,7 @@ def main():
     # 逐个处理
     results = []
     success_count = 0
+    total_start = time.time()
     # 提前生成输出路径
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     excel_path = os.path.join(OUTPUT_DIR, f"询证函识别结果_{timestamp}.xlsx")

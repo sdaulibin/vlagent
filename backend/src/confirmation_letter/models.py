@@ -45,6 +45,7 @@ class ConfirmationResult(SQLModel, table=True):
     seal_date: Optional[str] = Field(default=None, description="印章日期")
     seal_name: Optional[str] = Field(default=None, description="印章名称")
     signature_name: Optional[str] = Field(default=None, description="落款名称")
+    recipient_bank: Optional[str] = Field(default=None, description="询证函抬头(收件银行)")
     format_type: Optional[str] = Field(default=None, description="格式类型")
     format_check_passed: Optional[bool] = Field(default=None, description="格式校验是否通过")
     format_mismatches_json: Optional[str] = Field(default=None, description="格式差异JSON")
@@ -67,6 +68,7 @@ class ConfirmationResultUpdate(SQLModel):
     end_date: Optional[str] = None
     seal_date: Optional[str] = None
     signature_name: Optional[str] = None
+    recipient_bank: Optional[str] = None
 
 
 class FormatMismatch(SQLModel):
@@ -91,6 +93,7 @@ class ConfirmationRecognitionDTO(SQLModel):
     end_date: Optional[str] = None
     seal_date: Optional[str] = None
     signature_name: Optional[str] = None
+    recipient_bank: Optional[str] = None
     format_type: Optional[str] = None
     format_check_passed: Optional[bool] = None
     format_mismatches: List[FormatMismatch] = Field(default_factory=list)

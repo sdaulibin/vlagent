@@ -241,7 +241,8 @@ async def recognize_confirmation_file(
             print(f"  询证函识别完成: {conf_file.filename}  耗时: {duration_s}s")
             print(f"{'-' * 50}")
             _field_labels = {
-                "confirmation_no": "函证编号", "accounting_firm": "事务所名称",
+                "confirmation_no": "函证编号", "recipient_bank": "询证函抬头",
+                "accounting_firm": "事务所名称",
                 "reply_address": "回函地址", "contact_person": "联系人",
                 "phone": "电话", "postal_code": "邮编",
                 "debit_account": "扣费账号", "cutoff_date": "截止日期",

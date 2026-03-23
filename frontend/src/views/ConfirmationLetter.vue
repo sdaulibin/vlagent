@@ -32,6 +32,7 @@ interface RecognitionData {
   seal_date: string;
   seal_name: string;
   signature_name: string;
+  recipient_bank: string;
   format_type?: string;
   format_check_passed?: boolean;
   format_mismatches?: FormatMismatch[];
@@ -54,6 +55,7 @@ const isRecognizing = ref(false);
 // 字段定义（用于展示）
 const displayFields = [
   { key: 'confirmation_no', label: '函证编号' },
+  { key: 'recipient_bank', label: '询证函抬头' },
   { key: 'accounting_firm', label: '事务所名称' },
   { key: 'reply_address', label: '回函地址' },
   { key: 'contact_person', label: '联系人' },

@@ -132,31 +132,26 @@ def _is_cmb_serial_start(val: str) -> bool:
     """
     检测是否为招商银行流水号的起始部分
 
-    招商银行流水号格式：C0546RL00032SOZ
-    起始部分特征：C + 4-5位数字 + 可选字母
+    招商银行流水号格式：C0546RL00032SOZ 或 C03471N000BVNSZ
+    起始部分特征：C + 3-5位数字 + 可选字母
 
-    注意：
-    - Camelot可能将流水号和日期合并在一起，如 "C05471\\n2024-1"
-    - 需要区分：
-      - 纯流水号起始：C0546R, C05471 → 有效
-      - 流水号+日期（2行）：C05471\\n2024-1 → 有效
-      - 多行复合（3+行）：C0546R\\n2024-0\\n企业银 → 无效
+    注意：可能因为换行导致 2024- 和 C034 在同一个单元格的不同行
     """
     if not val:
         return False
     val = val.strip()
 
-    lines = val.split('\n')
-
-    # 如果超过2行，说明是多字段复合，不是单纯的流水号起始
-    if len(lines) > 2:
+    lines = [l.strip() for l in val.split('\n') if l.strip()]
+    if not lines:
         return False
 
-    # 取第一行
-    first_line = lines[0].strip()
+    # 检查前两行，因为第一行可能是被折行的日期如 2024-
+    for line in lines[:2]:
+        first_word = line.split(' ')[0] if line else ""
+        if re.match(r'^C\d{3,5}[A-Z]?$', first_word):
+            return True
 
-    # 流水号起始：C + 4-5位数字 + 可选字母（如 C0546R, C05471）
-    return bool(re.match(r'^C\d{4,5}[A-Z]?$', first_line))
+    return False
 
 
 def _merge_cmb_rows(rows: list) -> list:
@@ -864,48 +859,56 @@ def _parse_cmb_single_cell(cell: str) -> list:
     # 行4: PZZ 5:36:47... (第3部分：3位字母)
 
     serial_no = ''
+    # 提取流水号的各部分，这些通常在行的第一个词
+    serial_parts = []
+    for line in lines:
+        first_word = line.split(' ')[0]
+        w_clean = re.sub(r'[^A-Z0-9]', '', first_word)
+        if not w_clean:
+            continue
+            
+        if not serial_parts:
+            # 第一部分必须以 C 开头
+            if re.match(r'^C\d{3,5}[A-Z]?$', w_clean):
+                serial_parts.append(w_clean)
+        else:
+            # 后续部分长度一般在 3~6，不能是纯四位数字（如 2024 年份）
+            if re.match(r'^[A-Z0-9]{3,6}$', w_clean) and not re.match(r'^\d{4}$', w_clean):
+                serial_parts.append(w_clean)
 
-    # 方法1：尝试从5行结构中提取
-    if len(lines) >= 5:
-        # 第1部分：行0开头，C + 4-5位数字（可能后面跟字母）
-        part1_match = re.match(r'(C\d{4,5}[A-Z]?)', lines[0])
-        # 第2部分：行2开头，字母 + 4-5位字符
-        part2_match = re.match(r'([A-Z][A-Z0-9]{4,5})', lines[2])
-        # 第3部分：行4开头，3-4位字符（字母或数字）
-        part3_match = re.match(r'([A-Z0-9]{3,4})', lines[4])
+    if serial_parts:
+        candidate = "".join(serial_parts)
+        if len(candidate) >= 15:
+            serial_no = candidate[:15]
 
-        if part1_match and part2_match and part3_match:
-            serial_no = part1_match.group(1) + part2_match.group(1) + part3_match.group(1)
-            # 验证总长度
-            if len(serial_no) != 15:
-                serial_no = ''
-
-    # 方法2：尝试从无空格文本中匹配完整流水号
+    # 兜底：原始匹配
+    if not serial_no or len(serial_no) != 15:
+        if len(lines) >= 5:
+            part1_match = re.match(r'(C\d{4,5}[A-Z]?)', lines[0])
+            part2_match = re.match(r'([A-Z][A-Z0-9]{4,5})', lines[2])
+            part3_match = re.match(r'([A-Z0-9]{3,4})', lines[4])
+    
+            if part1_match and part2_match and part3_match:
+                serial_no = part1_match.group(1) + part2_match.group(1) + part3_match.group(1)
+                if len(serial_no) != 15:
+                    serial_no = ''
+    
     if not serial_no or len(serial_no) != 15:
         full_text_no_space = re.sub(r'[^A-Z0-9]', '', full_text)  # 只保留字母和数字
-        serial_match = re.search(r'(C\d{4,5}[A-Z][A-Z0-9]{5}[A-Z]{3})', full_text_no_space)
+        serial_match = re.search(r'(C\d{3,5}[A-Z][A-Z0-9]{5}[A-Z]{3})', full_text_no_space)
         if serial_match:
             serial_no = serial_match.group(1)
-
-    # 方法3：更宽松的匹配 - 找C开头的15位序列
+    
     if not serial_no or len(serial_no) != 15:
         full_text_no_space = re.sub(r'[^A-Z0-9]', '', full_text)
         serial_match = re.search(r'(C[A-Z0-9]{14})', full_text_no_space)
         if serial_match:
             serial_no = serial_match.group(1)
-
+    
     if not serial_no or len(serial_no) != 15:
         return None
-
-    # 验证流水号格式
-    # 有效格式：C0546RL00032SOZ, C05471K000EJPZZ, C05471N000HOB3Z
-    # 无效格式：C0546R20240269B（包含日期年份）
-    #
-    # 规则：
-    # 1. 长度必须是15位
-    # 2. 以C + 数字开头
-    # 3. 不包含明显的年份（2020-2029）
-    if not re.match(r'^C\d{4,5}[A-Z]', serial_no):
+    
+    if not re.match(r'^C\d{3,5}[A-Z]?', serial_no):
         return None
     if re.search(r'202\d', serial_no):  # 排除包含年份的无效流水号
         return None
@@ -926,8 +929,10 @@ def _parse_cmb_single_cell(cell: str) -> list:
         # 检查金额前面的文字来判断是支出还是收入
         for i, line in enumerate(lines):
             if amounts[0].replace(',', '') in line.replace(',', ''):
-                # 检查这行是否有"还借款"等关键词，通常是支出
-                if '还借款' in line or '工资' in line or '电费' in line or '加油' in line or '外包' in line:
+                # 检查这行是否有"还借款"等关键词，区分收入支出
+                if any(kw in line for kw in ['结息', '收息']):
+                    income = amounts[0].replace(',', '')
+                elif any(kw in line for kw in ['还借款', '工资', '电费', '加油', '外包']):
                     expense = amounts[0].replace(',', '')
                 else:
                     # 默认为支出
@@ -943,41 +948,64 @@ def _parse_cmb_single_cell(cell: str) -> list:
 
     date_str = ''
     if date_parts:
-        # 合并日期部分：2024-1 + 2-28 -> 2024-12-28
-        date_part1 = date_parts[0]  # 2024-1
-        # 从 full_text 中找到完整的日期
-        full_date_match = re.search(r'(\d{4})-(\d{1,2})\s*(\d{1,2})-(\d{1,2})', full_text)
-        if full_date_match:
+        date_part1 = date_parts[0]
+        # 兼容中间被文本隔开的碎片日期，例如：2024-1 青岛... 2-28
+        full_date_match = re.search(r'(\d{4})-(\d{1,2}).*?(\d{1,2})-(\d{1,2})', full_text)
+        if full_date_match and len(full_date_match.group(0)) < 30: # 避免跨越太多字符
             year = full_date_match.group(1)
             month = full_date_match.group(2) + full_date_match.group(3)
             day = full_date_match.group(4)
             date_str = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
         else:
-            date_str = date_parts[0]
+            # 另外一种方式：合并所有能找到的日期碎片
+            date_matches = re.findall(r'\d{1,4}-\d{1,2}', full_text)
+            if len(date_matches) >= 2:
+                p1, p2 = date_matches[0], date_matches[1]
+                if p1.startswith("202"):
+                    year, m1 = p1.split('-')
+                    m2, d = p2.split('-')
+                    month = m1 + m2
+                    date_str = f"{year}-{month.zfill(2)}-{d.zfill(2)}"
+            
+            if not date_str:
+                date_str = date_parts[0]
 
     if time_match:
         date_str = f"{date_str} {time_match.group(1)}"
 
     # 提取对方名称和账号
-    counterparty_name = ''
-    counterparty_account = ''
-
-    # 对方名称通常是公司名，包含"公司"、"有限"等
+    counterparty_name_parts = []
+    counterparty_account_parts = []
+    
     for line in lines:
-        if '公司' in line or '有限' in line:
-            # 提取公司名
-            name_match = re.search(r'([^\d\n]+(?:公司|有限)[^\d\n]*)', line)
-            if name_match:
-                counterparty_name = name_match.group(1).strip()
-            # 提取账号（通常是19位数字）
-            acct_match = re.search(r'(\d{15,22})', line)
-            if acct_match:
-                counterparty_account = acct_match.group(1)
-            break
+        # 去掉该行开头的流水号部分，时间部分等
+        clean_line = re.sub(r'^(?:C\d{4,5}[A-Z]?|[A-Z][A-Z0-9]{4,5}|[A-Z0-9]{3,4}|\d{4}-\d{1,2}|\d{1,2}-\d{1,2}|\d{1,2}:\d{2}:\d{2})\s*', '', line)
+        if not clean_line.strip():
+            continue
+            
+        parts = re.split(r'\s+', clean_line)
+        for part in parts:
+            if re.match(r'^[0-9,\.]+$', part): 
+                continue
+            if part in ['还借款', '工资', '电费', '加油费', '外包服务费', '手续费', '服务费', '往来款', '利息', '对公转', '提出', '企业银', '实时代', '账正常', '1']:
+                continue
+            
+            # 判断是否包含汉字或明显是名字的一部分（带星号等）
+            if re.search(r'[\u4e00-\u9fa5A-Za-z\*]', part) and len(part) > 1:
+                # 排除孤立字母或完全不是名字的字符
+                if not re.match(r'^[A-Z0-9]{2,}$', part):
+                    counterparty_name_parts.append(part)
+                
+        acct_match = re.search(r'(\d{10,22})', line)
+        if acct_match:
+            counterparty_account_parts.append(acct_match.group(1))
+
+    counterparty_name = "".join(counterparty_name_parts)
+    counterparty_account = "".join(counterparty_account_parts)
 
     # 提取摘要
     description = ''
-    desc_keywords = ['还借款', '工资', '电费', '加油费', '外包服务费', '手续费', '服务费', '往来款', '利息']
+    desc_keywords = ['还借款', '工资', '电费', '加油费', '外包服务费', '手续费', '服务费', '往来款', '利息', '账户结息']
     for kw in desc_keywords:
         if kw in full_text:
             description = kw
@@ -991,10 +1019,22 @@ def _parse_cmb_single_cell(cell: str) -> list:
         transaction_type = '企业银行各项费用'
     elif '实时代' in full_text:
         transaction_type = '实时代收业务付款'
+    elif '账户结息' in full_text:
+        transaction_type = '账户结息'
 
-    # 提取实例号：269B + 数字
-    instance_match = re.search(r'(269B\d+)', full_text)
-    instance_no = instance_match.group(1) if instance_match else ''
+    # 提取实例号：跨越多行的情况下，在每行末尾寻找
+    instance_parts = []
+    for line in lines:
+        last_word = line.split(' ')[-1]
+        if not instance_parts and last_word.startswith("269B"):
+            instance_parts.append(last_word)
+        elif len(instance_parts) > 0 and re.match(r'^\d+$', last_word):
+            instance_parts.append(last_word)
+
+    instance_no = "".join(instance_parts)
+    if not instance_no:
+        instance_match = re.search(r'(269B\d+)', full_text)
+        instance_no = instance_match.group(1) if instance_match else ''
 
     # 一卡通号通常为空
     card_no = ''
@@ -1025,6 +1065,8 @@ def _clean_time_string(val: str) -> str:
     
     # 针对被无情物理水平切断的字符串进行缝合（例如招商银行的 "2024-0\n1-04 0" -> 缝合并踢出单独的0 -> "2024-01-04"）
     val = re.sub(r"(\d{4}[\-/\.]\d*)\s*\n\s*(\d{1,2}[\-/\.]\d{1,2})", r"\1\2", val)
+    val = re.sub(r"(\d{1,2}:\d{1,2}:)\s*\n\s*(\d{1,2})", r"\1\2", val)
+    val = re.sub(r"(\d{1,2}:)\s*\n\s*(\d{1,2}:\d{1,2})", r"\1\2", val)
     
     parts = [p.strip() for p in val.replace(" ", "\n").split('\n') if p.strip()]
     dates, times, others = [], [], []
@@ -1060,6 +1102,35 @@ def _fix_camelot_shifted_row(row: list, mapped_len: int) -> list:
                         # Assume standard order: Balance -> Currency
                         return row[:i] + [num, curr] + row[i+1:]
     return row
+
+
+def _clean_cmb_name(val: str) -> str:
+    """清理被 Camelot 错误吸附进来的摘要等冗余信息"""
+    parts = val.split('\n')
+    cleaned_parts = []
+    for p in parts:
+        p = p.strip()
+        if not p: continue
+        if re.search(r'(网银支付|手续费|企业银行|跨行|本地|普通|汇划费|对公转|还借款|电费|务费|实时代收|款项|提出|正常)', p):
+            continue
+        cleaned_parts.append(p)
+    return "".join(cleaned_parts)
+
+
+def _clean_cmb_instance_no(val: str) -> str:
+    """清理被 Camelot 错误吸附进来的账号等冗余数字"""
+    parts = val.split('\n')
+    instance_parts = []
+    for p in parts:
+        p = p.strip()
+        if not p: continue
+        # 丢弃看起来像纯账号的长数字（通常 CMB 账号在 10~22 位，保守起见丢弃 7 位以上数字）
+        if re.match(r'^\d{7,22}$', p):
+            continue
+        instance_parts.append(p)
+    res = "".join(instance_parts)
+    m = re.search(r'(\d{3,4}[A-Z]\d+)', res)
+    return m.group(1) if m else res
 
 
 def parse_native_pdf(pdf_path: str) -> dict:
@@ -1145,6 +1216,11 @@ def parse_native_pdf(pdf_path: str) -> dict:
                 if field in ["transaction_time", "transaction_date"]:
                     val = _clean_time_string(val)
                 else:
+                    if bank_type == "cmb":
+                        if field in ["counterparty_name", "收(付)方名称", "收方名称", "对方户名"]:
+                            val = _clean_cmb_name(val)
+                        elif field in ["print_instance_no", "实例号", "打印实例号"]:
+                            val = _clean_cmb_instance_no(val)
                     # 原生PDF跨行合并后含有 \n，按用户要求将其剔除，防止Excel中撑大行高
                     val = val.replace('\n', '')
                 record[field] = val

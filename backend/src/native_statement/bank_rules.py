@@ -124,6 +124,8 @@ DEFAULT_HEADER_MAPPING = {
     "交易地点": "transaction_location",
     "起息日": "value_date",
     "打印实例号": "print_instance_no",
+    "实例号": "print_instance_no",
+    "一卡通号": "card_no",
     "卡号": "card_no",
     "公司一卡通号": "card_no",
     "全局路由号": "global_route_no",
@@ -196,7 +198,7 @@ NOISE_KEYWORDS = [
     "期初余额", "期末余额",
     "注：", "备注：", "说明：",
     "---",  # 分隔线
-    "总计", "总金额", "总笔数", "起止日期", "账户名:", "账号:",
+    "总计", "总金额", "总笔数", "起止日期", r"^\s*账户名称?[:：]", r"^\s*账\s*号[:：]",
 ]
 
 

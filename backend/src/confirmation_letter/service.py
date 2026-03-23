@@ -20,12 +20,14 @@ from src.json_repair import fix_json
 FIELD_EXTRACTION_PROMPT = """
 Role: 银行询证函信息提取专家
 
-【核心原则 - 所见即所得】
-- 你是一个纯粹的信息提取工具，只负责提取图片中已经存在、肉眼可见的文字内容
-- 绝对禁止推理、猜测、补全或联想任何图片中看不到的内容
-- 如果某个字段在图片中找不到明确可见的文字，必须返回空字符串 ""
+【绝对核心原则 - 所见即所得，零联想】
+- 你是一个纯粹的 OCR 文字复制工具，只负责逐字复制图片中已经存在、肉眼可见的文字
+- 【严禁】任何形式的推理、猜测、补全、联想、推断、推导
+- 【严禁】根据上下文"推断"可能的值——即使你觉得"这里应该有XX"，如果图片中没有明确写出，就必须返回空字符串 ""
+- 【严禁】添加任何图片中没有的字符，包括但不限于："公司"、"有限"、"股份"、"有限合伙"等后缀
+- 【严禁】修正图片中的"错误"——图片写什么就提取什么，不要"纠正"
+- 每个字段提取后，必须逐字对照原图验证：图片里这几个字真的存在吗？如果不确定，返回空字符串 ""
 - 宁可漏提也不要错提——误报比漏报严重得多
-- 不要根据上下文语义去"推断"可能的值，只提取你能在图片中明确看到的文字
 
 Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，并输出文档的全部原文文字。
 
@@ -48,45 +50,63 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 事务所名称包含「会计师事务所」关键字
    - 必须提取完整全称，包括：事务所名 + （特殊普通合伙）+ 分所名称（如"济南分所""大连分所"等）
    - 示例："和信会计师事务所（特殊普通合伙）济南分所"、"安永华明会计师事务所（特殊普通合伙）济南分所"
-   - 【重要】必须严格按照图片中的原文提取，逐字对照，不要添加或修改任何文字。例如原文是"有限责任会计师事务所"就不要写成"有限责任公司会计师事务所"
+   - 【绝对禁止】添加图片中没有的文字！例如：图片写的是"XX会计师事务所"，绝不能提取成"XX会计师事务所公司"或"XX会计公司"
+   - 【逐字对照】提取后必须逐一字符与原图比对：图片里真的有这几个字吗？没有就删掉或返回空字符串
    - 【注意】不要将页面其他位置的公司名称（如落款公司、银行名称）误认为事务所名称
-3. **reply_address (回函地址)** - 关键字：回函地址、收件地址、回函请寄、回函邮寄地址，提取完整地址
+3. **reply_address (回函地址)**
+   - 关键字：回函地址、收件地址、回函请寄、回函邮寄地址
+   - 【绝对禁止】添加图片中没有的文字，包括"公司"、"省"、"市"等
+   - 【逐字对照】地址必须与图片中完全一致，一个字都不能多、一个字都不能少
 4. **contact_person (回函联系人)**
    - 【重要】当存在「业务联系人」和「回函收件人」两种联系人时，必须提取「回函收件人」
    - 优先级：回函收件人 > 回函联系人 > 收件人 > 联系人
    - 通常在「回函地址」之后出现
+   - 【逐字对照】只提取图片中明确可见的姓名文字，不要联想添加任何字符
    - 【注意】不要把相邻的"电话"、"手机"、"邮箱"、"邮编"等字样错误提取到联系人中
    - 【注意】联系人姓名如果包含中划线（如"审计二部-路"），请完整提取，不要遗漏中划线及前面的内容。
    - 【注意】联系人姓名处如果盖有印章（如普华永道），请区分印章文字（如"道"被识别为"董"）与真实的姓名（如"静"），不要把印章文字当成姓名（如不要输出"董静"）。
    - 不要提取「业务联系人」
 5. **phone (回函联系电话)**
+   - 【最重要】只提取「回函信息区」的「联系电话」，这是事务所的联系用电话
+   - 【绝对禁止】提取「公司签章区」的「公司经办人电话」或印章后面的「电话」！
+   - 【位置区分】：
+     - ✅ 正确：在「回函地址」「联系人」「邮编」附近的「联系电话」
+     - ❌ 错误：在印章、落款、「公司经办人」、「职务」附近的「电话」
    - 【重要】提取与「回函收件人」对应的电话，不是「业务联系电话」
    - 通常紧跟回函收件人之后
    - 优先级：回函收件人旁的电话 > 业务联系电话
+   - 【逐字对照】只提取图片中可见的数字和符号，不要联想添加任何内容
    - 【注意】如果存在多个电话，请全部提取，用逗号或者斜杠隔开。
    - 【注意】在提取电话时，坚决不要包含括号及其内部的任何无关文字（例如不要提取"(项目组成员)"或"(函证中心)"等字样）。
-6. **postal_code (邮编)** - 6位数字格式
+6. **postal_code (邮编)**
+   - 6位数字格式
+   - 【逐字对照】只提取图片中可见的数字，不要联想添加
 7. **debit_account (扣费账号)**
    - 常见位置：正文第一页，通常在「截至」日期附近
    - 常见句式：「本公司谨授权贵行可从本公司 xxx 号支取办理本询证函回函服务的费用」
    - 也可能出现为：「扣费账号：xxx」「付款账号：xxx」「费用从账号 xxx 扣除」
    - 账号可能出现字母开头（如 NRA 等），请不要保留任何字母，只需提取纯数字账号
    - 提取账号时必须只提取数字内容，不要限制长度
+   - 【逐字对照】只提取图片中可见的数字，不要联想添加任何内容
    - 如果找不到任何扣费/授权支付相关的账号，返回空字符串
-8. **cutoff_date (截止日期)** - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
+8. **cutoff_date (截止日期)**
+   - 「截至xxxx年xx月xx日」或「函证基准日」对应的日期
+   - 【逐字对照】只提取图片中明确可见的日期数字，不要联想推断
 9. **start_date (起始日期)**
    - 【最重要】从表格3的标题中提取，表格的标题一般为"3. 自xxxx年x月x日起至xxxx年x月x日期间内注销的银行存款账户"
    - 【禁止】绝对不能从正文第一段中提取起始日期！
+   - 【逐字对照】只提取图片中明确可见的日期数字
 10. **end_date (终止日期)**
    - 【最重要】从表格3的标题中提取，表格的标题一般为"3. 自xxxx年x月x日起至xxxx年x月x日期间内注销的银行存款账户"
    - 【禁止】绝对不能从正文第一段的审计期间描述中提取终止日期！
+   - 【逐字对照】只提取图片中明确可见的日期数字
 11. **seal_date (印章日期)**
    - 提取被询证单位（客户公司）落款处的日期
    - 常见位置：在公司名称和「预留签章/采用电子授权」下方，格式通常为手写的「xxxx年x月x日」
    - 也可能在「以下由被询证银行填列」上方的落款区域，或「资金归集」表的下方落款区域
    - 【最重要】页面右上角的蓝色方形标记章（如"FS""2025-07-25"）是事务所的收发章，其中的日期绝对不是 seal_date！
    - 【最重要】seal_date 必须是落款区域中手写或打印的「xxxx年x月x日」格式的日期，位于公司名称附近
-   - 【注意】手写日期务必仔细放大分辨原图中手写数字笔画的弯折处特征，确保每一位数字100%精确。
+   - 【逐字对照】手写日期务必仔细放大分辨原图中手写数字笔画的弯折处特征，确保每一位数字100%精确，不要猜测或联想
    - 【注意】如果落款区域的手写日期难以辨认，请尽力识别；实在无法辨认才返回空字符串
    - 【注意】不要从正文抬头、页眉、编号区域取日期
 12. **signature_name (落款名称)**
@@ -94,9 +114,10 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 常见位置有两种格式：
      - 格式一：在「以下由被询证银行填列」上方的落款区域，打印的公司名称文字后跟「（预留签章/采用电子授权）」
      - 格式二：在「资金归集」表下方的落款区域，直接打印的公司名称文字
-   - 【最重要】如果公司名称被裁切或只显示了部分文字，只提取图片中可见的部分，绝对不要补全缺失的文字
+   - 【最重要】【逐字对照】如果公司名称被裁切或只显示了部分文字，只提取图片中可见的部分，绝对不要补全缺失的文字
    - 【最重要】请从打印/手写的文字中提取公司名称，不要从圆形红色印章图案中识别文字
    - 【最重要】以「预留签章/采用电子授权」上方那行打印文字为准，那才是 signature_name
+   - 【绝对禁止】添加图片中没有的字符，如"公司"、"有限"等后缀
    - 【重要】signature_name 要的是被询证的客户公司名称（如"xx有限公司"），不是印章类型
    - 【重要】signature_name 不是会计师事务所/审计机构的名称，事务所名称应填入 accounting_firm 字段
    - 【重要】不要将页面上出现的「毕马威」「安永」「德勤」「普华永道」等事务所名称作为 signature_name
@@ -104,12 +125,28 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
    - 【注意】不要包含「预留签章」「采用电子授权」等非单位名称的文字
    - 【注意】如果无法识别公司名称，返回空字符串
 
+13. **recipient_bank (询证函抬头/收件银行)**
+   - 提取正文开头的收件银行全称（即被询证的银行网点）
+   - 常见位置一：正文第一段，通常在「（以下简称"贵行"）」之前，如「青岛银行股份有限公司潍坊诸城支行」
+   - 常见位置二：在特殊抬头中，位于紧接「致」或「致：」之后，如「致：青岛银行」，需提取「青岛银行」
+   - 【逐字对照】只提取图片中明确可见的文字，不要添加"银行"、"支行"等图片中没有的后缀
+   - 【注意】不要包含「（以下简称"贵行"）」等括号及内部文字
+   - 【注意】不要包含「致」或「致：」等字样
+   - 【注意】必须提取完整的支行或分行名称（如果有），不要遗漏
+
 ## 输出要求：
 - 返回 JSON 格式
 - 无法识别的字段返回空字符串 ""
 - 日期格式统一为 YYYY-MM-DD
 - raw_text 字段输出所有页面的全部原文文字，保持原文顺序，各页之间用换行分隔
 - 仅输出 JSON，无需解释
+
+## 最终检查（必须执行）：
+在输出每个字段前，逐一字符与原图比对：
+1. 图片中真的有这个字符吗？
+2. 图片中的字符顺序是这样的吗？
+3. 有没有多加任何字符（如"公司"、"有限"等后缀）？
+如果有任何不确定，返回空字符串 "" 而不是猜测！
 
 ## JSON Schema:
 {
@@ -125,13 +162,14 @@ Task: 从银行询证函扫描图片中精确提取以下 13 项字段信息，�
     "end_date": "",
     "seal_date": "",
     "signature_name": "",
+    "recipient_bank": "",
     "raw_text": ""
 }
 """
 
 # 所有识别字段
 ALL_FIELDS = [
-    "confirmation_no", "accounting_firm", "reply_address",
+    "confirmation_no", "recipient_bank", "accounting_firm", "reply_address",
     "contact_person", "phone", "postal_code", "debit_account",
     "cutoff_date", "start_date", "end_date", "seal_date",
     "signature_name"
@@ -153,11 +191,48 @@ FORMAT_TEMPLATES = {
     "capital_verification": ["验资", "询证函", "出资", "截止日期"],
 }
 
+# 模型高频幻觉修正规则（不依赖 raw_text 验证）
+# 格式：(错误模式, 正确模式)
+HALLUCINATION_FIX_RULES = [
+    # 事务所名称：模型喜欢在"有限责任会计师事务所"中间插入"公司"
+    (r"有限责任公司会计师事务所", "有限责任会计师事务所"),
+    (r"有限公司会计师事务所", "有限责任会计师事务所"),
+    (r"公司会计师事务所", "会计师事务所"),
+    # 事务所名称常见幻觉：多余的后缀
+    (r"会计师事务所公司$", "会计师事务所"),
+    (r"会计师事务所有限$", "会计师事务所"),
+    # 地址字段：模型可能添加的后缀
+    (r"(\d号)公司$", r"\1"),  # "XX路88号公司" → "XX路88号"
+    (r"(\d层)公司$", r"\1"),  # "XX大厦5层公司" → "XX大厦5层"
+    # 银行名称：模型可能添加的后缀
+    (r"银行股份有限$", "银行股份有限公司"),
+    (r"(\w银行)有限公司$", r"\1股份有限公司"),
+]
+
+
+def _fix_hallucination_by_rules(value: str, field_name: str = "") -> str:
+    """使用规则修正模型的高频幻觉（所见即所得）"""
+    if not value:
+        return value
+
+    original = value
+    for wrong_pattern, correct_pattern in HALLUCINATION_FIX_RULES:
+        if isinstance(correct_pattern, str):
+            value = re.sub(wrong_pattern, correct_pattern, value)
+        else:
+            value = re.sub(wrong_pattern, correct_pattern, value)
+
+    if value != original:
+        print(f"  ⚠️ [幻觉修正] {field_name}='{original}' → '{value}'")
+    return value
+
+
 # 需要做原文交叉验证的字段（防止模型幻觉）
-# 注意：raw_text 与字段来自同一次 AI 调用，对于像 accounting_firm 这类模型一致性幻觉无法拦截
-# 仅对误提取风险高且 raw_text 有效的字段启用验证
+# 注意：raw_text 与字段来自同一次 AI 调用，对于模型一致性幻觉可能无法完全拦截
+# 主要依赖 HALLUCINATION_FIX_RULES 进行规则修正
 FIELDS_TO_VALIDATE = [
     "signature_name",
+    "recipient_bank",
 ]
 
 
@@ -168,10 +243,16 @@ def _validate_field_in_raw_text(field_name: str, value: str, raw_text: str) -> s
     # 去除空格后在 raw_text 中搜索
     normalized_value = re.sub(r'\s+', '', value)
     normalized_text = re.sub(r'\s+', '', raw_text)
-    if normalized_value not in normalized_text:
-        print(f"  ⚠️ [幻觉检测] {field_name}='{value}' 在原文中未找到，疑似模型幻觉，已清除")
-        return ""
-    return value
+    if normalized_value in normalized_text:
+        return value
+
+    # 尝试应用幻觉修正规则后再验证
+    fixed_value = _fix_hallucination_by_rules(normalized_value, field_name)
+    if fixed_value != normalized_value and fixed_value in normalized_text:
+        return fixed_value
+
+    print(f"  ⚠️ [幻觉检测] {field_name}='{value}' 在原文中未找到，疑似模型幻觉，已清除")
+    return ""
 
 
 def _clean_id_value(value: str) -> str:
@@ -430,6 +511,31 @@ def _extract_debit_account(text: str, ai_value: str = "") -> str:
 
 
 
+def _extract_recipient_bank(text: str, ai_value: str = "") -> str:
+    """从 OCR 文本中提取询证函抬头（收件银行）"""
+    raw = text or ""
+    # 优先使用正则从头部匹配
+    # 模式一：xxx银行xxx支行（以下简称...
+    pattern_standard = r"^\s*([\u4e00-\u9fffA-Za-z0-9]+银行[\u4e00-\u9fff]{0,15}(?:分行|支行|营业部|总行)?)\s*[(（]\s*以下简称"
+    # 模式二：不在开头但格式严格：(不在开头时避免误伤)
+    pattern_standard_2 = r"([\u4e00-\u9fffA-Za-z0-9]+银行[\u4e00-\u9fff]{0,15}(?:分行|支行|营业部|总行)?)\s*[(（]\s*以下简称"
+    # 模式三：致：xxx银行
+    pattern_to = r"致\s*[:：]?\s*([\u4e00-\u9fffA-Za-z0-9]+银行[\u4e00-\u9fff]{0,15}(?:分行|支行|营业部|总行)?)"
+    
+    for pat in [pattern_standard, pattern_standard_2, pattern_to]:
+        match = re.search(pat, raw)
+        if match:
+            bname = match.group(1).strip()
+            # 轻微清理可能的错误换行符或多余前缀
+            bname = re.sub(r"^致[:：]?\s*", "", bname)
+            return _fix_text_hallucination(bname)
+
+    # 回退到 AI 提取结果
+    ai_clean = (ai_value or "").strip()
+    ai_clean = re.sub(r"^致[:：]?\s*", "", ai_clean)
+    ai_clean = re.sub(r"[(（]\s*以下简称.*", "", ai_clean)
+    return _fix_text_hallucination(ai_clean)
+
 
 def _extract_accounting_firm(text: str, ai_value: str = "") -> str:
     """从 OCR 文本中提取事务所名称，包含分所后缀"""
@@ -476,6 +582,18 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
     contact = ""
     phone = ""
 
+    # 【关键】确定搜索边界：只在"回函信息区"搜索，不要延伸到"公司签章区"
+    # 找到"公司经办人"、"预留签章"、"以下由被询证银行"等关键字后停止搜索
+    boundary_keywords = ["公司经办人", "经办人", "预留签章", "采用电子授权", "以下由被询证银行", "被询证银行填列"]
+    boundary_pos = len(raw)
+    for keyword in boundary_keywords:
+        pos = raw.find(keyword)
+        if pos > 0 and pos < boundary_pos:
+            boundary_pos = pos
+
+    # 截取回函信息区的文本（从开头到边界）
+    reply_zone = raw[:boundary_pos]
+
     # 电话/手机号的统一正则（匹配「电话」「手机号」等关键字）
     # 支持：+86(757) 8620 4251、(852) 98624135、18624282945/0411-39724212 以及中文备注和逗号分隔
     PHONE_PATTERN = r"(?:手机号|电话|联系电话)\s*[:：]\s*(.*?)(?=\s*(?:邮政编码|邮编|电邮|电子邮箱|邮箱|传真|网址|回函|[\n\r]|$))"
@@ -489,7 +607,7 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
         r"回函.*?收件人\s*[:：]\s*" + NAME_CAPTURE,
     ]
     for pattern in contact_patterns:
-        match = re.search(pattern, raw)
+        match = re.search(pattern, reply_zone)
         if match:
             contact = match.group(1).strip()
             break
@@ -497,9 +615,9 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
     # 如果没找到回函收件人，查找回函地址之后的联系人/收件人
     if not contact:
         # 从「回函地址」之后的文本中查找
-        addr_match = re.search(r"回函[地址]*\s*[:：]", raw)
+        addr_match = re.search(r"回函[地址]*\s*[:：]", reply_zone)
         if addr_match:
-            after_addr = raw[addr_match.end():]
+            after_addr = reply_zone[addr_match.end():]
             general_patterns = [
                 r"收件人\s*[:：]\s*" + NAME_CAPTURE,
                 r"联系人\s*[:：]\s*" + NAME_CAPTURE,
@@ -510,21 +628,21 @@ def _extract_reply_contact(text: str, ai_contact: str = "", ai_phone: str = "") 
                     contact = match.group(1).strip()
                     break
 
-    # 提取回函联系电话：优先在回函收件人附近找
+    # 提取回函联系电话：只在回函信息区搜索
     if contact:
         # 在联系人出现位置之后找电话
-        contact_pos = raw.find(contact)
+        contact_pos = reply_zone.find(contact)
         if contact_pos >= 0:
-            nearby_text = raw[contact_pos:contact_pos + 150]
+            nearby_text = reply_zone[contact_pos:contact_pos + 150]
             phone_match = re.search(PHONE_PATTERN, nearby_text)
             if phone_match:
                 phone = phone_match.group(1).strip()
 
     # 如果在回函区域没找到电话，从回函地址之后找
     if not phone:
-        addr_match = re.search(r"回函[地址]*\s*[:：]", raw)
+        addr_match = re.search(r"回函[地址]*\s*[:：]", reply_zone)
         if addr_match:
-            after_addr = raw[addr_match.end():]
+            after_addr = reply_zone[addr_match.end():]
             phone_match = re.search(PHONE_PATTERN, after_addr)
             if phone_match:
                 phone = phone_match.group(1).strip()
@@ -581,8 +699,16 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     for field in FIELDS_TO_VALIDATE:
         normalized[field] = _validate_field_in_raw_text(field, normalized[field], text)
     normalized["confirmation_no"] = _parse_confirmation_no(text, normalized.get("confirmation_no", ""))
-    # 事务所名称：优先从 OCR 文本中提取（更准确），回退到 AI 返回值
-    normalized["accounting_firm"] = _extract_accounting_firm(text, normalized.get("accounting_firm", ""))
+    # 事务所名称：优先从 OCR 文本中提取（更准确），回退到 AI 返回值，最后应用幻觉修正规则
+    normalized["accounting_firm"] = _fix_hallucination_by_rules(
+        _extract_accounting_firm(text, normalized.get("accounting_firm", "")),
+        "accounting_firm"
+    )
+    # 回函地址：应用幻觉修正规则
+    normalized["reply_address"] = _fix_hallucination_by_rules(
+        normalized.get("reply_address", ""),
+        "reply_address"
+    )
     # 联系人和电话：优先取回函收件人，而非业务联系人
     reply_contact, reply_phone = _extract_reply_contact(
         text, normalized.get("contact_person", ""), normalized.get("phone", "")
@@ -600,6 +726,8 @@ def _validate_and_normalize_fields(data: dict[str, Any], text: str) -> dict[str,
     normalized["seal_date"] = _correct_hallucinated_date(_normalize_seal_date(normalized.get("seal_date", ""), text), text)
     # 落款名称：使用印章名称清理逻辑（去除签章类型、事务所名称等噪音）
     normalized["signature_name"] = _normalize_seal_name(normalized.get("signature_name", ""))
+    # 询证函抬头（收件银行）：正则配合 AI 获取
+    normalized["recipient_bank"] = _extract_recipient_bank(text, normalized.get("recipient_bank", ""))
     return normalized
 
 
