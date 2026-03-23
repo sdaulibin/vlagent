@@ -7,6 +7,7 @@ from src.confirmation_letter.router import router as confirmation_router
 from src.confirmation_letter.router import router as confirmation_router
 from src.confirmation_compare.router import router as format_compare_router
 from src.invoice_recognition.router import router as invoice_router
+from src.native_statement.router import router as native_statement_router
 
 api_router = APIRouter()
 
@@ -23,8 +24,10 @@ api_router.include_router(contracts_router)
 api_router.include_router(confirmation_router)
 
 # 询证函格式比对（独立模块）
-# 询证函格式比对（独立模块）
 api_router.include_router(format_compare_router)
 
 # 发票识别（独立模块）
 api_router.include_router(invoice_router)
+
+# 原生 PDF 流水识别（独立模块）
+api_router.include_router(native_statement_router)
