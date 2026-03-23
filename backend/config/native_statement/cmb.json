@@ -1,0 +1,52 @@
+{
+    "template_id": "cmb",
+    "bank_names": ["招商银行", "CMB", "CHINA MERCHANTS"],
+
+    "detection": {
+        "keywords": ["招商银行", "CMB", "CHINA MERCHANTS"],
+        "serial_pattern": "^C\\d{3,5}[A-Z]?.*[A-Z]{3}$",
+        "header_keywords": ["交易流水号", "交易日期", "借方", "贷方", "余额"]
+    },
+
+    "extraction": {
+        "preferred_strategy": "camelot_stream",
+        "fallback_strategies": ["pdfplumber_lines", "pdfplumber_text"],
+        "multiline_merge": true,
+        "serial_column_index": 0,
+        "min_columns": 3,
+        "first_page_only_summary": true
+    },
+
+    "post_processing": {
+        "clean_counterparty_name": true,
+        "merge_serial_fragments": true,
+        "serial_fragment_pattern": "^C\\d{3,5}[A-Z]?$",
+        "clean_time_string": true,
+        "remove_newlines": true
+    },
+
+    "summary_schema": {
+        "账号": {"field": "account_number", "pattern": "账\\s*号[：:]\\s*(\\d+)"},
+        "账号名": {"field": "account_name", "pattern": "户\\s*名[：:]\\s*(.+?)$"},
+        "开始日期": {"field": "start_date", "pattern": "开始日期[：:]\\s*(.+)"},
+        "结束日期": {"field": "end_date", "pattern": "结束日期[：:]\\s*(.+)"},
+        "出账总笔数": {"field": "expense_count", "pattern": "支出总笔数[：:]\\s*(\\d+)"},
+        "入账总笔数": {"field": "income_count", "pattern": "收入总笔数[：:]\\s*(\\d+)"},
+        "出账总金额": {"field": "expense_total", "pattern": "支出总金额[：:]\\s*([\\d,\\.]+)"},
+        "入账总金额": {"field": "income_total", "pattern": "收入总金额[：:]\\s*([\\d,\\.]+)"}
+    },
+
+    "transaction_schema": [
+        {"交易流水号": {"field": "serial_no", "type": "string"}},
+        {"交易日期": {"field": "transaction_date", "type": "datetime"}},
+        {"借方(出账)": {"field": "expense", "type": "amount"}},
+        {"贷方(入账)": {"field": "income", "type": "amount"}},
+        {"余额": {"field": "balance", "type": "amount"}},
+        {"收(付)方名称": {"field": "counterparty_name", "type": "string"}},
+        {"收(付)方账号": {"field": "counterparty_account", "type": "string"}},
+        {"摘要": {"field": "description", "type": "string"}},
+        {"交易类型": {"field": "transaction_type", "type": "string"}},
+        {"公司一卡通号": {"field": "card_no", "type": "string"}},
+        {"打印实例号": {"field": "print_instance_no", "type": "string"}}
+    ]
+}

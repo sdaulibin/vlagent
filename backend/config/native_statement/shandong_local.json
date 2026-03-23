@@ -1,0 +1,44 @@
+{
+    "template_id": "shandong_local",
+    "bank_names": [
+        "德州银行",
+        "潍坊银行",
+        "莱商银行",
+        "齐鲁银行"
+    ],
+    "detection": {
+        "keywords": ["德州银行", "潍坊银行", "莱商银行", "齐鲁银行"],
+        "header_keywords": ["序号", "交易时间", "交易渠道", "收入", "支出", "账户余额"]
+    },
+    "extraction": {
+        "preferred_strategy": "pdfplumber_text",
+        "fallback_strategies": ["pdfplumber_default"],
+        "multiline_merge": true,
+        "min_columns": 9
+    },
+    "summary_schema": {
+        "账户名称": "",
+        "账(卡)号": "",
+        "起止日期": "",
+        "收入总笔数": "",
+        "收入总金额": "",
+        "支出总笔数": "",
+        "支出总金额": "",
+        "开户行": "",
+        "盖章类型": ""
+    },
+    "transaction_schema": [
+        {
+            "序号": "",
+            "交易时间": "",
+            "交易渠道": "",
+            "收入": "",
+            "支出": "",
+            "账户余额": "",
+            "币种": "",
+            "对方账号": "",
+            "对方户名": "",
+            "摘要备注": ""
+        }
+    ]
+}

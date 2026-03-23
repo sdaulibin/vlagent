@@ -1,0 +1,40 @@
+{
+    "template_id": "abc",
+    "bank_names": [
+        "中国农业银行",
+        "农业银行",
+        "农行",
+        "ABC"
+    ],
+    "vertical_line_config": {
+        "enabled": false,
+        "lines": []
+    },
+    "summary_config": {
+        "first_page_only": false,
+        "extract_from_last_page": true,
+        "description": "汇总信息分布在首页顶部(账号、户名等)和末页底部(总收支统计)"
+    },
+    "summary_schema": {
+        "账号": "",
+        "户名": "",
+        "币种": "",
+        "起止日期": "",
+        "总收入笔数": "",
+        "总收入金额": "",
+        "总支出笔数": "",
+        "总支出金额": ""
+    },
+    "transaction_schema": [
+        {
+            "交易时间": "",
+            "收入金额": "",
+            "支出金额": "",
+            "账户余额": "",
+            "对方账号": "",
+            "对方户名": "",
+            "对方开户行": "",
+            "摘要": ""
+        }
+    ]
+}

@@ -1,0 +1,45 @@
+{
+    "template_id": "icbc",
+    "bank_names": ["中国工商银行", "工商银行", "工行", "ICBC"],
+
+    "detection": {
+        "keywords": ["中国工商银行", "工商银行", "工行", "ICBC"],
+        "header_keywords": ["交易时间", "借方", "贷方", "余额", "对方户名"]
+    },
+
+    "extraction": {
+        "preferred_strategy": "auto",
+        "fallback_strategies": ["pdfplumber_lines", "pdfplumber_text"],
+        "multiline_merge": false,
+        "serial_column_index": 0,
+        "min_columns": 5,
+        "first_page_only_summary": true
+    },
+
+    "post_processing": {
+        "clean_counterparty_name": false,
+        "merge_serial_fragments": false,
+        "clean_time_string": true,
+        "remove_newlines": true
+    },
+
+    "summary_schema": {
+        "账号": {"field": "account_number", "pattern": "账\\s*号[：:]\\s*(\\d[\\d\\s\\-]*\\d)"},
+        "本方账号户名": {"field": "account_name", "pattern": "(?:户\\s*名|账户名称|本方账号户名)[：:]\\s*(.+?)(?:\\s{2,}|$)"},
+        "币种": {"field": "currency", "pattern": "币\\s*种[：:]\\s*(.+?)(?:\\s{2,}|$)"},
+        "本方账号开户行": {"field": "bank_name", "pattern": "(?:开户行|本方账号开户行)[：:]\\s*(.+?)(?:\\s{2,}|$)"},
+        "财务日期范围": {"field": "date_range", "pattern": "(?:财务日期范围|起止日期)[：:]\\s*(.+?)(?:\\s{2,}|$)"}
+    },
+
+    "transaction_schema": [
+        {"交易时间": {"field": "transaction_time", "type": "datetime"}},
+        {"转入金额": {"field": "income", "type": "amount"}},
+        {"转出金额": {"field": "expense", "type": "amount"}},
+        {"对方账号": {"field": "counterparty_account", "type": "string"}},
+        {"借贷标志": {"field": "debit_credit", "type": "string"}},
+        {"对方单位": {"field": "counterparty_name", "type": "string"}},
+        {"对方行号": {"field": "counterparty_bank_code", "type": "string"}},
+        {"用途": {"field": "purpose", "type": "string"}},
+        {"摘要": {"field": "description", "type": "string"}}
+    ]
+}

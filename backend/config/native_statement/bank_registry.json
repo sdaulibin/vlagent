@@ -1,0 +1,30 @@
+{
+  "keywords": {
+    "德州银行": "shandong_local",
+    "潍坊银行": "shandong_local",
+    "莱商银行": "shandong_local",
+    "齐鲁银行": "shandong_local",
+    "光大银行": "everbright",
+    "中国光大银行": "everbright",
+    "招商银行": "cmb",
+    "招行": "cmb",
+    "中国邮政储蓄银行": "psbc",
+    "邮储银行": "psbc",
+    "邮政储蓄银行": "psbc",
+    "邮政储蓄": "psbc",
+    "中国工商银行": "icbc",
+    "工商银行": "icbc",
+    "工行": "icbc",
+    "中国建设银行": "ccb",
+    "建设银行": "ccb",
+    "建行": "ccb",
+    "中国农业银行": "abc",
+    "农业银行": "abc",
+    "农行": "abc",
+    "中国银行": "boc",
+    "中行": "boc",
+    "交通银行": "bocom",
+    "交行": "bocom"
+  },
+  "default": "shandong_local"
+}
