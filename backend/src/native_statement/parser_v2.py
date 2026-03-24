@@ -226,6 +226,10 @@ def parse_native_pdf(pdf_path: str) -> Dict[str, Any]:
         extraction_strategy = "legacy:cmb"
     else:
         # 其他银行使用新版处理器
+        # 强制重新注册处理器以确保使用最新代码
+        from .processors.banks.shandong_processor import ShandongLocalProcessor
+        ProcessorFactory.register("shandong_local", ShandongLocalProcessor)
+
         processor = ProcessorFactory.create(schema)
         mapped_headers, tx_list = processor.process(extraction_result.rows, [])
         transactions = [tx.to_dict() for tx in tx_list]

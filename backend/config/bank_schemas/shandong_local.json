@@ -3,17 +3,9 @@
     "bank_names": [
         "潍坊银行",
         "莱商银行",
-        "齐鲁银行"
+        "齐鲁银行",
+        "德州银行"
     ],
-    "vertical_line_config": {
-        "enabled": true,
-        "lines": [
-            {
-                "x_position": 1175,
-                "description": "摘要备注"
-            }
-        ]
-    },
     "summary_schema": {
         "账户名称": "",
         "账(卡)号": "",
