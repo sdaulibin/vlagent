@@ -129,6 +129,15 @@ class ShandongLocalProcessor(BaseBankProcessor):
             if not row or not any(row):
                 continue
 
+            # 检测并跳过噪声行（比如页内合计），防止它们污染有效的末行交易
+            # 必须在合并之前阻断它，除非它是包含有效时间的主行
+            if self._is_noise_row(row):
+                first_cell = str(row[0] or "").strip()
+                second_cell = str(row[1] or "").strip() if len(row) > 1 else ""
+                # 如果这个噪声行碰巧也有主交易的序号和时间特征，则不能丢弃
+                if not (self.serial_pattern.match(first_cell) and self.time_pattern.match(second_cell)):
+                    continue
+
             # 清理行数据
             row = [str(c or "").strip() for c in row]
             original_len = len(row)  # 保存原始长度
@@ -324,21 +333,58 @@ class ShandongLocalProcessor(BaseBankProcessor):
         return result
 
     def _needs_split(self, row: List[Any]) -> bool:
-        """检测行数据是否需要拆分（9列格式且最后一列包含空格）"""
-        # 统计非空列数
+        """检测行数据是否需要拆分（9列格式）"""
         non_empty = [c for c in row if c and str(c).strip()]
-        if len(non_empty) == 9:
-            # 数据已经被补齐到10列，第9列（索引8）包含了合并的内容，第10列应该是空的
-            target_cell = str(row[8] if len(row) > 8 else row[-1] or "").strip()
-            # 如果该列包含空格，可能需要拆分
-            if " " in target_cell:
-                return True
-        return False
+        return len(non_empty) == 9
 
     def _auto_split_row(self, row: List[Any]) -> List[Any]:
-        """自动检测并拆分9列格式的行"""
-        if self._needs_split(row):
-            return self._split_merged_row(row, 8)  # 索引8是最后一列
+        """自动检测并拆分9列格式的行中的合并单元格"""
+        if not self._needs_split(row):
+            return row
+
+        new_row = list(row)
+        for i in range(len(new_row)):
+            cell = str(new_row[i] or "").strip()
+            if not cell:
+                continue
+
+            # 1. 检查币种和余额合并 ('人民币\n453859.08' 等)
+            if "人民币" in cell and re.search(r'\d+\.\d{2}', cell):
+                parts = cell.replace('\n', ' ').split(' ')
+                val_num = ""
+                val_currency = ""
+                for p in parts:
+                    if "人民币" in p:
+                        val_currency = p
+                    else:
+                        val_num = p
+                
+                # 金额占据当前列，币种右移成新列
+                new_row[i] = val_num
+                new_row.insert(i + 1, val_currency)
+                return new_row[:10]
+
+            # 2. 检查对方户名和摘要合并
+            elif i >= 7 and ("\n" in cell or " " in cell or self._find_desc_start(cell) > 0):
+                split_pos = self._find_desc_start(cell)
+                if split_pos > 0:
+                    part1 = cell[:split_pos].replace('\n', ' ').strip()
+                    part2 = cell[split_pos:].replace('\n', ' ').strip()
+                elif "\n" in cell:
+                    parts = cell.split('\n', 1)
+                    part1 = parts[0].strip()
+                    part2 = parts[1].strip()
+                elif " " in cell:
+                    parts = cell.split(' ', 1)
+                    part1 = parts[0].strip()
+                    part2 = parts[1].strip()
+                else:
+                    continue
+                    
+                new_row[i] = part1
+                new_row.insert(i + 1, part2)
+                return new_row[:10]
+
         return row
 
     def _is_header_row(self, row: List[str]) -> bool:
@@ -478,6 +524,7 @@ class ShandongLocalProcessor(BaseBankProcessor):
             "期初余额", "期末余额",
             "总金额", "总笔数",
             "第.*页", "单位:元",
+            "账.卡.号", "账户名:?", "起止日期"
         ]
 
         for kw in noise_keywords:

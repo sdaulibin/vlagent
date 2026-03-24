@@ -115,7 +115,7 @@ def export_to_excel(result: dict, output_path: str = None) -> str | io.BytesIO:
                 
                 # 针对金额字段尝试转换为数字并设置格式
                 is_num = False
-                if field in ["income", "expense", "balance"]:
+                if field in ["income", "expense", "balance", "收入", "支出", "账户余额", "借方发生额", "贷方发生额", "余额", "存入金额", "支出金额", "收入金额"]:
                     try:
                         # 有的数值可能有千分位占位符，需剔除
                         num_val = float(str(value).replace(",", "").strip())
