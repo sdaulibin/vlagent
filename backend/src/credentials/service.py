@@ -87,6 +87,10 @@ def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:
             image_paths = [file_path]
             
         result = extract_fields_from_images(image_paths, credential_type)
+        
+        # 打印识别结果以供查看
+        print(f"\n[凭证识别结果 - {credential_type}] -> {json.dumps(result, ensure_ascii=False)}")
+        
         return {
             "credential_type": credential_type,
             "extracted_data": result

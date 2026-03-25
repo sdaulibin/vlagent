@@ -24,8 +24,8 @@ class IdCardResponse(BaseModel):
 # 2. 电子印章 (Electronic Seal)
 # -----------------------
 class ElectronicSealResponse(BaseModel):
-    header: Optional[str] = Field("", description="表头(如企业名称)")
-    seal_code: Optional[str] = Field("", description="电子印章编码")
+    header: Optional[str] = Field("", description="表头(如文件类型)")
+    seal_codes: List[str] = Field(default_factory=list, description="电子印章编码列表")
 
 
 # -----------------------

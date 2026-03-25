@@ -44,8 +44,8 @@ const FIELD_LABELS: Record<string, string> = {
   expiry_date: '有效期限',
 
   // Electronic Seal
-  header: '表头/单位名称',
-  seal_code: '印章编码',
+  header: '文件类型',
+  seal_codes: '电子印章编码',
 
   // Bank Card
   card_number: '银行卡号',
@@ -202,7 +202,13 @@ const handleFileUpload = async (event: Event) => {
               <div v-if="key !== 'operators' && val !== null" class="bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <p class="text-xs text-slate-400 font-mono mb-1">{{ FIELD_LABELS[key] || key }}</p>
                 <p class="text-sm font-medium text-slate-800 break-words">
-                  <template v-if="typeof val === 'boolean'">
+                  <template v-if="Array.isArray(val)">
+                    <div v-for="(item, i) in val" :key="i" class="bg-indigo-50 px-2 py-1 rounded text-xs inline-block mr-2 mb-1 border border-indigo-100">
+                      {{ item }}
+                    </div>
+                    <span v-if="val.length === 0" class="text-slate-400">无</span>
+                  </template>
+                  <template v-else-if="typeof val === 'boolean'">
                     <span :class="val ? 'text-green-600 bg-green-100 px-2 py-0.5 rounded text-xs' : 'text-slate-500 bg-slate-200 px-2 py-0.5 rounded text-xs'">
                       {{ val ? '是 (True)' : '否 (False)' }}
                     </span>
