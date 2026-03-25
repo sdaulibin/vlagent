@@ -247,26 +247,25 @@ Task: 审核影像版式，并提取开户申请人确认信息，特别是手�
 ACCOUNT_OPENING_APP_PROMPT = """
 Role: 银行开户申请书信息抽取专家
 
-Task: 识别《开立单位银行账户申请书》中的所有结构化要素，包含复杂的表格内容及勾选项。
+Task: 识别《开立单位银行账户申请书》中的所有要素。请遵循“所见即所得”原则。
 
 ## 提取要求：
-1. 版式识别 (is_account_opening_app): 确认为“开立单位银行账户申请书”返回 true。
-2. 要素提取：
-   - 存款人信息：名称(depositor_name_cn)、类别(depositor_type)、税务登记证(tax_registration_cert)、组织机构代码证(org_code_cert)、证明文件种类/编号(proof_file_type/proof_file_number)、注册地址(registered_address)、经营范围(business_scope)。
-   - 关键人员：
-     - 法定代表人/单位负责人：姓名(legal_rep_name)、电话(legal_rep_phone)、证件种类(legal_rep_id_type)、证件号码(legal_rep_id_number)。
-     - 财务负责人1&2：姓名(financial_manager_1_name/financial_manager_2_name)、电话(financial_manager_1_phone/financial_manager_2_phone)。
-     - 业务经办人：姓名(bus_handler_name)、电话(bus_handler_phone)。
-   - 账户详情：性质(account_nature)、定期类(fixed_term_account)、一般户原因(general_account_reason)、专用户资金性质(special_account_fund_nature)、有效期(expiry_date)、币种(currency)、密码使用(use_account_password)、税收声明(tax_resident_declaration)。
-   - 服务开通 (Boolean): 识别是否勾选开通：网银(open_online_banking)、手机银行(open_mobile_banking)、短信(open_sms_notice)、电话对账(open_phone_reconciliation)、官网对账(open_official_web_reconciliation)。
-   - 服务详情：网银服务框内容(online_banking_services_detail)、短信详情(sms_notice_details)。
-   - 银行信息：银行名称(bank_name)、银行代码(bank_code)、账户名称(account_name)、账号(account_number)、许可证核准号(basic_account_license_no)、开户日期(open_date)。
-   - 签章/经办：公章(depositor_seal)、法人名章(legal_rep_seal)、经办人签名(handler_signature)、日期(sign_date)、底部最后一行备注(bottom_line_content)。
+1. 版式识别 (is_account_opening_app): 确认为“开立单位银行账户申请书”才返回 true。
+2. 要素提取 (所见即所得)：
+   - **精确匹配标签**：请识别纸面上的打印标签文字（如“财务负责人1”、“业务经办人”、“财务负责人2”），并提取其右侧或下方的对应内容。
+   - **严禁错位填充**：若某个标签（如“财务负责人2”）右侧没有任何文字内容，**必须返回空字符串 ""**。绝不可使用其他行（如“业务经办人”）的内容进行填充。
+3. 勾选要素识别 (极度重要 - 业务准断)：
+   - **选中 (True/已开通)**：方框 [ ] 内包含打钩 **√**、**V** 形状、实心涂黑或圆圈内打钩。
+   - **未选中 (False/不授权/取消)**：
+     - 方框 [ ] 内为**完全空白**。
+     - 方框 [ ] 内为明显的**叉号 X 或 x** (两条对角线交叉)。
+   - **特别注意**：本业务中，**叉号 X 专门表示“不授权”或“不办理”**。即使框内有墨迹，只要是叉号 X 形状，**必须判定为 false**。严禁仅凭“非空”就判定为 true。
+4. 细节信息：包含账号(account_number)、申请原因(general_account_reason)、银行处理记录（银行名称、代码等）。
 
-## 输出规则：
-- 返回严格的 JSON 对象。
-- 不要输出 markdown 标记。
+## 字段特殊说明：
+- 财务负责人2姓名(financial_manager_2_name)：请确认其左侧是否有“财务负责人2”标签，且右侧有手写文字。若无手写内容，结果须为空。
 
+## 输出格式 (严格 JSON):
 {
     "is_account_opening_app": true,
     "depositor_name_cn": "",
@@ -283,10 +282,10 @@ Task: 识别《开立单位银行账户申请书》中的所有结构化要素�
     "legal_rep_id_number": "",
     "financial_manager_1_name": "",
     "financial_manager_1_phone": "",
-    "financial_manager_2_name": "",
-    "financial_manager_2_phone": "",
     "bus_handler_name": "",
     "bus_handler_phone": "",
+    "financial_manager_2_name": "",
+    "financial_manager_2_phone": "",
     "account_nature": "",
     "fixed_term_account": "",
     "general_account_reason": "",
@@ -330,7 +329,7 @@ Task: 请从授权委托书影像中提取关键的委托信息和授权事项�
 2. 要素提取：
    - principal_name (本人/委托人姓名)
    - principal_id_number (身份证件号码)
-   - authorized_items (授权事项列表): 提取所有已挑勾 (checked) 或选中的授权事项文字。
+   - authorized_items (授权事项列表): **仅提取方框内打钩 (√) 的项目**。如果方框内是 **叉号 (X)**、**对角线交叉标记** 或者为空，则视为**未授权/不提取**。请仔细辨别 √ 和 X。
    - is_employee (是否为本单位职工): 如果勾选了是或明确标识为职工返回 true。
    - authorized_person_id_number (被授权人身份证号码)
    - authorized_date (代表本人在...日期): 提取具体的日期。
