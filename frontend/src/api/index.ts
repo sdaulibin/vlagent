@@ -201,3 +201,13 @@ export const deleteInvoiceFile = async (fileId: number) => {
   const response = await api.delete(`/invoice_recognition/${fileId}`);
   return response.data;
 };
+
+// ===== 类凭证识别 API =====
+
+export const extractCredential = async (file: File, credentialType: string) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("credential_type", credentialType);
+  const response = await api.post("/credentials/extract", formData);
+  return response.data;
+};

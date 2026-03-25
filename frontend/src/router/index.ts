@@ -5,6 +5,7 @@ import ContractCompare from '../views/ContractCompare.vue'
 import ConfirmationLetter from '../views/ConfirmationLetter.vue'
 import FormatCompare from '../views/FormatCompare.vue'
 import InvoiceRecognition from '../views/InvoiceRecognition.vue'
+import CredentialRecognition from '../views/CredentialRecognition.vue'
 
 const routes = [
     {
@@ -36,6 +37,11 @@ const routes = [
         path: '/invoice-recognition',
         name: 'InvoiceRecognition',
         component: InvoiceRecognition
+    },
+    {
+        path: '/credential-recognition',
+        name: 'CredentialRecognition',
+        component: CredentialRecognition
     }
 ]
 
