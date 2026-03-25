@@ -114,6 +114,88 @@ class NoticeOfIllegalActivityResponse(BaseModel):
     has_fingerprint: Optional[bool] = Field(None, description="签名处是否有手印")
 
 
+# -----------------------
+# 7. 开户申请书 (Account Opening Application)
+# -----------------------
+class AccountOpeningAppResponse(BaseModel):
+    is_account_opening_app: Optional[bool] = Field(None, description="是否为开立单位银行账户申请书")
+    depositor_name_cn: Optional[str] = Field("", description="存款人名称（中文）")
+    depositor_type: Optional[str] = Field("", description="存款人类别")
+    tax_registration_cert: Optional[str] = Field("", description="税务登记证")
+    org_code_cert: Optional[str] = Field("", description="组织机构代码证")
+    proof_file_type: Optional[str] = Field("", description="证明文件种类")
+    proof_file_number: Optional[str] = Field("", description="证明文件编号")
+    registered_address: Optional[str] = Field("", description="注册地址")
+    business_scope: Optional[str] = Field("", description="经营范围")
+    
+    # 人员信息
+    legal_rep_name: Optional[str] = Field("", description="法定代表人/单位负责人姓名")
+    legal_rep_phone: Optional[str] = Field("", description="法定代表人联系电话")
+    legal_rep_id_type: Optional[str] = Field("", description="法定代表人证件种类")
+    legal_rep_id_number: Optional[str] = Field("", description="法定代表人证件号码")
+    financial_manager_1_name: Optional[str] = Field("", description="财务负责人1姓名")
+    financial_manager_1_phone: Optional[str] = Field("", description="财务负责人1联系电话")
+    financial_manager_2_name: Optional[str] = Field("", description="财务负责人2姓名")
+    financial_manager_2_phone: Optional[str] = Field("", description="财务负责人2联系电话")
+    bus_handler_name: Optional[str] = Field("", description="业务经办人姓名")
+    bus_handler_phone: Optional[str] = Field("", description="业务经办人联系电话")
+    
+    # 账户详情
+    account_nature: Optional[str] = Field("", description="账户性质")
+    fixed_term_account: Optional[str] = Field("", description="定期类账户")
+    general_account_reason: Optional[str] = Field("", description="申请一般户原因")
+    special_account_fund_nature: Optional[str] = Field("", description="专用户资金性质")
+    expiry_date: Optional[str] = Field("", description="有效日期至")
+    currency: Optional[str] = Field("", description="申请开户币种")
+    
+    # 账户服务
+    other_account_services: Optional[str] = Field("", description="其他账户服务")
+    use_account_password: Optional[str] = Field("", description="使用账户密码")
+    tax_resident_declaration: Optional[str] = Field("", description="机构税收居民身份声明")
+    
+    # 开通服务 (Boolean)
+    open_online_banking: Optional[bool] = Field(None, description="开通网上银行")
+    open_mobile_banking: Optional[bool] = Field(None, description="开通手机银行")
+    open_sms_notice: Optional[bool] = Field(None, description="开通短信通知")
+    open_phone_reconciliation: Optional[bool] = Field(None, description="开通电话对账")
+    open_official_web_reconciliation: Optional[bool] = Field(None, description="开通官网对账")
+    
+    # 服务详情
+    online_banking_services_detail: Optional[str] = Field("", description="网上银行手机银行服务框里的全部内容")
+    sms_notice_details: Optional[str] = Field("", description="短信通知服务信息")
+    
+    # 银行记录
+    bank_name: Optional[str] = Field("", description="开户银行名称")
+    bank_code: Optional[str] = Field("", description="开户银行代码")
+    account_name: Optional[str] = Field("", description="账户名称")
+    account_number: Optional[str] = Field("", description="账号")
+    basic_account_license_no: Optional[str] = Field("", description="基本存款账户开户许可证核准号")
+    open_date: Optional[str] = Field("", description="开户日期")
+    
+    # 签章区域
+    depositor_seal: Optional[str] = Field("", description="存款人公章名称")
+    legal_rep_seal: Optional[str] = Field("", description="法定代表人名章名字")
+    handler_signature: Optional[str] = Field("", description="经办人签名")
+    sign_date: Optional[str] = Field("", description="日期")
+    bottom_line_content: Optional[str] = Field("", description="申请书最下面一行的内容")
+
+
+# -----------------------
+# 8. 授权委托书 (Power of Attorney)
+# -----------------------
+class PowerOfAttorneyResponse(BaseModel):
+    is_power_of_attorney: bool = Field(..., description="是否为授权委托书")
+    principal_name: str = Field("", description="本人(委托人)")
+    principal_id_number: str = Field("", description="身份证件号码")
+    authorized_items: List[str] = Field(default_factory=list, description="所有授权的事项挑勾的为是")
+    is_employee: bool = Field(False, description="是否为本单位职工")
+    authorized_person_id_number: str = Field("", description="被授权人身份证号码")
+    authorized_date: str = Field("", description="代表本人在（日期）")
+    seal_date: str = Field("", description="公章下面的日期")
+    authorized_person_signature: str = Field("", description="被授权人签字")
+    sign_date: str = Field("", description="日期")
+
+
 # 统一的外层 Response 结构
 class CredentialExtractionResponse(BaseModel):
     credential_type: str = Field(..., description="凭证类型")

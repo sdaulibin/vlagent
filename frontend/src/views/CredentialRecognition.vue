@@ -12,7 +12,9 @@ const CREDENTIAL_TYPES = [
   { value: 'bank_card', label: '银行卡' },
   { value: 'electronic_credential', label: '电子凭证' },
   { value: 'online_banking_app', label: '网银申请书' },
-  { value: 'notice_illegal_activity', label: '违法犯罪告知书' }
+  { value: 'notice_illegal_activity', label: '违法犯罪告知书' },
+  { value: 'account_opening_app', label: '开户申请书' },
+  { value: 'power_of_attorney', label: '授权委托书' }
 ];
 
 const selectedType = ref('id_card');
@@ -92,7 +94,61 @@ const FIELD_LABELS: Record<string, string> = {
   // Illegal Activity Notice
   bank_account: '银行账号',
   applicant_signature: '开户申请人签名',
-  sign_date: '日期'
+  sign_date: '日期',
+
+  // Account Opening App
+  is_account_opening_app: '是否为开户申请书',
+  depositor_name_cn: '存款人名称(中)',
+  depositor_type: '存款人类别',
+  tax_registration_cert: '税务登记证',
+  org_code_cert: '组织机构代码证',
+  proof_file_type: '证明文件种类',
+  proof_file_number: '证明文件编号',
+  registered_address: '注册地址',
+  business_scope: '经营范围',
+  legal_rep_id_type: '法人证件种类',
+  legal_rep_id_number: '法人证件号码',
+  financial_manager_1_name: '财务负责人1',
+  financial_manager_1_phone: '财务负责人1电话',
+  financial_manager_2_name: '财务负责人2',
+  financial_manager_2_phone: '财务负责人2电话',
+  bus_handler_name: '业务经办人',
+  bus_handler_phone: '业务经办人电话',
+  account_nature: '账户性质',
+  fixed_term_account: '定期类账户',
+  general_account_reason: '申请一般户原因',
+  special_account_fund_nature: '专用户资金性质',
+  currency: '账户币种',
+  other_account_services: '其他账户服务',
+  use_account_password: '使用账户密码',
+  tax_resident_declaration: '税收居民声明',
+  open_online_banking: '开通网上银行',
+  open_mobile_banking: '开通手机银行',
+  open_sms_notice: '开通短信通知',
+  open_phone_reconciliation: '开通电话对账',
+  open_official_web_reconciliation: '开通官网对账',
+  online_banking_services_detail: '服务框全部内容',
+  sms_notice_details: '短信服务细节',
+  bank_name: '开户银行名称',
+  bank_code: '开户银行代码',
+  account_name: '账户名称',
+  basic_account_license_no: '核准号',
+  open_date: '开户日期',
+  depositor_seal: '存款人公章',
+  legal_rep_seal: '法人名章',
+  handler_signature: '经办人签名',
+  bottom_line_content: '底部文字内容',
+
+  // Power of Attorney
+  is_power_of_attorney: '是否为授权委托书',
+  principal_name: '本人(委托人)',
+  principal_id_number: '委托人证件号',
+  authorized_items: '授权事项',
+  is_employee: '本单位职工',
+  authorized_person_id_number: '被授权人证件号',
+  authorized_date: '代表本人日期',
+  seal_date: '公章日期',
+  authorized_person_signature: '被授权人签字'
 };
 
 const goBack = () => {

@@ -52,32 +52,31 @@ Task: 请仔细识别并提取影像中的中华人民共和国居民身份证�
 # 2. 电子印章 (Electronic Seal)
 # -----------------------
 ELECTRONIC_SEAL_PROMPT = """
-Role: 电子印章信息提取专家
+Role: 财务单据多印章高精度识别专家
 
-Task: 请从提供的电子印章影像中提取关键要素，特别关注多印章识别及方向纠正后的文字精度。
+Task: 识别影像中所有的电子印章，并提取每一枚印章的唯一编码。
 
-## 提取要求：
-1. header (表头): 提取影像顶部的**文件类型名称**（如“早送尾箱交接单”等）。
-2. seal_codes (电子印章编码列表): 
-   - 扫描影像中出现的所有电子印章实例。
-   - 【方向识别】**重点关注印章的旋转方向**。影像中可能包含倒立(180°)、侧转(90°)或任意角度倾斜的印章。
-   - 【纠正识别】对于倒立或倾斜的印章，请在你的视角中进行**心理旋正**后再提取编码。
-   - **编码提取规则**：
-     - 提取位于印章底部边缘弧形排列的防伪编码（通常为一串由大写英文字母和数字组成的混合代码）。
-     - 请务必**逐位比对物理像素**，避免将 H 误认为 A，将 6 误认为 9，或把 Q 误认为 0，尤其是在印章倒立时。
-   - 【防重机制】：
-     - 影像中可能有多个区域（如上下联），请依次定位所有的印章并分别提取各自编码。
-     - **严禁直接复制粘贴**上一个提取到的编码。必须根据物理位置不同，确认为新的实例并重新抓取文字内容。
-   - 返回一个包含所有识别出的、物理位置不同的 seal_codes 列表。
+## 特别注意 (Critical):
+- 影像中可能包含**多张相互独立的表单或联次**（建议已在预处理中切分）。
+- 每张独立表单中通常各有一枚印章。即便它们形态极其相似，其**防伪编码通常也是不同的**。
+- **严禁直接复用第一个编码**或产生视觉残留错觉。必须对每一枚印章进行独立的局部区域扫描。
 
-## 输出规则：
-- 返回严格的 JSON 对象。
-- seal_codes 必须是字符串列表。
-- 不要输出 markdown 标记。
+## 提取步骤：
+1. **定位锚点**：寻找“**业务受理章**”字样，编码通常在其正下方。
+2. **字符级校验 (极度重要)**：
+   - 提取编码时，请**逐位读写**，不要凭直觉组合。
+   - **区分相似字符**：严格区分 H 与 Q、6 与 9、A 与 V、0 与 Q。
+   - **确认顺序**：核对每个字符的先后顺序（例如是 E-H-Q 还是 E-Q-H），确保完全一致。
+3. **方向识别**：对于倒立的印章，请在脑中先旋转 180 度再以正向视角读取。
 
+## 输出要求：
+- header (表头): 提取影像顶部的**文件类型名称**（如“早送尾箱交接单”）。
+- seal_codes (电子印章编码列表): 返回提取到的**所有印章实例**的编码。
+
+## 输出格式 (严格 JSON):
 {
     "header": "",
-    "seal_codes": []
+    "seal_codes": ["编码1", "编码2", "..."]
 }
 """
 
@@ -242,11 +241,128 @@ Task: 审核影像版式，并提取开户申请人确认信息，特别是手�
 }
 """
 
+# -----------------------
+# 7. 开户申请书 (Account Opening Application)
+# -----------------------
+ACCOUNT_OPENING_APP_PROMPT = """
+Role: 银行开户申请书信息抽取专家
+
+Task: 识别《开立单位银行账户申请书》中的所有结构化要素，包含复杂的表格内容及勾选项。
+
+## 提取要求：
+1. 版式识别 (is_account_opening_app): 确认为“开立单位银行账户申请书”返回 true。
+2. 要素提取：
+   - 存款人信息：名称(depositor_name_cn)、类别(depositor_type)、税务登记证(tax_registration_cert)、组织机构代码证(org_code_cert)、证明文件种类/编号(proof_file_type/proof_file_number)、注册地址(registered_address)、经营范围(business_scope)。
+   - 关键人员：
+     - 法定代表人/单位负责人：姓名(legal_rep_name)、电话(legal_rep_phone)、证件种类(legal_rep_id_type)、证件号码(legal_rep_id_number)。
+     - 财务负责人1&2：姓名(financial_manager_1_name/financial_manager_2_name)、电话(financial_manager_1_phone/financial_manager_2_phone)。
+     - 业务经办人：姓名(bus_handler_name)、电话(bus_handler_phone)。
+   - 账户详情：性质(account_nature)、定期类(fixed_term_account)、一般户原因(general_account_reason)、专用户资金性质(special_account_fund_nature)、有效期(expiry_date)、币种(currency)、密码使用(use_account_password)、税收声明(tax_resident_declaration)。
+   - 服务开通 (Boolean): 识别是否勾选开通：网银(open_online_banking)、手机银行(open_mobile_banking)、短信(open_sms_notice)、电话对账(open_phone_reconciliation)、官网对账(open_official_web_reconciliation)。
+   - 服务详情：网银服务框内容(online_banking_services_detail)、短信详情(sms_notice_details)。
+   - 银行信息：银行名称(bank_name)、银行代码(bank_code)、账户名称(account_name)、账号(account_number)、许可证核准号(basic_account_license_no)、开户日期(open_date)。
+   - 签章/经办：公章(depositor_seal)、法人名章(legal_rep_seal)、经办人签名(handler_signature)、日期(sign_date)、底部最后一行备注(bottom_line_content)。
+
+## 输出规则：
+- 返回严格的 JSON 对象。
+- 不要输出 markdown 标记。
+
+{
+    "is_account_opening_app": true,
+    "depositor_name_cn": "",
+    "depositor_type": "",
+    "tax_registration_cert": "",
+    "org_code_cert": "",
+    "proof_file_type": "",
+    "proof_file_number": "",
+    "registered_address": "",
+    "business_scope": "",
+    "legal_rep_name": "",
+    "legal_rep_phone": "",
+    "legal_rep_id_type": "",
+    "legal_rep_id_number": "",
+    "financial_manager_1_name": "",
+    "financial_manager_1_phone": "",
+    "financial_manager_2_name": "",
+    "financial_manager_2_phone": "",
+    "bus_handler_name": "",
+    "bus_handler_phone": "",
+    "account_nature": "",
+    "fixed_term_account": "",
+    "general_account_reason": "",
+    "special_account_fund_nature": "",
+    "expiry_date": "",
+    "currency": "",
+    "other_account_services": "",
+    "use_account_password": "",
+    "tax_resident_declaration": "",
+    "open_online_banking": false,
+    "open_mobile_banking": false,
+    "open_sms_notice": false,
+    "open_phone_reconciliation": false,
+    "open_official_web_reconciliation": false,
+    "online_banking_services_detail": "",
+    "sms_notice_details": "",
+    "bank_name": "",
+    "bank_code": "",
+    "account_name": "",
+    "account_number": "",
+    "basic_account_license_no": "",
+    "open_date": "",
+    "depositor_seal": "",
+    "legal_rep_seal": "",
+    "handler_signature": "",
+    "sign_date": "",
+    "bottom_line_content": ""
+}
+"""
+
+# -----------------------
+# 8. 授权委托书 (Power of Attorney)
+# -----------------------
+POWER_OF_ATTORNEY_PROMPT = """
+Role: 授权委托书识别专家
+
+Task: 请从授权委托书影像中提取关键的委托信息和授权事项。
+
+## 提取要求：
+1. 版式识别 (is_power_of_attorney): 确认为授权委托书返回 true。
+2. 要素提取：
+   - principal_name (本人/委托人姓名)
+   - principal_id_number (身份证件号码)
+   - authorized_items (授权事项列表): 提取所有已挑勾 (checked) 或选中的授权事项文字。
+   - is_employee (是否为本单位职工): 如果勾选了是或明确标识为职工返回 true。
+   - authorized_person_id_number (被授权人身份证号码)
+   - authorized_date (代表本人在...日期): 提取具体的日期。
+   - seal_date (公章下面的日期): 印章附近的标注日期。
+   - authorized_person_signature (被授权人签字)
+   - sign_date (日期): 最后的签署日期。
+
+## 输出规则：
+- 返回严格的 JSON 对象。
+- 不要输出 markdown 标记。
+
+{
+    "is_power_of_attorney": true,
+    "principal_name": "",
+    "principal_id_number": "",
+    "authorized_items": [],
+    "is_employee": false,
+    "authorized_person_id_number": "",
+    "authorized_date": "",
+    "seal_date": "",
+    "authorized_person_signature": "",
+    "sign_date": ""
+}
+"""
+
 PROMPT_MAPPING = {
     "id_card": ID_CARD_PROMPT,
     "electronic_seal": ELECTRONIC_SEAL_PROMPT,
     "bank_card": BANK_CARD_PROMPT,
     "electronic_credential": ELECTRONIC_CREDENTIAL_PROMPT,
     "online_banking_app": ONLINE_BANKING_APP_PROMPT,
-    "notice_illegal_activity": NOTICE_ILLEGAL_ACTIVITY_PROMPT
+    "notice_illegal_activity": NOTICE_ILLEGAL_ACTIVITY_PROMPT,
+    "account_opening_app": ACCOUNT_OPENING_APP_PROMPT,
+    "power_of_attorney": POWER_OF_ATTORNEY_PROMPT
 }
