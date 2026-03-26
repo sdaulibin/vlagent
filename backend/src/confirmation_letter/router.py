@@ -73,6 +73,7 @@ def _to_recognition_dto(recognition: ConfirmationResult | None) -> ConfirmationR
         id=recognition.id,
         file_id=recognition.file_id,
         confirmation_no=recognition.confirmation_no,
+        recipient_bank=recognition.recipient_bank,
         accounting_firm=recognition.accounting_firm,
         reply_address=recognition.reply_address,
         contact_person=recognition.contact_person,
@@ -266,6 +267,7 @@ async def recognize_confirmation_file(
             conf_result = ConfirmationResult(
                 file_id=file_id,
                 confirmation_no=recognition_result.get("confirmation_no", ""),
+                recipient_bank=recognition_result.get("recipient_bank", ""),
                 accounting_firm=recognition_result.get("accounting_firm", ""),
                 reply_address=recognition_result.get("reply_address", ""),
                 contact_person=recognition_result.get("contact_person", ""),

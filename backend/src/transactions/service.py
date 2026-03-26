@@ -2,6 +2,7 @@
 交易记录创建服务 - 将原始交易数据转换为数据库模型
 """
 from typing import List, Optional
+from decimal import Decimal
 
 from src.transactions.models import (
     # 山东地方银行
@@ -30,6 +31,21 @@ from src.transactions.models import (
 
 
 # ============================================================
+# 辅助函数
+# ============================================================
+
+def _to_decimal_or_none(value) -> Optional[Decimal]:
+    """将字符串转换为 Decimal，空字符串返回 None"""
+    if value is None or value == "":
+        return None
+    # 移除千分位逗号
+    clean_value = str(value).replace(",", "").strip()
+    if not clean_value:
+        return None
+    return Decimal(clean_value)
+
+
+# ============================================================
 # 山东地方银行（潍坊、莱商、齐鲁）记录创建
 # ============================================================
 
@@ -40,15 +56,15 @@ def create_shandong_transaction_records(file_id: int, raw_transactions: list) ->
         t = ShandongLocalTransaction(
             file_id=file_id,
             sequence=str(item.get("序号", idx + 1)),
-            transaction_time=item.get("交易时间", ""),
-            channel=item.get("交易渠道", ""),
-            income=item.get("收入", ""),
-            expense=item.get("支出", ""),
-            balance=item.get("账户余额", ""),
-            currency=item.get("币种", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方户名", ""),
-            description=item.get("摘要备注", "")
+            transaction_time=item.get("交易时间", "") or None,
+            channel=item.get("交易渠道", "") or None,
+            income=_to_decimal_or_none(item.get("收入")),
+            expense=_to_decimal_or_none(item.get("支出")),
+            balance=_to_decimal_or_none(item.get("账户余额")),
+            currency=item.get("币种", "") or None,
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            description=item.get("摘要备注", "") or None
         )
         records.append(t)
     return records
@@ -60,16 +76,16 @@ def create_shandong_summary_record(file_id: int, summary_data: dict) -> Optional
         return None
     return ShandongLocalSummary(
         file_id=file_id,
-        account_name=summary_data.get("账户名称", ""),
-        account_number=summary_data.get("账(卡)号", ""),
-        date_range=summary_data.get("起止日期", ""),
-        income_count=summary_data.get("收入总笔数", ""),
-        income_total=summary_data.get("收入总金额", ""),
-        expense_count=summary_data.get("支出总笔数", ""),
-        expense_total=summary_data.get("支出总金额", ""),
-        has_stamp=summary_data.get("是否有盖章", ""),
-        bank_name=summary_data.get("开户行", ""),
-        stamp_type=summary_data.get("盖章类型", "")
+        account_name=summary_data.get("账户名称", "") or None,
+        account_number=summary_data.get("账(卡)号", "") or None,
+        date_range=summary_data.get("起止日期", "") or None,
+        income_count=summary_data.get("收入总笔数", "") or None,
+        income_total=_to_decimal_or_none(summary_data.get("收入总金额")),
+        expense_count=summary_data.get("支出总笔数", "") or None,
+        expense_total=_to_decimal_or_none(summary_data.get("支出总金额")),
+        has_stamp=summary_data.get("是否有盖章", "") or None,
+        bank_name=summary_data.get("开户行", "") or None,
+        stamp_type=summary_data.get("盖章类型", "") or None
     )
 
 
@@ -84,16 +100,16 @@ def create_everbright_transaction_records(file_id: int, raw_transactions: list) 
         t = EverbrightTransaction(
             file_id=file_id,
             sequence=str(item.get("序号", idx + 1)),
-            transaction_date=item.get("交易日期", ""),
-            transaction_time=item.get("时间", ""),
-            debit_credit=item.get("借/贷", ""),
-            amount=item.get("交易金额", ""),
-            balance=item.get("账户余额", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方名称", ""),
-            voucher_no=item.get("凭证号", ""),
-            description=item.get("摘要", ""),
-            serial_no=item.get("流水号", "")
+            transaction_date=item.get("交易日期", "") or None,
+            transaction_time=item.get("时间", "") or None,
+            debit_credit=item.get("借/贷", "") or None,
+            amount=_to_decimal_or_none(item.get("交易金额")),
+            balance=_to_decimal_or_none(item.get("账户余额")),
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方名称", "") or None,
+            voucher_no=item.get("凭证号", "") or None,
+            description=item.get("摘要", "") or None,
+            serial_no=item.get("流水号", "") or None
         )
         records.append(t)
     return records
@@ -105,13 +121,13 @@ def create_everbright_summary_record(file_id: int, summary_data: dict) -> Option
         return None
     return EverbrightSummary(
         file_id=file_id,
-        account_name=summary_data.get("账户名称", ""),
-        account_number=summary_data.get("账号", ""),
-        date_range=summary_data.get("交易日期", ""),
-        debit_amount=summary_data.get("借方发生额", ""),
-        credit_amount=summary_data.get("贷方发生额", ""),
-        debit_count=summary_data.get("借方笔数", ""),
-        credit_count=summary_data.get("贷方笔数", "")
+        account_name=summary_data.get("账户名称", "") or None,
+        account_number=summary_data.get("账号", "") or None,
+        date_range=summary_data.get("交易日期", "") or None,
+        debit_amount=_to_decimal_or_none(summary_data.get("借方发生额")),
+        credit_amount=_to_decimal_or_none(summary_data.get("贷方发生额")),
+        debit_count=summary_data.get("借方笔数", "") or None,
+        credit_count=summary_data.get("贷方笔数", "") or None
     )
 
 
@@ -125,17 +141,17 @@ def create_cmb_transaction_records(file_id: int, raw_transactions: list) -> List
     for idx, item in enumerate(raw_transactions):
         t = CmbTransaction(
             file_id=file_id,
-            serial_no=item.get("交易流水号", ""),
-            transaction_date=item.get("交易日期", ""),
-            debit_amount=item.get("借方(出账)", ""),
-            credit_amount=item.get("贷方(入账)", ""),
-            balance=item.get("余额", ""),
-            counterparty_name=item.get("收(付)方名称", ""),
-            counterparty_account=item.get("收(付)方账号", ""),
-            description=item.get("摘要", ""),
-            transaction_type=item.get("交易类型", ""),
-            card_no=item.get("公司一卡通号", ""),
-            print_instance_no=item.get("打印实例号", "")
+            serial_no=item.get("交易流水号", "") or None,
+            transaction_date=item.get("交易日期", "") or None,
+            debit_amount=_to_decimal_or_none(item.get("借方(出账)")),
+            credit_amount=_to_decimal_or_none(item.get("贷方(入账)")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            counterparty_name=item.get("收(付)方名称", "") or None,
+            counterparty_account=item.get("收(付)方账号", "") or None,
+            description=item.get("摘要", "") or None,
+            transaction_type=item.get("交易类型", "") or None,
+            card_no=item.get("公司一卡通号", "") or None,
+            print_instance_no=item.get("打印实例号", "") or None
         )
         records.append(t)
     return records
@@ -147,15 +163,15 @@ def create_cmb_summary_record(file_id: int, summary_data: dict) -> Optional[CmbS
         return None
     return CmbSummary(
         file_id=file_id,
-        account_number=summary_data.get("账号", ""),
-        account_name=summary_data.get("账号名", ""),
-        start_date=summary_data.get("开始日期", ""),
-        end_date=summary_data.get("结束日期", ""),
-        debit_count=summary_data.get("出账总笔数", ""),
-        credit_count=summary_data.get("入账总笔数", ""),
-        debit_total=summary_data.get("出账总金额", ""),
-        credit_total=summary_data.get("入账总金额", ""),
-        total_count=summary_data.get("笔数", "")
+        account_number=summary_data.get("账号", "") or None,
+        account_name=summary_data.get("账号名", "") or None,
+        start_date=summary_data.get("开始日期", "") or None,
+        end_date=summary_data.get("结束日期", "") or None,
+        debit_count=summary_data.get("出账总笔数", "") or None,
+        credit_count=summary_data.get("入账总笔数", "") or None,
+        debit_total=_to_decimal_or_none(summary_data.get("出账总金额")),
+        credit_total=_to_decimal_or_none(summary_data.get("入账总金额")),
+        total_count=summary_data.get("笔数", "") or None
     )
 
 
@@ -170,13 +186,13 @@ def create_jining_transaction_records(file_id: int, raw_transactions: list) -> L
         t = JiningTransaction(
             file_id=file_id,
             sequence=str(item.get("序号", idx + 1)),
-            transaction_date=item.get("记账日期", ""),
-            channel=item.get("交易渠道", ""),
-            income=item.get("收入", ""),
-            expense=item.get("支出", ""),
-            balance=item.get("账户余额", ""),
-            description=item.get("摘要备注", ""),
-            counterparty_info=item.get("交易对手信息", "")
+            transaction_date=item.get("记账日期", "") or None,
+            channel=item.get("交易渠道", "") or None,
+            income=_to_decimal_or_none(item.get("收入")),
+            expense=_to_decimal_or_none(item.get("支出")),
+            balance=_to_decimal_or_none(item.get("账户余额")),
+            description=item.get("摘要备注", "") or None,
+            counterparty_info=item.get("交易对手信息", "") or None
         )
         records.append(t)
     return records
@@ -188,13 +204,13 @@ def create_jining_summary_record(file_id: int, summary_data: dict) -> Optional[J
         return None
     return JiningSummary(
         file_id=file_id,
-        account_number=summary_data.get("账号", ""),
-        account_name=summary_data.get("账户名称", ""),
-        date_range=summary_data.get("起止日期", ""),
-        currency=summary_data.get("币种", ""),
-        income_total=summary_data.get("收入金额合计", ""),
-        expense_total=summary_data.get("支出金额合计", ""),
-        bank_name=summary_data.get("开户机构", "")
+        account_number=summary_data.get("账号", "") or None,
+        account_name=summary_data.get("账户名称", "") or None,
+        date_range=summary_data.get("起止日期", "") or None,
+        currency=summary_data.get("币种", "") or None,
+        income_total=_to_decimal_or_none(summary_data.get("收入金额合计")),
+        expense_total=_to_decimal_or_none(summary_data.get("支出金额合计")),
+        bank_name=summary_data.get("开户机构", "") or None
     )
 
 
@@ -209,21 +225,21 @@ def create_cgb_transaction_records(file_id: int, raw_transactions: list, summary
         t = CgbTransaction(
             file_id=file_id,
             summary_id=summary_id,  # 关联汇总
-            serial_no=item.get("流水号", ""),
-            transaction_time=item.get("交易时间", ""),
-            income=item.get("收入", ""),
-            expense=item.get("支出", ""),
-            balance=item.get("余额", ""),
-            currency=item.get("币种", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方户名", ""),
-            transaction_branch=item.get("交易行所", ""),
-            counterparty_bank_code=item.get("对方开户行联行号", ""),
-            counterparty_bank=item.get("对方开户行", ""),
-            voucher_no=item.get("凭证号", ""),
-            description=item.get("摘要", ""),
-            remark=item.get("备注", ""),
-            postscript=item.get("附言", "")
+            serial_no=item.get("流水号", "") or None,
+            transaction_time=item.get("交易时间", "") or None,
+            income=_to_decimal_or_none(item.get("收入")),
+            expense=_to_decimal_or_none(item.get("支出")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            currency=item.get("币种", "") or None,
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            transaction_branch=item.get("交易行所", "") or None,
+            counterparty_bank_code=item.get("对方开户行联行号", "") or None,
+            counterparty_bank=item.get("对方开户行", "") or None,
+            voucher_no=item.get("凭证号", "") or None,
+            description=item.get("摘要", "") or None,
+            remark=item.get("备注", "") or None,
+            postscript=item.get("附言", "") or None
         )
         records.append(t)
     return records
@@ -235,17 +251,17 @@ def create_cgb_summary_record(file_id: int, summary_data: dict) -> Optional[CgbS
         return None
     return CgbSummary(
         file_id=file_id,
-        account_name=summary_data.get("户名", ""),
-        account_number=summary_data.get("账号", ""),
-        date_range=summary_data.get("起止日期", ""),
-        currency=summary_data.get("币种", ""),
-        unit=summary_data.get("单位", ""),
-        expense_total=summary_data.get("支出总金额", ""),
-        expense_count=summary_data.get("支出总笔数", ""),
-        income_total=summary_data.get("收入总金额", ""),
-        income_count=summary_data.get("收入总笔数", ""),
-        current_balance=summary_data.get("账户当前余额", ""),
-        record_count=summary_data.get("记录数", "")
+        account_name=summary_data.get("户名", "") or None,
+        account_number=summary_data.get("账号", "") or None,
+        date_range=summary_data.get("起止日期", "") or None,
+        currency=summary_data.get("币种", "") or None,
+        unit=summary_data.get("单位", "") or None,
+        expense_total=_to_decimal_or_none(summary_data.get("支出总金额")),
+        expense_count=summary_data.get("支出总笔数", "") or None,
+        income_total=_to_decimal_or_none(summary_data.get("收入总金额")),
+        income_count=summary_data.get("收入总笔数", "") or None,
+        current_balance=_to_decimal_or_none(summary_data.get("账户当前余额")),
+        record_count=summary_data.get("记录数", "") or None
     )
 
 
@@ -270,19 +286,19 @@ def create_psbc_transaction_records(file_id: int, raw_transactions: list) -> Lis
     for idx, item in enumerate(raw_transactions):
         t = PsbcTransaction(
             file_id=file_id,
-            serial_no=item.get("交易流水号", ""),
-            global_route_no=item.get("全局路由号", ""),
-            transaction_time=item.get("交易时间", ""),
-            transaction_date=item.get("记账日期", ""),
-            income=item.get("收入金额", ""),
-            expense=item.get("支出金额", ""),
-            balance=item.get("余额", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方户名", ""),
-            counterparty_bank=item.get("对方行名", ""),
-            purpose=item.get("用途", ""),
-            postscript=item.get("附言", ""),
-            description=item.get("摘要", "")
+            serial_no=item.get("交易流水号", "") or None,
+            global_route_no=item.get("全局路由号", "") or None,
+            transaction_time=item.get("交易时间", "") or None,
+            transaction_date=item.get("记账日期", "") or None,
+            income=_to_decimal_or_none(item.get("收入金额")),
+            expense=_to_decimal_or_none(item.get("支出金额")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            counterparty_bank=item.get("对方行名", "") or None,
+            purpose=item.get("用途", "") or None,
+            postscript=item.get("附言", "") or None,
+            description=item.get("摘要", "") or None
         )
         records.append(t)
     return records
@@ -294,14 +310,14 @@ def create_psbc_summary_record(file_id: int, summary_data: dict) -> Optional[Psb
         return None
     return PsbcSummary(
         file_id=file_id,
-        account_name=summary_data.get("户名", ""),
-        account_number=summary_data.get("账号", ""),
-        income_total=summary_data.get("收入总金额", ""),
-        expense_total=summary_data.get("支出总金额", ""),
-        income_count=summary_data.get("收入总笔数", ""),
-        expense_count=summary_data.get("支出总笔数", ""),
-        start_date=summary_data.get("起始日期", ""),
-        end_date=summary_data.get("结束日期", "")
+        account_name=summary_data.get("户名", "") or None,
+        account_number=summary_data.get("账号", "") or None,
+        income_total=_to_decimal_or_none(summary_data.get("收入总金额")),
+        expense_total=_to_decimal_or_none(summary_data.get("支出总金额")),
+        income_count=summary_data.get("收入总笔数", "") or None,
+        expense_count=summary_data.get("支出总笔数", "") or None,
+        start_date=summary_data.get("起始日期", "") or None,
+        end_date=summary_data.get("结束日期", "") or None
     )
 
 
@@ -315,15 +331,15 @@ def create_icbc_transaction_records(file_id: int, raw_transactions: list) -> Lis
     for idx, item in enumerate(raw_transactions):
         t = IcbcTransaction(
             file_id=file_id,
-            transaction_time=item.get("交易时间", ""),
-            income=item.get("转入金额", ""),
-            expense=item.get("转出金额", ""),
-            counterparty_account=item.get("对方账号", ""),
-            debit_credit=item.get("借贷标志", ""),
-            counterparty_name=item.get("对方单位", ""),
-            counterparty_bank_code=item.get("对方行号", ""),
-            description=item.get("摘要", ""),
-            purpose=item.get("用途", "")
+            transaction_time=item.get("交易时间", "") or None,
+            income=_to_decimal_or_none(item.get("转入金额")),
+            expense=_to_decimal_or_none(item.get("转出金额")),
+            counterparty_account=item.get("对方账号", "") or None,
+            debit_credit=item.get("借贷标志", "") or None,
+            counterparty_name=item.get("对方单位", "") or None,
+            counterparty_bank_code=item.get("对方行号", "") or None,
+            description=item.get("摘要", "") or None,
+            purpose=item.get("用途", "") or None
         )
         records.append(t)
     return records
@@ -353,23 +369,23 @@ def create_ccb_transaction_records(file_id: int, raw_transactions: list) -> List
     for idx, item in enumerate(raw_transactions):
         t = CcbTransaction(
             file_id=file_id,
-            account_number=item.get("账号", ""),
-            transaction_time=item.get("交易时间", ""),
-            debit_amount=item.get("借方发生额", ""),
-            credit_amount=item.get("贷方发生额", ""),
-            balance=item.get("余额", ""),
-            currency=item.get("币种", ""),
-            counterparty_name=item.get("对方户名", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_bank=item.get("对方开户机构", ""),
-            booking_date=item.get("记账日期", ""),
-            description=item.get("摘要", ""),
-            remark=item.get("备注", ""),
-            transaction_serial=item.get("账户明细编号-交易流水号", ""),
-            enterprise_serial=item.get("企业流水号", ""),
-            voucher_type=item.get("凭证种类", ""),
-            voucher_number=item.get("凭证号", ""),
-            transaction_medium=item.get("交易介质编号", "")
+            account_number=item.get("账号", "") or None,
+            transaction_time=item.get("交易时间", "") or None,
+            debit_amount=_to_decimal_or_none(item.get("借方发生额")),
+            credit_amount=_to_decimal_or_none(item.get("贷方发生额")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            currency=item.get("币种", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_bank=item.get("对方开户机构", "") or None,
+            booking_date=item.get("记账日期", "") or None,
+            description=item.get("摘要", "") or None,
+            remark=item.get("备注", "") or None,
+            transaction_serial=item.get("账户明细编号-交易流水号", "") or None,
+            enterprise_serial=item.get("企业流水号", "") or None,
+            voucher_type=item.get("凭证种类", "") or None,
+            voucher_number=item.get("凭证号", "") or None,
+            transaction_medium=item.get("交易介质编号", "") or None
         )
         records.append(t)
     return records
@@ -381,8 +397,8 @@ def create_ccb_summary_record(file_id: int, summary_data: dict) -> Optional[CcbS
         return None
     return CcbSummary(
         file_id=file_id,
-        account_name=summary_data.get("本方户名", ""),
-        print_date=summary_data.get("打印日期", "")
+        account_name=summary_data.get("本方户名", "") or None,
+        print_date=summary_data.get("打印日期", "") or None
     )
 
 
@@ -396,14 +412,14 @@ def create_abc_transaction_records(file_id: int, raw_transactions: list) -> List
     for idx, item in enumerate(raw_transactions):
         t = AbcTransaction(
             file_id=file_id,
-            transaction_time=item.get("交易时间", ""),
-            income=item.get("收入金额", ""),
-            expense=item.get("支出金额", ""),
-            balance=item.get("账户余额", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方户名", ""),
-            counterparty_bank=item.get("对方开户行", ""),
-            description=item.get("摘要", "")
+            transaction_time=item.get("交易时间", "") or None,
+            income=_to_decimal_or_none(item.get("收入金额")),
+            expense=_to_decimal_or_none(item.get("支出金额")),
+            balance=_to_decimal_or_none(item.get("账户余额")),
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            counterparty_bank=item.get("对方开户行", "") or None,
+            description=item.get("摘要", "") or None
         )
         records.append(t)
     return records
@@ -411,7 +427,7 @@ def create_abc_transaction_records(file_id: int, raw_transactions: list) -> List
 
 def create_abc_summary_record(file_id: int, summary_data: dict) -> Optional[AbcSummary]:
     """创建农业银行汇总记录
-    
+
     注意：农业银行汇总信息分布在首页顶部和末页底部
     - 首页：账号、户名、币种、起止日期
     - 末页：总收入笔数、总收入金额、总支出笔数、总支出金额
@@ -420,14 +436,14 @@ def create_abc_summary_record(file_id: int, summary_data: dict) -> Optional[AbcS
         return None
     return AbcSummary(
         file_id=file_id,
-        account_number=summary_data.get("账号", ""),
-        account_name=summary_data.get("户名", ""),
-        currency=summary_data.get("币种", ""),
-        date_range=summary_data.get("起止日期", ""),
-        income_count=summary_data.get("总收入笔数", ""),
-        income_total=summary_data.get("总收入金额", ""),
-        expense_count=summary_data.get("总支出笔数", ""),
-        expense_total=summary_data.get("总支出金额", "")
+        account_number=summary_data.get("账号", "") or None,
+        account_name=summary_data.get("户名", "") or None,
+        currency=summary_data.get("币种", "") or None,
+        date_range=summary_data.get("起止日期", "") or None,
+        income_count=summary_data.get("总收入笔数", "") or None,
+        income_total=_to_decimal_or_none(summary_data.get("总收入金额")),
+        expense_count=summary_data.get("总支出笔数", "") or None,
+        expense_total=_to_decimal_or_none(summary_data.get("总支出金额"))
     )
 
 
@@ -441,17 +457,17 @@ def create_boc_transaction_records(file_id: int, raw_transactions: list) -> List
     for idx, item in enumerate(raw_transactions):
         t = BocTransaction(
             file_id=file_id,
-            sequence=item.get("序号", ""),
-            booking_date=item.get("记账日", ""),
-            value_date=item.get("起息日", ""),
-            transaction_type=item.get("交易类型", ""),
-            voucher=item.get("凭证", ""),
-            transaction_details=item.get("凭证号业务号用途摘要", ""),
-            debit_amount=item.get("借方发生额", ""),
-            credit_amount=item.get("贷方发生额", ""),
-            balance=item.get("余额", ""),
-            reference_no=item.get("机构柜员流水", ""),
-            notes=item.get("备注", "")
+            sequence=item.get("序号", "") or None,
+            booking_date=item.get("记账日", "") or None,
+            value_date=item.get("起息日", "") or None,
+            transaction_type=item.get("交易类型", "") or None,
+            voucher=item.get("凭证", "") or None,
+            transaction_details=item.get("凭证号业务号用途摘要", "") or None,
+            debit_amount=_to_decimal_or_none(item.get("借方发生额")),
+            credit_amount=_to_decimal_or_none(item.get("贷方发生额")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            reference_no=item.get("机构柜员流水", "") or None,
+            notes=item.get("备注", "") or None
         )
         records.append(t)
     return records
@@ -463,13 +479,13 @@ def create_boc_summary_record(file_id: int, summary_data: dict) -> Optional[BocS
         return None
     return BocSummary(
         file_id=file_id,
-        account_number=summary_data.get("账号", ""),
-        account_name=summary_data.get("账户名称", ""),
-        currency=summary_data.get("币种", ""),
-        account_type=summary_data.get("账户类型", ""),
-        bank_name=summary_data.get("开户行", ""),
-        start_date=summary_data.get("起始日期", ""),
-        end_date=summary_data.get("截止日期", "")
+        account_number=summary_data.get("账号", "") or None,
+        account_name=summary_data.get("账户名称", "") or None,
+        currency=summary_data.get("币种", "") or None,
+        account_type=summary_data.get("账户类型", "") or None,
+        bank_name=summary_data.get("开户行", "") or None,
+        start_date=summary_data.get("起始日期", "") or None,
+        end_date=summary_data.get("截止日期", "") or None
     )
 
 
@@ -488,22 +504,22 @@ def create_bocom_transaction_records(file_id: int, raw_transactions: list) -> Li
     for idx, item in enumerate(raw_transactions):
         t = BocomTransaction(
             file_id=file_id,
-            sequence=item.get("序号", ""),
-            accounting_date=item.get("会计日期", ""),
-            transaction_date=item.get("交易日期", ""),
-            transaction_name=item.get("交易名称", ""),
-            voucher_type=item.get("凭证种类", ""),
-            voucher_number=item.get("凭证号码", ""),
-            debit_amount=item.get("借方发生额", ""),
-            credit_amount=item.get("贷方发生额", ""),
-            balance=item.get("余额", ""),
-            card_number=item.get("卡号", ""),
-            transaction_location=item.get("交易地点", ""),
-            counterparty_account=item.get("对方账号", ""),
-            counterparty_name=item.get("对方户名", ""),
-            counterparty_bank=item.get("对方行名", ""),
-            description=item.get("摘要", ""),
-            serial_no=item.get("流水号", "")
+            sequence=item.get("序号", "") or None,
+            accounting_date=item.get("会计日期", "") or None,
+            transaction_date=item.get("交易日期", "") or None,
+            transaction_name=item.get("交易名称", "") or None,
+            voucher_type=item.get("凭证种类", "") or None,
+            voucher_number=item.get("凭证号码", "") or None,
+            debit_amount=_to_decimal_or_none(item.get("借方发生额")),
+            credit_amount=_to_decimal_or_none(item.get("贷方发生额")),
+            balance=_to_decimal_or_none(item.get("余额")),
+            card_number=item.get("卡号", "") or None,
+            transaction_location=item.get("交易地点", "") or None,
+            counterparty_account=item.get("对方账号", "") or None,
+            counterparty_name=item.get("对方户名", "") or None,
+            counterparty_bank=item.get("对方行名", "") or None,
+            description=item.get("摘要", "") or None,
+            serial_no=item.get("流水号", "") or None
         )
         records.append(t)
     return records
@@ -515,10 +531,10 @@ def create_bocom_summary_record(file_id: int, summary_data: dict) -> Optional[Bo
         return None
     return BocomSummary(
         file_id=file_id,
-        bank_branch=summary_data.get("开户机构", ""),
-        account_number=summary_data.get("账号", ""),
-        account_name=summary_data.get("户名", ""),
-        currency=summary_data.get("币种", ""),
-        year=summary_data.get("年份", ""),
-        month=summary_data.get("月份", "")
+        bank_branch=summary_data.get("开户机构", "") or None,
+        account_number=summary_data.get("账号", "") or None,
+        account_name=summary_data.get("户名", "") or None,
+        currency=summary_data.get("币种", "") or None,
+        year=summary_data.get("年份", "") or None,
+        month=summary_data.get("月份", "") or None
     )
