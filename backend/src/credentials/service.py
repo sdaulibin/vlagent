@@ -56,6 +56,68 @@ def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
     return data
 
 
+def _verify_symbols_with_secondary_check(image_paths: List[str], item_names: List[str]) -> Dict[str, bool]:
+    """
+    使用专门的符号识别 prompt 进行二次验证
+
+    Args:
+        image_paths: 图片路径列表
+        item_names: 需要验证的项目名称列表
+
+    Returns:
+        dict: {项目名称: is_checkmark}
+    """
+    from src.credentials.prompts import SYMBOL_RECOGNITION_PROMPT
+
+    # 构造验证 prompt，明确指定需要验证的项目
+    items_text = "\n".join([f"- {name}" for name in item_names])
+    verification_prompt = f"{SYMBOL_RECOGNITION_PROMPT}\n\n需要验证的项目：\n{items_text}"
+
+    print(f"[DEBUG] 启动二次验证，验证 {len(item_names)} 个项目")
+
+    try:
+        # 调用 AI 进行二次验证
+        response = request_qwen35(
+            question=verification_prompt,
+            file_base=image_paths[0],
+            show_request=False
+        ).strip()
+
+        data = json.loads(fix_json(response))
+
+        # 提取验证结果（新格式包含推理过程）
+        result = {}
+        symbols = data.get("symbols", [])
+
+        print(f"[DEBUG] 二次验证详细结果:")
+        for symbol_info in symbols:
+            name = symbol_info.get("item_name", "")
+            is_checkmark = symbol_info.get("is_checkmark", False)
+
+            # 打印推理过程
+            has_ink = symbol_info.get("has_ink", "未知")
+            intersection_analysis = symbol_info.get("intersection_analysis", "")
+            symbol_description = symbol_info.get("symbol_description", "")
+
+            print(f"  [{name}]")
+            print(f"    - 有墨迹: {has_ink}")
+            print(f"    - 交叉点分析: {intersection_analysis}")
+            print(f"    - 符号描述: {symbol_description}")
+            print(f"    - 最终判断: {'√' if is_checkmark else '×'}")
+
+            result[name] = is_checkmark
+
+        print(f"[DEBUG] 二次验证最终结果: {result}")
+        return result
+
+    except Exception as e:
+        print(f"[ERROR] 二次验证失败: {e}")
+        import traceback
+        traceback.print_exc()
+        # 返回空字典，表示验证失败，保持原始结果
+        return {}
+
+
 def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
     """
     后处理授权委托书的授权事项（四类分组结构）
@@ -69,10 +131,27 @@ def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
     if credential_type != "power_of_attorney":
         return data
 
+    # 【调试】打印AI返回的原始数据
+    print(f"[DEBUG] AI返回的原始 authorized_items_by_category: {data.get('authorized_items_by_category', {})}")
+
     # 获取四类分组的原始数据
     raw_categories = data.get("authorized_items_by_category", {})
     if not isinstance(raw_categories, dict):
         raw_categories = {}
+
+    # 【统计】记录模型返回的勾选情况
+    total_items = 0
+    checked_items = 0
+    for category in ["opening", "change", "cancellation"]:
+        raw_items = raw_categories.get(category, [])
+        if isinstance(raw_items, list):
+            for item in raw_items:
+                if isinstance(item, dict):
+                    total_items += 1
+                    if item.get("checked", False):
+                        checked_items += 1
+
+    print(f"[DEBUG] 授权事项统计: 总计 {total_items} 项, 已勾选 {checked_items} 项")
 
     # 【标准项目定义】每类业务的所有已知项目（按顺序，与prompts.py完全一致）
     STANDARD_ITEMS = {
@@ -349,6 +428,11 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
     else:
         compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size)
     prompt = PROMPT_MAPPING.get(credential_type)
+
+    # 【调试】确认prompt已加载
+    if credential_type == "power_of_attorney":
+        print(f"[DEBUG] Prompt 前100字符: {prompt[:100] if prompt else 'None'}")
+        print(f"[DEBUG] Prompt 包含'默认 false': {'默认 false' in prompt if prompt else False}")
 
     if not prompt:
         raise ValueError(f"Unsupported credential type: {credential_type}")
