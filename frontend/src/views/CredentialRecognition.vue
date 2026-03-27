@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, Upload, Loader2, FileCheck2 } from 'lucide-vue-next';
 import { extractCredential } from '../api';
+import PowerOfAttorneyResult from '../components/PowerOfAttorneyResult.vue';
 
 const router = useRouter();
 
@@ -162,7 +163,7 @@ const handleFileUpload = async (event: Event) => {
 
   const file = fileList[0];
   if (!file) return;
-  
+
   isUploading.value = true;
   resultData.value = null;
   errorMsg.value = '';
@@ -201,13 +202,13 @@ const handleFileUpload = async (event: Event) => {
 
     <!-- Main Content -->
     <main class="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1">
-      
+
       <!-- Left: Upload & Config -->
       <div class="md:col-span-4 flex flex-col gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <h3 class="font-medium text-slate-700 mb-4">1. 选择凭证类型</h3>
-          <select 
-            v-model="selectedType" 
+          <select
+            v-model="selectedType"
             class="w-full border-slate-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2 border"
           >
             <option v-for="t in CREDENTIAL_TYPES" :key="t.value" :value="t.value">
@@ -252,48 +253,54 @@ const handleFileUpload = async (event: Event) => {
 
         <!-- Results Display -->
         <div v-if="resultData" class="flex-1 p-6 overflow-auto">
-          <!-- Dynamic key-value rendering -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <template v-for="(val, key) in resultData" :key="key">
-              <div v-if="key !== 'operators' && val !== null" class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p class="text-xs text-slate-400 font-mono mb-1">{{ FIELD_LABELS[key] || key }}</p>
-                <p class="text-sm font-medium text-slate-800 break-words">
-                  <template v-if="Array.isArray(val)">
-                    <div v-for="(item, i) in val" :key="i" class="bg-indigo-50 px-2 py-1 rounded text-xs inline-block mr-2 mb-1 border border-indigo-100">
-                      {{ item }}
-                    </div>
-                    <span v-if="val.length === 0" class="text-slate-400">无</span>
-                  </template>
-                  <template v-else-if="typeof val === 'boolean'">
-                    <span :class="val ? 'text-green-600 bg-green-100 px-2 py-0.5 rounded text-xs' : 'text-slate-500 bg-slate-200 px-2 py-0.5 rounded text-xs'">
-                      {{ val ? '是 (True)' : '否 (False)' }}
-                    </span>
-                  </template>
-                  <template v-else>
-                    {{ val === '' || val === null ? '无' : val }}
-                  </template>
-                </p>
-              </div>
-            </template>
-          </div>
+          <!-- 授权委托书特殊展示 -->
+          <template v-if="selectedType === 'power_of_attorney'">
+            <PowerOfAttorneyResult :data="resultData" />
+          </template>
 
-          <!-- Operators Array Display for Online Banking App -->
-          <div v-if="resultData.operators && resultData.operators.length > 0" class="mt-6">
-            <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作人员列表</h4>
-            <div class="space-y-3">
-              <div v-for="(op, idx) in resultData.operators" :key="idx" class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between">
-                <div>
-                  <p class="text-xs text-blue-400 mb-1">姓名: <span class="text-sm font-medium text-slate-800">{{ op.name || '-' }}</span></p>
-                  <p class="text-xs text-blue-400">身份证: <span class="font-mono text-slate-800">{{ op.id_number || '-' }}</span></p>
+          <!-- 其他凭证类型：通用展示 -->
+          <template v-else>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <template v-for="(val, key) in resultData" :key="key">
+                <div v-if="String(key) !== 'operators' && String(key) !== 'authorized_items_by_category' && val !== null" class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <p class="text-xs text-slate-400 font-mono mb-1">{{ FIELD_LABELS[key] || key }}</p>
+                  <p class="text-sm font-medium text-slate-800 break-words">
+                    <template v-if="Array.isArray(val)">
+                      <div v-for="(item, i) in val" :key="i" class="bg-indigo-50 px-2 py-1 rounded text-xs inline-block mr-2 mb-1 border border-indigo-100">
+                        {{ item }}
+                      </div>
+                      <span v-if="val.length === 0" class="text-slate-400">无</span>
+                    </template>
+                    <template v-else-if="typeof val === 'boolean'">
+                      <span :class="val ? 'text-green-600 bg-green-100 px-2 py-0.5 rounded text-xs' : 'text-slate-500 bg-slate-200 px-2 py-0.5 rounded text-xs'">
+                        {{ val ? '是 (True)' : '否 (False)' }}
+                      </span>
+                    </template>
+                    <template v-else>
+                      {{ val === '' || val === null ? '无' : val }}
+                    </template>
+                  </p>
                 </div>
-                <div class="text-right">
-                  <p class="text-xs text-blue-400 mb-1">手机:</p>
-                  <p class="text-sm font-medium text-slate-800">{{ op.phone || '-' }}</p>
+              </template>
+            </div>
+
+            <!-- Operators Array Display for Online Banking App -->
+            <div v-if="resultData.operators && resultData.operators.length > 0" class="mt-6">
+              <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作人员列表</h4>
+              <div class="space-y-3">
+                <div v-for="(op, idx) in resultData.operators" :key="idx" class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between">
+                  <div>
+                    <p class="text-xs text-blue-400 mb-1">姓名: <span class="text-sm font-medium text-slate-800">{{ op.name || '-' }}</span></p>
+                    <p class="text-xs text-blue-400">身份证: <span class="font-mono text-slate-800">{{ op.id_number || '-' }}</span></p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs text-blue-400 mb-1">手机:</p>
+                    <p class="text-sm font-medium text-slate-800">{{ op.phone || '-' }}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
+          </template>
         </div>
       </div>
     </main>

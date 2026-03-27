@@ -4,6 +4,7 @@ Supports: Electronic Seal, Electronic Credential, ID Card, Bank Card, Online Ban
 """
 import os
 import json
+import re
 import shutil
 import tempfile
 from typing import List, Dict, Any
@@ -13,6 +14,214 @@ from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 from src.credentials.prompts import PROMPT_MAPPING
+
+
+def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
+    """
+    后处理 Boolean 字段，针对开户申请书和授权委托书中的勾选字段进行二次校验和修正
+
+    规则：
+    1. 如果字符串值看起来像 "X" 或 "×" 标记，转换为 false
+    2. 清理可能的误识别
+    """
+    if credential_type not in ["account_opening_app", "power_of_attorney"]:
+        return data
+
+    boolean_field_patterns = {
+        "account_opening_app": [
+            "open_online_banking", "open_mobile_banking", "open_sms_notice",
+            "open_phone_reconciliation", "open_official_web_reconciliation"
+        ],
+        "power_of_attorney": ["is_employee"]
+    }
+
+    fields_to_check = boolean_field_patterns.get(credential_type, [])
+
+    for field in fields_to_check:
+        if field in data:
+            value = data[field]
+            # 如果是字符串，检查是否包含 X/× 标记
+            if isinstance(value, str):
+                # 检查是否是叉号标记
+                if re.search(r'^[×xX]$', value.strip()):
+                    data[field] = False
+                elif value.lower() in ["false", "no", "否", "未勾选", "×", "x"]:
+                    data[field] = False
+                elif value.lower() in ["true", "yes", "是", "√", "勾选"]:
+                    data[field] = True
+                else:
+                    # 无法确定，保持原值或默认 false
+                    data[field] = bool(value) if isinstance(value, bool) else False
+
+    return data
+
+
+def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
+    """
+    后处理授权委托书的授权事项（四类分组结构）
+
+    处理逻辑：
+    1. opening（开户类）、change（变更类）、cancellation（注销类）：
+       - 确保返回所有已知项目及其勾选状态
+       - 使用白名单过滤非标准项目名称
+    2. other（其他业务）：按逗号/顿号/空格分隔，识别手写或机打的任意内容
+    """
+    if credential_type != "power_of_attorney":
+        return data
+
+    # 获取四类分组的原始数据
+    raw_categories = data.get("authorized_items_by_category", {})
+    if not isinstance(raw_categories, dict):
+        raw_categories = {}
+
+    # 【标准项目定义】每类业务的所有已知项目（按顺序，与prompts.py完全一致）
+    STANDARD_ITEMS = {
+        "opening": [
+            "账户开户",
+            "企业网上银行注册",
+            "企业手机银行注册",
+            "企业短信通知注册",
+            "签署税收居民身份声明文件",
+        ],
+        "change": [
+            "账户信息变更",
+            "预留印鉴变更",
+            "公章变更",
+            "企业网上银行变更",
+            "企业短信通知变更",
+            "企业手机银行变更",
+        ],
+        "cancellation": [
+            "账户销户",
+            "企业网上银行注销",
+            "企业手机银行注销",
+            "企业短信通知注销",
+        ],
+    }
+
+    # 【名称标准化】处理各种变体（包含更多变体形式）
+    NAME_MAPPING = {
+        # 开户类
+        "账户开户": "账户开户",
+        "企业网上银行注册": "企业网上银行注册",
+        "企业网上银行": "企业网上银行注册",
+        "网银注册": "企业网上银行注册",
+        "企业手机银行注册": "企业手机银行注册",
+        "企业手机银行": "企业手机银行注册",
+        "手机银行注册": "企业手机银行注册",
+        "企业短信通知注册": "企业短信通知注册",
+        "企业短信通知": "企业短信通知注册",
+        "短信通知注册": "企业短信通知注册",
+        "签署税收居民身份声明文件": "签署税收居民身份声明文件",
+        "税收居民身份声明文件": "签署税收居民身份声明文件",
+        "税收居民身份声明": "签署税收居民身份声明文件",
+        "签署税收居民身份声明": "签署税收居民身份声明文件",
+        # 变更类
+        "账户信息变更": "账户信息变更",
+        "预留印鉴变更": "预留印鉴变更",
+        "印鉴变更": "预留印鉴变更",
+        "公章变更": "公章变更",
+        "企业网上银行变更": "企业网上银行变更",
+        "网银变更": "企业网上银行变更",
+        "企业短信通知变更": "企业短信通知变更",
+        "短信通知变更": "企业短信通知变更",
+        "企业手机银行变更": "企业手机银行变更",
+        "手机银行变更": "企业手机银行变更",
+        # 注销类
+        "账户销户": "账户销户",
+        "销户": "账户销户",
+        "企业网上银行注销": "企业网上银行注销",
+        "网银注销": "企业网上银行注销",
+        "企业手机银行注销": "企业手机银行注销",
+        "手机银行注销": "企业手机银行注销",
+        "企业短信通知注销": "企业短信通知注销",
+        "短信通知注销": "企业短信通知注销",
+    }
+
+    result = {
+        "opening": [],
+        "change": [],
+        "cancellation": [],
+        "other": [],
+    }
+
+    # 处理三类已知业务
+    for category in ["opening", "change", "cancellation"]:
+        raw_items = raw_categories.get(category, [])
+        if not isinstance(raw_items, list):
+            raw_items = []
+
+        standard_names = set(STANDARD_ITEMS[category])
+        # 从模型结果中提取已勾选的项目
+        checked_names = set()
+
+        for item in raw_items:
+            if isinstance(item, dict):
+                # 新格式：{"name": "xxx", "checked": true/false}
+                name = item.get("name", "")
+                checked = item.get("checked", False)
+                if name and isinstance(name, str):
+                    normalized = NAME_MAPPING.get(name.strip(), name.strip())
+                    if normalized in standard_names and checked:
+                        checked_names.add(normalized)
+            elif isinstance(item, str):
+                # 旧格式兼容：纯字符串表示已勾选
+                normalized = NAME_MAPPING.get(item.strip(), item.strip())
+                if normalized in standard_names:
+                    checked_names.add(normalized)
+
+        # 生成完整的标准列表（包含所有项目及其勾选状态）
+        for name in STANDARD_ITEMS[category]:
+            result[category].append({
+                "name": name,
+                "checked": name in checked_names
+            })
+
+    # 处理"其他业务"（按分隔符拆分，包括空格）
+    raw_other = raw_categories.get("other", [])
+    if not isinstance(raw_other, list):
+        raw_other = []
+
+    other_items = []
+    for item in raw_other:
+        if isinstance(item, dict):
+            # 如果是对象格式，提取内容
+            content = item.get("name", "") or item.get("content", "")
+            if content:
+                # 按多种分隔符分隔（包括中文和英文标点）
+                parts = re.split(r'[,，、;；\s\n\r]+', str(content))
+                for part in parts:
+                    part = part.strip()
+                    if part and len(part) > 1 and part not in other_items:
+                        other_items.append(part)
+        elif isinstance(item, str) and item.strip():
+            # 按多种分隔符分隔（包括中文和英文标点）
+            parts = re.split(r'[,，、;；\s\n\r]+', item)
+            for part in parts:
+                part = part.strip()
+                if part and len(part) > 1 and part not in other_items:
+                    other_items.append(part)
+
+    # 【新增】如果 other_items 为空，尝试从原始数据中查找可能遗漏的内容
+    # 检查是否有类似"其他"的键
+    if not other_items:
+        for key in raw_categories:
+            if "其他" in str(key) or "other" in str(key).lower():
+                extra_content = raw_categories.get(key, "")
+                if isinstance(extra_content, str) and extra_content.strip():
+                    parts = re.split(r'[,，、;；\s\n\r]+', extra_content)
+                    for part in parts:
+                        part = part.strip()
+                        if part and len(part) > 1 and part not in other_items:
+                            other_items.append(part)
+
+    result["other"] = other_items
+
+    # 更新数据
+    data["authorized_items_by_category"] = result
+    print(f"[DEBUG] Post-processed authorized_items_by_category: {result}")
+
+    return data
 
 def _compress_images_for_ai(image_paths: List[str], max_size=1600, quality=85) -> List[str]:
     """Compress images to reduce API payload size."""
@@ -112,10 +321,10 @@ def _merge_json_results(results: List[dict]) -> dict:
 def extract_fields_from_images(image_paths: List[str], credential_type: str) -> dict:
     """Call AI to extract fields from document images."""
     final_image_paths = []
-    tmp_split_paths = [] 
-    
-    # Strategy 1: Grid split for dense A4 forms (Account Opening, Power of Attorney)
-    DENSE_TYPES = ["account_opening_app", "power_of_attorney"]
+    tmp_split_paths = []
+
+    # Strategy 1: Grid split for dense A4 forms (Account Opening only - NOT Power of Attorney)
+    DENSE_TYPES = ["account_opening_app"]  # 移除 power_of_attorney
     if credential_type in DENSE_TYPES and len(image_paths) == 1:
         tmp_split_paths = _grid_split_image(image_paths[0], rows=2, cols=2)
         final_image_paths = tmp_split_paths
@@ -125,13 +334,22 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         tmp_split_paths = _split_multi_form_image(image_paths[0])
         final_image_paths = tmp_split_paths
         max_size = 1600
+    # Strategy 3: Power of Attorney - high resolution, no split
+    elif credential_type == "power_of_attorney" and len(image_paths) == 1:
+        final_image_paths = image_paths
+        max_size = 2048  # 提升分辨率
+        quality = 95     # 提升质量
     else:
         final_image_paths = image_paths
         max_size = 1600
 
-    compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size)
+    # 根据凭证类型调整压缩质量
+    if credential_type == "power_of_attorney":
+        compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size, quality=95)
+    else:
+        compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size)
     prompt = PROMPT_MAPPING.get(credential_type)
-    
+
     if not prompt:
         raise ValueError(f"Unsupported credential type: {credential_type}")
 
@@ -145,6 +363,10 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             ).strip()
             try:
                 data = json.loads(fix_json(response))
+                # 后处理 Boolean 字段
+                data = _post_process_boolean_fields(data, credential_type)
+                # 后处理授权事项列表
+                data = _post_process_authorized_items(data, credential_type)
                 return data
             except Exception as e:
                 print(f"[{credential_type}] JSON parse failed: {e}")
@@ -162,9 +384,14 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                     part_results.append(json.loads(fix_json(resp)))
                 except:
                     continue
-            
-            return _merge_json_results(part_results)
-            
+
+            merged = _merge_json_results(part_results)
+            # 后处理 Boolean 字段
+            merged = _post_process_boolean_fields(merged, credential_type)
+            # 后处理授权事项列表
+            merged = _post_process_authorized_items(merged, credential_type)
+            return merged
+
     finally:
         # Clean temporary directories
         all_dirs_to_clean = set()
@@ -172,7 +399,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             d = os.path.dirname(p)
             if d and d.startswith(tempfile.gettempdir()) and ("grid_split_" in d or "compressed_cred_" in d or "split_img_" in d):
                 all_dirs_to_clean.add(d)
-        
+
         for d in all_dirs_to_clean:
             shutil.rmtree(d, ignore_errors=True)
 

@@ -183,11 +183,28 @@ class AccountOpeningAppResponse(BaseModel):
 # -----------------------
 # 8. 授权委托书 (Power of Attorney)
 # -----------------------
+class AuthorizedItem(BaseModel):
+    """单个授权事项"""
+    name: str = Field(..., description="业务项目名称")
+    checked: bool = Field(False, description="是否打勾(√)")
+
+
+class AuthorizedItemsByCategory(BaseModel):
+    """授权事项按类别分组（包含所有项目及其勾选状态）"""
+    opening: List[AuthorizedItem] = Field(default_factory=list, description="开户类业务")
+    change: List[AuthorizedItem] = Field(default_factory=list, description="变更类业务")
+    cancellation: List[AuthorizedItem] = Field(default_factory=list, description="注销类业务")
+    other: List[str] = Field(default_factory=list, description="其他业务（手写或机打内容）")
+
+
 class PowerOfAttorneyResponse(BaseModel):
     is_power_of_attorney: bool = Field(..., description="是否为授权委托书")
     principal_name: str = Field("", description="本人(委托人)")
     principal_id_number: str = Field("", description="身份证件号码")
-    authorized_items: List[str] = Field(default_factory=list, description="所有授权的事项挑勾的为是")
+    authorized_items_by_category: AuthorizedItemsByCategory = Field(
+        default_factory=AuthorizedItemsByCategory,
+        description="授权事项按类别分组（包含所有项目及其勾选状态）"
+    )
     is_employee: bool = Field(False, description="是否为本单位职工")
     authorized_person_id_number: str = Field("", description="被授权人身份证号码")
     authorized_date: str = Field("", description="代表本人在（日期）")
