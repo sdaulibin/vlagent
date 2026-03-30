@@ -413,10 +413,10 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         tmp_split_paths = _split_multi_form_image(image_paths[0])
         final_image_paths = tmp_split_paths
         max_size = 1600
-    # Strategy 3: Power of Attorney - high resolution, no split
+    # Strategy 3: Power of Attorney - higher resolution to preserve small checkbox symbols
     elif credential_type == "power_of_attorney" and len(image_paths) == 1:
         final_image_paths = image_paths
-        max_size = 2048  # 提升分辨率
+        max_size = 3072  # 提升分辨率以保留方框内符号细节
         quality = 95     # 提升质量
     else:
         final_image_paths = image_paths
