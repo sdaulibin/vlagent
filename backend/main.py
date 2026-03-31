@@ -1,15 +1,26 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from src.database import init_db
+from src.config import settings
+from src.file_provider.service import init_jvm, shutdown_jvm
 from api import api_router
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    if settings.ECM_ENABLED:
+        if not init_jvm():
+            logger.warning("JVM 启动失败，影像平台功能不可用")
     yield
+    if settings.ECM_ENABLED:
+        shutdown_jvm()
 
 
 app = FastAPI(

@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     RES_DIR: str = "res"
     RECOGNITION_TIMEOUT: int = 1800  # 自动停止识别任务的超时时间（秒）30分钟
     
+    # Image Platform (SunECM)
+    ECM_ENABLED: bool = False
+    ECM_CACHE_IP: str = "10.238.145.107"
+    ECM_CACHE_PORT: int = 8022
+    ECM_MODEL_CODE: str = "RP_RB"
+    ECM_DOC_PART: str = "RP_RB_PART"
+    ECM_SERVER_NAME: str = "SunECMDM"
+    ECM_GROUP_NAME: str = "group107"
+    ECM_USERNAME: str = "ibd"
+    ECM_PASSWORD: str = ""
+
     # Database
     DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
     DATABASE_ECHO: bool = False

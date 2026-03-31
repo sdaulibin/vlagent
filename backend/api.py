@@ -9,6 +9,7 @@ from src.confirmation_compare.router import router as format_compare_router
 from src.invoice_recognition.router import router as invoice_router
 from src.native_statement.router import router as native_statement_router
 from src.credentials.router import router as credentials_router
+from src.file_provider.router import router as file_provider_router
 
 api_router = APIRouter()
 
@@ -35,3 +36,6 @@ api_router.include_router(native_statement_router)
 
 # 类凭证识别（独立模块）
 api_router.include_router(credentials_router)
+
+# 影像平台文件服务
+api_router.include_router(file_provider_router)
