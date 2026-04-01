@@ -1,6 +1,6 @@
 # ⚙️ Backend Service
 
-基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，支持银行流水识别、询证函识别和合同比对等多种文档智能处理功能。
+基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，支持银行流水识别、询证函识别与格式比对、证件识别、发票识别、合同比对等多种文档智能处理功能。
 
 ---
 
@@ -33,7 +33,6 @@
    RECOGNITION_TIMEOUT=300     # 识别超时时间 (秒)
 
    # --- 数据库配置 ---
-   # 开发环境默认使用 SQLite，生产环境推荐 PostgreSQL
    DATABASE_URL=postgresql+asyncpg://user:pass@localhost/vl_flow
    ```
 
@@ -47,7 +46,7 @@
 
 ## 🏗️ 核心架构：策略模式 (Strategy Pattern)
 
-后端采用高度解耦的策略模式来处理不同银行的流水模板。每种银行都有其专属的 `Handler`，这使得系统具有极强的扩展性。
+后端采用高度解耦的策略模式来处理不同银行的流水模板。每种银行都有其专属的 `Handler`，这使得系统具有极强的扩展性。目前已适配 11 家银行。
 
 ### 🧩 BankHandler 接口
 
@@ -65,7 +64,7 @@
 
 1. **定义 Model**: 在 `src/models/` 创建 `xxx_models.py`，定义汇总和明细表结构。
 2. **实现 Handler**: 创建 `src/banks/xxx_handler.py`，继承 `BankHandler` 并使用 `@register_bank` 装饰。
-3. **配置 Prompt**: 在 `config/prompts/` 添加 `xxx.json`，定制专属的 AI 提取提示词。
+3. **配置 Prompt**: 在 `config/` 添加专属的 AI 提取提示词和 Schema。
 
 ---
 
@@ -73,25 +72,57 @@
 
 ```bash
 backend/
-├── main.py                # FastAPI 应用入口与中间件配置
-├── api.py                 # 统一路由分发中心
+├── main.py                   # FastAPI 应用入口与中间件配置
+├── api.py                    # 统一路由分发中心
 ├── src/
-│   ├── banks/             # 银行处理器实现 (Strategy Pattern)
-│   ├── models/            # 各银行数据模型 (SQLModel)
-│   ├── files/             # 文件上传、存储与识别状态管理
-│   ├── transactions/      # 统一的交易数据查询接口
+│   ├── banks/                # 银行流水处理器 (Strategy Pattern, 11家银行)
+│   │   ├── abc_handler.py    #   农业银行
+│   │   ├── boc_handler.py    #   中国银行
+│   │   ├── bocom_handler.py  #   交通银行
+│   │   ├── ccb_handler.py    #   建设银行
+│   │   ├── cgb_handler.py    #   广发银行
+│   │   ├── cmb_handler.py    #   招商银行
+│   │   ├── everbright_handler.py  # 光大银行
+│   │   ├── icbc_handler.py   #   工商银行
+│   │   ├── jining_handler.py #   济宁银行
+│   │   ├── psbc_handler.py   #   邮储银行
+│   │   └── shandong_handler.py   # 齐鲁银行
+│   ├── models/               # 各银行数据模型 (SQLModel)
+│   ├── files/                # 文件上传、存储与识别状态管理
+│   ├── transactions/         # 统一的交易数据查询接口
 │   ├── confirmation_letter/  # 📝 询证函识别模块
-│   │   ├── models.py      #   ConfirmationFile + ConfirmationResult (分表存储)
-│   │   ├── router.py      #   API 路由
-│   │   └── service.py     #   AI 识别逻辑与 Prompt
-│   ├── contracts/         # 📄 合同比对模块
-│   ├── config.py          # 全局配置
-│   ├── database.py        # 数据库引擎与会话管理
-│   └── exceptions.py      # 自定义异常
-├── services/              # 通用业务逻辑
-│   ├── pdf/               # PDF 解析、银行检测、数据提取、Excel 导出
-│   └── contract_processor.py # 文本比对算法
-└── config/                # 外部化配置 (JSON schemas, Prompts)
+│   │   ├── models.py         #   ConfirmationFile + ConfirmationResult
+│   │   ├── router.py         #   API 路由
+│   │   └── service.py        #   AI 识别逻辑与 Prompt
+│   ├── confirmation_compare/ # 📐 询证函格式比对模块
+│   │   ├── models.py         #   FormatTask + FormatDifference
+│   │   ├── router.py         #   API 路由
+│   │   ├── service.py        #   比对逻辑
+│   │   └── templates.py      #   标准模板定义
+│   ├── credentials/          # 🪪 证件识别模块
+│   │   ├── models.py         #   凭证数据模型
+│   │   ├── router.py         #   API 路由
+│   │   ├── service.py        #   AI 识别与网格切片逻辑
+│   │   └── prompts.py        #   各证件类型提示词
+│   ├── invoice_recognition/  # 🧾 发票识别模块
+│   │   ├── models.py         #   InvoiceFile + InvoiceResult
+│   │   ├── router.py         #   API 路由
+│   │   └── service.py        #   发票识别逻辑
+│   ├── native_statement/     # 📊 原生电子流水解析模块
+│   │   ├── router.py         #   API 路由
+│   │   └── service.py        #   PDF 原生解析逻辑
+│   ├── contracts/            # 📄 合同比对模块
+│   ├── legal_contact/        # 📋 律师联系方式提取
+│   ├── file_provider/        # 📦 ECM 影像平台文件服务
+│   │   ├── router.py         #   API 路由
+│   │   └── service.py        #   SunECM Java SDK 集成
+│   ├── config.py             # 全局配置
+│   ├── database.py           # 数据库引擎与会话管理
+│   └── exceptions.py         # 自定义异常
+├── services/                 # 通用业务逻辑
+│   ├── pdf/                  # PDF 解析、银行检测、数据提取、Excel 导出
+│   └── core/                 # AI 请求、JSON 修复、配置管理
+└── config/                   # 外部化配置 (JSON schemas, Prompts, 银行模板)
 ```
 
 ---
@@ -105,22 +136,54 @@ backend/
 - `GET /api/transactions/{id}`: 获取识别后的结构化明细。
 - `GET /api/files/{id}/export`: 生成并下载标准化的 Excel 报表。
 
-### 📝 询证函模块
+### 📊 原生电子流水模块
+
+- `POST /api/native-statement/check`: 检测 PDF 是否为原生电子格式。
+- `POST /api/native-statement/parse`: 解析原生电子流水返回 JSON。
+- `POST /api/native-statement/parse-to-excel`: 解析并导出 Excel。
+
+### 📝 询证函识别模块
 
 文件信息与识别结果分表存储（`confirmation_files` + `confirmation_results`）：
 
 - `POST /api/confirmation/upload`: 上传询证函 PDF。
 - `POST /api/confirmation/{id}/recognize`: AI 识别 12 个关键字段。
 - `GET /api/confirmation`: 获取所有询证函列表（含识别结果）。
-- `GET /api/confirmation/{id}`: 获取单个询证函详情。
 - `PUT /api/confirmation/{id}/result`: 人工修改识别结果。
 - `DELETE /api/confirmation/{id}`: 删除询证函及关联数据。
+
+### 📐 询证函格式比对模块
+
+- `GET /api/format-compare/templates`: 获取可用模板列表。
+- `POST /api/format-compare/upload`: 上传询证函。
+- `POST /api/format-compare/{task_id}/compare`: 执行格式比对。
+- `GET /api/format-compare/{task_id}`: 获取比对结果（含差异分级）。
+- `GET /api/format-compare/templates/{format_key}/preview`: 预览模板 PDF。
+
+### 🪪 证件识别模块
+
+- `POST /api/credentials/extract`: 上传证件文件并提取结构化数据（支持 8 种类型）。
+
+### 🧾 发票识别模块
+
+- `POST /api/invoice_recognition/upload`: 上传发票进行识别。
+- `GET /api/invoice_recognition/list`: 获取所有已识别发票列表。
+- `GET /api/invoice_recognition/list/{file_id}`: 获取指定发票识别结果。
+- `DELETE /api/invoice_recognition/{file_id}`: 删除发票及结果。
 
 ### 📄 合同比对模块
 
 - `POST /api/contracts/upload`: 上传待比对合同。
 - `POST /api/contracts/{id}/compare`: 执行合同差异比对。
 - `GET /api/contracts/{id}`: 获取比对结果。
+
+### 📦 ECM 文件服务模块
+
+- `GET /api/file-provider/status`: 检查 JVM 和 ECM SDK 状态。
+- `POST /api/file-provider/upload`: 上传文件到 ECM。
+- `POST /api/file-provider/download`: 从 ECM 下载文件（多文件自动打包 ZIP）。
+- `POST /api/file-provider/query`: 查询 ECM 文件信息。
+- `DELETE /api/file-provider/{busi_serial_no}`: 删除 ECM 文件。
 
 ---
 
@@ -129,6 +192,7 @@ backend/
 - **Framework**: FastAPI (Asynchronous)
 - **ORM**: SQLModel (SQLAlchemy + Pydantic)
 - **DB Driver**: asyncpg
-- **PDF Engine**: pdf2image + Pillow
+- **PDF Engine**: pdf2image + pdfplumber + camelot + Pillow
 - **Data Export**: Pandas + Openpyxl
-- **AI Integration**: OpenAI SDK (compatible with local LLM gateways)
+- **AI Integration**: OpenAI SDK (兼容本地 LLM 网关)
+- **Java Integration**: JPype (ECM SDK 调用)
