@@ -6,6 +6,7 @@ import ConfirmationLetter from '../views/ConfirmationLetter.vue'
 import FormatCompare from '../views/FormatCompare.vue'
 import InvoiceRecognition from '../views/InvoiceRecognition.vue'
 import CredentialRecognition from '../views/CredentialRecognition.vue'
+import PdfExtract from '../views/PdfExtract.vue'
 
 const routes = [
     {
@@ -42,6 +43,11 @@ const routes = [
         path: '/credential-recognition',
         name: 'CredentialRecognition',
         component: CredentialRecognition
+    },
+    {
+        path: '/pdf-extract',
+        name: 'PdfExtract',
+        component: PdfExtract
     }
 ]
 

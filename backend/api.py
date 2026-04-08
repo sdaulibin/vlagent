@@ -4,12 +4,12 @@ from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
 from src.contracts.router import router as contracts_router
 from src.confirmation_letter.router import router as confirmation_router
-from src.confirmation_letter.router import router as confirmation_router
 from src.confirmation_compare.router import router as format_compare_router
 from src.invoice_recognition.router import router as invoice_router
 from src.native_statement.router import router as native_statement_router
 from src.credentials.router import router as credentials_router
 from src.file_provider.router import router as file_provider_router
+from src.pdf_extract.router import router as pdf_extract_router
 
 api_router = APIRouter()
 
@@ -39,3 +39,6 @@ api_router.include_router(credentials_router)
 
 # 影像平台文件服务
 api_router.include_router(file_provider_router)
+
+# 通用 PDF 提取（独立模块）
+api_router.include_router(pdf_extract_router)

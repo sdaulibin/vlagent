@@ -103,6 +103,21 @@
                         <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                     </div>
                 </router-link>
+
+                <!-- 通用 PDF 提取 -->
+                <router-link to="/pdf-extract" class="scenario-card group">
+                    <div class="scenario-card-icon bg-gradient-to-br from-cyan-500 to-blue-600">
+                        <FileScan class="w-8 h-8 text-white" />
+                    </div>
+                    <h3 class="scenario-card-title">通用 PDF 提取</h3>
+                    <p class="scenario-card-desc">
+                        自定义提取字段，AI 自动从任意 PDF 文件中提取结构化信息
+                    </p>
+                    <div class="scenario-card-link group-hover:text-cyan-300">
+                        立即使用
+                        <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                    </div>
+                </router-link>
             </div>
         </main>
 
@@ -114,6 +129,6 @@
 </template>
 
 <script setup lang="ts">
-import { Scan, CreditCard, FileText, FileDiff, FileSearch, Receipt, ArrowRight, FileCheck2 } from 'lucide-vue-next'
+import { Scan, CreditCard, FileText, FileDiff, FileSearch, Receipt, ArrowRight, FileCheck2, FileScan } from 'lucide-vue-next'
 </script>
 

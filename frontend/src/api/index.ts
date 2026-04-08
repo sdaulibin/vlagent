@@ -211,3 +211,34 @@ export const extractCredential = async (file: File, credentialType: string) => {
   const response = await api.post("/credentials/extract", formData);
   return response.data;
 };
+
+// ===== 通用 PDF 提取 API =====
+
+export const uploadPdfExtract = async (file: File, fields: string, outputFormat: string) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fields", fields);
+  formData.append("output_format", outputFormat);
+  const response = await api.post("/pdf_extract/upload", formData);
+  return response.data;
+};
+
+export const getPdfExtractTasks = async () => {
+  const response = await api.get("/pdf_extract/list");
+  return response.data;
+};
+
+export const getPdfExtractTask = async (taskId: number) => {
+  const response = await api.get(`/pdf_extract/list/${taskId}`);
+  return response.data;
+};
+
+export const deletePdfExtractTask = async (taskId: number) => {
+  const response = await api.delete(`/pdf_extract/${taskId}`);
+  return response.data;
+};
+
+export const downloadPdfExtract = (taskId: number) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  return `${baseUrl}/pdf_extract/download/${taskId}`;
+};
