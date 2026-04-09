@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue';
-import { FileScan, ArrowLeft, Upload, Trash2, Loader2, ChevronRight, Plus, X, Download } from 'lucide-vue-next';
+import { FileScan, ArrowLeft, Upload, Trash2, Loader2, ChevronRight, Plus, X, Download, Copy, Check, FileJson, Table2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
   uploadPdfExtract,
@@ -10,11 +10,17 @@ import {
   downloadPdfExtract
 } from '../api';
 
+interface ExtractFieldItem {
+  name: string;
+  type: string;
+  description?: string;
+}
+
 interface ExtractField {
   name: string;
   description: string;
   type: string;
-  items?: { name: string; type: string; description?: string }[];
+  items?: ExtractFieldItem[];
 }
 
 interface TaskItem {
@@ -46,6 +52,7 @@ const selectedDetail = ref<TaskDetail | null>(null);
 const selectedTaskId = ref<number | null>(null);
 const isUploading = ref(false);
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
+const copied = ref(false);
 
 // 字段配置
 const fields = ref<ExtractField[]>([
@@ -56,9 +63,91 @@ const outputFormat = ref('json');
 // 是否显示配置面板
 const showConfig = ref(true);
 
+// 结果展示模式：table / json
+const resultViewMode = ref<'table' | 'json'>('table');
+
 const hasProcessingTasks = computed(() =>
   tasks.value.some(t => t.status === 'pending' || t.status === 'processing')
 );
+
+// 分离标量字段和表格字段
+const scalarResult = computed(() => {
+  if (!selectedDetail.value?.result) return {};
+  const result = selectedDetail.value.result;
+  const tableFieldNames = new Set(
+    (selectedDetail.value.fields || [])
+      .filter(f => f.type === 'object_array')
+      .map(f => f.name)
+  );
+  // 也把值为对象数组但字段定义中未标记的识别为表格
+  const scalar: Record<string, any> = {};
+  for (const [key, value] of Object.entries(result)) {
+    if (!tableFieldNames.has(key) && !isObjectArray(value)) {
+      scalar[key] = value;
+    }
+  }
+  return scalar;
+});
+
+const tableFields = computed(() => {
+  if (!selectedDetail.value?.result) return [];
+  const result = selectedDetail.value.result;
+  const fieldDefs = selectedDetail.value.fields || [];
+
+  // 从字段定义中获取 object_array 类型
+  const definedTableFields = fieldDefs
+    .filter(f => f.type === 'object_array' && result[f.name] && Array.isArray(result[f.name]))
+    .map(f => ({
+      key: f.name,
+      label: f.description || f.name,
+      columns: f.items || [],
+      data: result[f.name] as Record<string, any>[]
+    }));
+
+  // 自动检测结果中的对象数组（未被字段定义覆盖的）
+  const definedKeys = new Set(definedTableFields.map(f => f.key));
+  for (const [key, value] of Object.entries(result)) {
+    if (!definedKeys.has(key) && isObjectArray(value)) {
+      const arr = value as Record<string, any>[];
+      const cols = extractColumns(arr);
+      const fieldDef = fieldDefs.find(f => f.name === key);
+      definedTableFields.push({
+        key,
+        label: fieldDef?.description || key,
+        columns: cols,
+        data: arr
+      });
+    }
+  }
+
+  return definedTableFields;
+});
+
+// 判断值是否为对象数组
+const isObjectArray = (value: any): boolean => {
+  return Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && !Array.isArray(value[0]);
+};
+
+// 从对象数组中提取列定义
+const extractColumns = (arr: Record<string, any>[]): ExtractFieldItem[] => {
+  const colSet = new Set<string>();
+  for (const item of arr) {
+    for (const key of Object.keys(item)) {
+      colSet.add(key);
+    }
+  }
+  return Array.from(colSet).map(name => ({
+    name,
+    type: 'string',
+    description: name
+  }));
+};
+
+// 获取字段显示标签
+const getFieldLabel = (key: string): string => {
+  const fieldDef = (selectedDetail.value?.fields || []).find(f => f.name === key);
+  return fieldDef?.description || key;
+};
 
 const loadTasks = async () => {
   try {
@@ -72,6 +161,12 @@ const selectTask = async (id: number) => {
   selectedTaskId.value = id;
   try {
     selectedDetail.value = await getPdfExtractTask(id);
+    // 如果有表格数据，默认显示表格视图；否则显示 JSON
+    if (tableFields.value.length > 0) {
+      resultViewMode.value = 'table';
+    } else {
+      resultViewMode.value = 'json';
+    }
   } catch (e) {
     console.error("加载任务详情失败", e);
   }
@@ -87,6 +182,24 @@ const removeField = (index: number) => {
   fields.value.splice(index, 1);
 };
 
+// 添加 object_array 子字段
+const addSubField = (fieldIndex: number) => {
+  const field = fields.value[fieldIndex];
+  if (!field.items) field.items = [];
+  field.items.push({ name: '', type: 'string' });
+};
+
+const removeSubField = (fieldIndex: number, subIndex: number) => {
+  fields.value[fieldIndex].items?.splice(subIndex, 1);
+};
+
+// 当字段类型变为 object_array 时初始化 items
+const onFieldTypeChange = (field: ExtractField) => {
+  if (field.type === 'object_array' && !field.items) {
+    field.items = [{ name: '', type: 'string' }];
+  }
+};
+
 const handleFileUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const fileList = target.files;
@@ -98,6 +211,19 @@ const handleFileUpload = async (event: Event) => {
     alert('请至少配置一个提取字段');
     target.value = '';
     return;
+  }
+
+  // 校验 object_array 子字段
+  for (const field of validFields) {
+    if (field.type === 'object_array') {
+      const validItems = (field.items || []).filter(i => i.name.trim());
+      if (validItems.length === 0) {
+        alert(`字段"${field.name}"为对象数组类型，请至少定义一个子字段`);
+        target.value = '';
+        return;
+      }
+      field.items = validItems;
+    }
   }
 
   isUploading.value = true;
@@ -138,6 +264,33 @@ const handleDownload = (taskId: number) => {
   window.open(url, '_blank');
 };
 
+// 复制 JSON 到剪贴板
+const copyResultJson = async () => {
+  if (!selectedDetail.value?.result) return;
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(selectedDetail.value.result, null, 2));
+    copied.value = true;
+    setTimeout(() => { copied.value = false; }, 2000);
+  } catch (e) {
+    console.error("复制失败", e);
+  }
+};
+
+// 下载 JSON 文件
+const downloadJson = () => {
+  if (!selectedDetail.value?.result || !selectedDetail.value.filename) return;
+  const json = JSON.stringify(selectedDetail.value.result, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = selectedDetail.value.filename.replace('.pdf', '.json');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 const goBack = () => {
   router.push('/');
 };
@@ -165,6 +318,14 @@ const getStatusClass = (status: string) => {
 const formatDuration = (seconds: number | null) => {
   if (seconds === null || seconds === undefined) return '-';
   return `${seconds.toFixed(1)}s`;
+};
+
+// 格式化显示值
+const formatValue = (value: any): string => {
+  if (value === null || value === undefined) return '-';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 };
 
 const startPolling = () => {
@@ -245,11 +406,13 @@ onUnmounted(() => {
                 />
                 <select
                   v-model="field.type"
+                  @change="onFieldTypeChange(field)"
                   class="px-2 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-cyan-400"
                 >
                   <option value="string">文本</option>
                   <option value="number">数字</option>
                   <option value="array">数组</option>
+                  <option value="object_array">对象数组</option>
                 </select>
                 <button @click="removeField(index)" class="p-1.5 text-slate-400 hover:text-red-500">
                   <X class="w-4 h-4" />
@@ -261,6 +424,41 @@ onUnmounted(() => {
                 placeholder="字段描述（可选，帮助模型理解）"
                 class="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-cyan-400"
               />
+              <!-- object_array 子字段编辑 -->
+              <div v-if="field.type === 'object_array'" class="ml-3 pl-3 border-l-2 border-cyan-200 space-y-2">
+                <p class="text-xs text-slate-400">子字段定义：</p>
+                <div v-for="(sub, subIdx) in field.items" :key="subIdx" class="flex items-center gap-2">
+                  <input
+                    v-model="sub.name"
+                    type="text"
+                    placeholder="子字段名称"
+                    class="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-cyan-400"
+                  />
+                  <select
+                    v-model="sub.type"
+                    class="px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="string">文本</option>
+                    <option value="number">数字</option>
+                  </select>
+                  <input
+                    v-model="sub.description"
+                    type="text"
+                    placeholder="描述"
+                    class="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-cyan-400"
+                  />
+                  <button @click="removeSubField(index, subIdx)" class="p-1 text-slate-400 hover:text-red-500">
+                    <X class="w-3 h-3" />
+                  </button>
+                </div>
+                <button
+                  @click="addSubField(index)"
+                  class="flex items-center gap-1 py-1 text-xs text-cyan-600 hover:text-cyan-700"
+                >
+                  <Plus class="w-3 h-3" />
+                  添加子字段
+                </button>
+              </div>
             </div>
             <button
               v-if="fields.length < 10"
@@ -369,28 +567,132 @@ onUnmounted(() => {
           <p class="text-sm">{{ selectedDetail.error_msg }}</p>
         </div>
 
-        <!-- Result JSON -->
-        <div v-else-if="selectedDetail && selectedDetail.result" class="flex-1 overflow-auto p-4">
-          <!-- Field cards -->
-          <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-            <div
-              v-for="(value, key) in selectedDetail.result"
-              :key="key"
-              class="py-3 px-4 bg-gray-50 rounded-lg"
-            >
-              <p class="text-xs text-gray-400 mb-1">{{ key }}</p>
-              <p v-if="Array.isArray(value)" class="text-sm font-medium text-gray-700">
-                {{ value.join(', ') }}
-              </p>
-              <p v-else class="text-sm font-medium text-gray-700 break-all">{{ value ?? '-' }}</p>
+        <!-- Result Content -->
+        <div v-else-if="selectedDetail && selectedDetail.result" class="flex-1 overflow-auto">
+          <!-- Toolbar -->
+          <div class="px-4 pt-3 flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+              <button
+                @click="resultViewMode = 'table'"
+                :class="[
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  resultViewMode === 'table' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                ]"
+              >
+                <Table2 class="w-3.5 h-3.5" />
+                表格视图
+              </button>
+              <button
+                @click="resultViewMode = 'json'"
+                :class="[
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  resultViewMode === 'json' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                ]"
+              >
+                <FileJson class="w-3.5 h-3.5" />
+                JSON
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="downloadJson"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <Download class="w-3.5 h-3.5" />
+                JSON
+              </button>
+              <button
+                v-if="selectedDetail.output_format !== 'json'"
+                @click="handleDownload(selectedDetail.id)"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <Download class="w-3.5 h-3.5" />
+                {{ selectedDetail.output_format.toUpperCase() }}
+              </button>
+              <button
+                @click="copyResultJson"
+                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <Check v-if="copied" class="w-3.5 h-3.5 text-green-500" />
+                <Copy v-else class="w-3.5 h-3.5" />
+                {{ copied ? '已复制' : '复制' }}
+              </button>
             </div>
           </div>
 
-          <!-- Raw JSON toggle -->
-          <details class="mt-4">
-            <summary class="text-xs text-slate-400 cursor-pointer hover:text-slate-600">查看原始 JSON</summary>
-            <pre class="mt-2 p-3 bg-slate-50 rounded-lg text-xs text-slate-600 overflow-auto max-h-96">{{ JSON.stringify(selectedDetail.result, null, 2) }}</pre>
-          </details>
+          <!-- Table View -->
+          <div v-if="resultViewMode === 'table'" class="p-4 space-y-5">
+            <!-- Scalar fields as key-value cards -->
+            <div v-if="Object.keys(scalarResult).length > 0">
+              <h4 class="text-sm font-medium text-slate-600 mb-3">基本信息</h4>
+              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div
+                  v-for="(value, key) in scalarResult"
+                  :key="key"
+                  class="py-2.5 px-3 bg-gray-50 rounded-lg border border-gray-100"
+                >
+                  <p class="text-xs text-gray-400 mb-1">{{ getFieldLabel(key as string) }}</p>
+                  <p v-if="Array.isArray(value)" class="text-sm font-medium text-gray-700">
+                    {{ value.join(', ') || '-' }}
+                  </p>
+                  <p v-else class="text-sm font-medium text-gray-700 break-all">{{ value ?? '-' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table fields -->
+            <div v-for="tableField in tableFields" :key="tableField.key">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-medium text-slate-600">{{ tableField.label }}</h4>
+                <span class="text-xs text-slate-400">共 {{ tableField.data.length }} 条</span>
+              </div>
+              <div class="border border-slate-200 rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="bg-slate-50">
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 w-10">#</th>
+                      <th
+                        v-for="col in tableField.columns"
+                        :key="col.name"
+                        class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500"
+                      >
+                        {{ col.description || col.name }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(row, rowIdx) in tableField.data"
+                      :key="rowIdx"
+                      class="border-t border-slate-100 hover:bg-slate-50 transition-colors"
+                    >
+                      <td class="px-4 py-2.5 text-xs text-slate-400">{{ rowIdx + 1 }}</td>
+                      <td
+                        v-for="col in tableField.columns"
+                        :key="col.name"
+                        class="px-4 py-2.5 text-slate-700"
+                      >
+                        <span v-if="row[col.name] !== null && row[col.name] !== undefined">
+                          {{ row[col.name] }}
+                        </span>
+                        <span v-else class="text-slate-300">-</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Fallback: all scalar, no tables -->
+            <div v-if="Object.keys(scalarResult).length === 0 && tableFields.length === 0" class="text-center text-slate-400 py-8">
+              无结构化数据可展示
+            </div>
+          </div>
+
+          <!-- JSON View -->
+          <div v-else class="p-4">
+            <pre class="p-4 bg-slate-50 rounded-xl text-xs text-slate-600 overflow-auto max-h-[calc(100vh-320px)] leading-relaxed border border-slate-200">{{ JSON.stringify(selectedDetail.result, null, 2) }}</pre>
+          </div>
         </div>
 
         <!-- Done but no result -->
