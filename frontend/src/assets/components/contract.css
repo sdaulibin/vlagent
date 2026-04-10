@@ -1,0 +1,146 @@
+@layer components {
+  /* ===== Contract Compare - Upload Page ===== */
+  .contract-logo {
+    @apply p-3 rounded-2xl shadow-lg;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+  }
+
+  .contract-upload-area {
+    @apply bg-white rounded-2xl border-2 border-dashed border-slate-200 p-10 flex flex-col items-center justify-center cursor-pointer shadow-sm relative overflow-hidden transition-all;
+    min-height: 280px;
+  }
+
+  .contract-upload-area:hover {
+    @apply shadow-md;
+  }
+
+  .contract-upload-original:hover {
+    @apply border-red-400;
+  }
+
+  .contract-upload-compare:hover {
+    @apply border-green-400;
+  }
+
+  .contract-upload-badge {
+    @apply absolute top-0 left-0 text-white text-xs font-bold px-3 py-1 rounded-br-lg;
+  }
+
+  .contract-upload-icon {
+    @apply w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform;
+  }
+
+  .contract-upload-area:hover .contract-upload-icon {
+    @apply scale-110;
+  }
+
+  .contract-icon-original {
+    @apply bg-red-50 text-red-500;
+  }
+
+  .contract-icon-compare {
+    @apply bg-green-50 text-green-500;
+  }
+
+  .contract-btn-primary {
+    @apply bg-orange-600 hover:bg-orange-700 text-white text-lg font-semibold py-4 px-16 rounded-xl shadow-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ===== Contract Compare - Result Page ===== */
+  .contract-toolbar {
+    @apply h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shadow-sm;
+  }
+
+  .contract-sync-btn {
+    @apply flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors bg-slate-100 text-slate-600;
+  }
+
+  .contract-sync-btn.active {
+    @apply bg-orange-100 text-orange-700;
+  }
+
+  .contract-btn-export {
+    @apply bg-white border border-orange-200 text-orange-600 hover:bg-orange-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm;
+  }
+
+  /* ===== Document Pane ===== */
+  .contract-doc-pane {
+    @apply flex-1 flex flex-col h-full bg-white;
+    min-width: 0;
+  }
+
+  .contract-doc-header {
+    @apply px-4 py-3 border-b flex items-center gap-2 flex-shrink-0;
+  }
+
+  .contract-doc-header-original {
+    @apply bg-red-50 border-red-100;
+  }
+
+  .contract-doc-header-compare {
+    @apply bg-green-50 border-green-100;
+  }
+
+  .contract-doc-badge {
+    @apply px-2 py-0.5 rounded text-xs font-bold text-white flex-shrink-0;
+  }
+
+  .contract-badge-original {
+    @apply bg-red-500;
+  }
+
+  .contract-badge-compare {
+    @apply bg-green-600;
+  }
+
+  .contract-doc-content {
+    @apply flex-1 overflow-y-auto p-4 leading-relaxed text-slate-800;
+    min-height: 0;
+  }
+
+  /* ===== Diff Sidebar ===== */
+  .contract-diff-sidebar {
+    @apply w-80 bg-white border-l border-slate-200 flex flex-col shadow-xl flex-shrink-0;
+  }
+
+  .contract-filter-tab {
+    @apply flex-1 py-1.5 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700;
+  }
+
+  .contract-filter-tab.active {
+    @apply bg-white text-slate-800 shadow-sm;
+  }
+
+  /* ===== Diff Items ===== */
+  .diff-item {
+    @apply bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-orange-200 transition-colors cursor-pointer;
+  }
+
+  .diff-badge {
+    @apply text-xs font-bold px-2 py-1 rounded uppercase tracking-wide;
+  }
+
+  .diff-badge-added {
+    @apply bg-green-100 text-green-700;
+  }
+
+  .diff-badge-deleted {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .diff-badge-modified {
+    @apply bg-orange-100 text-orange-700;
+  }
+
+  .diff-text {
+    @apply text-sm p-2 rounded border;
+  }
+
+  .diff-text-original {
+    @apply text-slate-600 bg-red-50/50 border-red-50 line-through decoration-red-300 decoration-2;
+  }
+
+  .diff-text-compare {
+    @apply text-slate-800 bg-green-50/50 border-green-50 font-medium;
+  }
+}

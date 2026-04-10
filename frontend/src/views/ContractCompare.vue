@@ -190,18 +190,18 @@ const handleFileBUpdate = (file: File) => {
         <!-- Upload View -->
         <div v-if="activeView === 'upload'" class="min-h-screen flex flex-col p-8">
             <!-- Header -->
-            <div class="w-full mb-6">
-                <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+            <div class="w-full max-w-7xl mx-auto mb-6">
+                <button @click="goBack" class="page-back-btn">
                     <ArrowLeft class="w-5 h-5" />
                     返回首页
                 </button>
-                <div class="flex items-center gap-3">
+                <div class="page-title-group">
                     <div class="contract-logo">
                         <FileDiff class="w-8 h-8 text-white" />
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-slate-900">合同比对</h1>
-                        <p class="text-sm text-slate-500">上传两份文档以自动识别差异，支持 PDF, Word, 图片格式</p>
+                        <h1 class="page-title">合同比对</h1>
+                        <p class="page-subtitle">上传两份文档以自动识别差异，支持 PDF, Word, 图片格式</p>
                     </div>
                 </div>
             </div>

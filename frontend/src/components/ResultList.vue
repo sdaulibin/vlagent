@@ -190,13 +190,12 @@ const prevPage = () => {
 </script>
 
 <template>
-    <div class="card p-6 md:col-span-8 flex flex-col h-full min-h-0">
-        <h2 class="card-title-lg flex-shrink-0">
+    <div class="content-card p-6 md:col-span-8 flex flex-col h-full min-h-0">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center justify-between flex-shrink-0">
             <span class="flex items-center gap-2">
                 <CheckCircle class="w-6 h-6 text-green-500" />
                 识别结果
-                <!-- 银行类型标签 -->
-                <span v-if="currentSummary" :class="['text-xs font-medium px-2 py-1 rounded-full', bankTypeColor]">
+                <span v-if="currentSummary" :class="['status-badge text-xs font-medium px-2 py-1', bankTypeColor]">
                     {{ bankTypeName }}
                 </span>
             </span>
@@ -205,16 +204,16 @@ const prevPage = () => {
                 AI正在分析数据...
             </span>
         </h2>
-        
+
         <div class="flex-1 overflow-hidden bg-gray-50 rounded-lg border border-gray-200 flex flex-col min-h-0">
             <!-- 加载状态 -->
-            <div v-if="isProcessing && results.length === 0 && !summary" class="h-full flex flex-col items-center justify-center text-blue-500 space-y-4">
+            <div v-if="isProcessing && results.length === 0 && !summary" class="loading-state">
                 <Loader2 class="w-12 h-12 animate-spin text-blue-400" />
                 <p class="text-slate-500 font-medium">正在读取数据...</p>
             </div>
-            
+
             <!-- 空状态 -->
-            <div v-else-if="results.length === 0 && !summary" class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+            <div v-else-if="results.length === 0 && !summary" class="empty-state--column">
                 <div class="bg-gray-100 p-6 rounded-full">
                     <AlertCircle class="w-12 h-12 text-gray-300" />
                 </div>
@@ -609,8 +608,8 @@ const prevPage = () => {
         </div>
         
         <div class="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
-            <button 
-                class="btn-primary" 
+            <button
+                class="btn-primary"
                 @click="emit('export')"
                 :disabled="!selectedFileId"
             >导出结果</button>

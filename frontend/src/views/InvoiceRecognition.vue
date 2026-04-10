@@ -121,11 +121,11 @@ const getStatusText = (status: string) => {
 
 const getStatusClass = (status: string) => {
   switch (status) {
-    case 'pending': return 'bg-yellow-100 text-yellow-700';
-    case 'processing': return 'bg-blue-100 text-blue-700 animate-pulse';
-    case 'done': return 'bg-green-100 text-green-700';
-    case 'failed': return 'bg-red-100 text-red-700';
-    default: return 'bg-gray-100 text-gray-700';
+    case 'pending': return 'status-badge status-badge--pending';
+    case 'processing': return 'status-badge status-badge--processing';
+    case 'done': return 'status-badge status-badge--done';
+    case 'failed': return 'status-badge status-badge--failed';
+    default: return 'status-badge';
   }
 };
 
@@ -173,71 +173,71 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8 flex flex-col">
+  <div class="page-container">
     <!-- Header -->
-    <header class="w-full max-w-7xl mx-auto mb-6">
-      <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+    <header class="page-header">
+      <button @click="goBack" class="page-back-btn">
         <ArrowLeft class="w-5 h-5" />
         返回首页
       </button>
-      <div class="flex items-center gap-3">
-        <div class="bg-gradient-to-br from-rose-500 to-red-600 p-3 rounded-xl shadow-lg">
+      <div class="page-title-group">
+        <div class="page-icon bg-gradient-to-br from-rose-500 to-red-600">
           <Receipt class="text-white w-7 h-7" />
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">发票智能识别</h1>
-          <p class="text-sm text-slate-500">上传发票 PDF，AI 自动提取发票类型、号码、金额、购销方等关键信息</p>
+          <h1 class="page-title">发票智能识别</h1>
+          <p class="page-subtitle">上传发票 PDF，AI 自动提取发票类型、号码、金额、购销方等关键信息</p>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1">
+    <main class="page-main">
       <!-- Left: File List -->
-      <div class="md:col-span-4 flex flex-col gap-4">
+      <div class="page-left-col">
         <!-- Upload -->
-        <label class="flex items-center justify-center gap-2 bg-white border-2 border-dashed border-slate-300 hover:border-rose-400 rounded-xl p-4 cursor-pointer transition-colors">
+        <label class="upload-zone">
           <Upload class="w-5 h-5 text-slate-400" />
           <span class="text-slate-600">{{ isUploading ? '上传中...' : '点击上传发票（PDF / JPG / PNG）' }}</span>
           <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="hidden" @change="handleFileUpload" :disabled="isUploading" />
         </label>
 
         <!-- File List -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-auto">
-          <div class="p-3 border-b border-slate-100">
+        <div class="file-list">
+          <div class="file-list-header">
             <h3 class="font-medium text-slate-700">文件列表 ({{ files.length }})</h3>
           </div>
-          <ul class="divide-y divide-slate-100">
+          <ul class="file-list-items">
             <li
               v-for="file in files"
               :key="file.id"
               @click="selectFile(file.id)"
               :class="[
-                'p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors',
-                selectedFileId === file.id ? 'bg-rose-50' : ''
+                'file-list-item',
+                selectedFileId === file.id ? 'file-list-item--active' : ''
               ]"
             >
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-slate-700 truncate">{{ file.filename }}</p>
-                <div class="flex items-center gap-2 mt-1">
-                  <span :class="['text-xs px-2 py-0.5 rounded-full', getStatusClass(file.status)]">
+              <div class="file-list-item-info">
+                <p class="file-list-item-name">{{ file.filename }}</p>
+                <div class="file-list-item-meta">
+                  <span :class="getStatusClass(file.status)">
                     {{ getStatusText(file.status) }}
                   </span>
                   <span v-if="file.page_count" class="text-xs text-slate-400">{{ file.page_count }}页</span>
                   <span v-if="file.recognition_duration" class="text-xs text-slate-400">{{ formatDuration(file.recognition_duration) }}</span>
                 </div>
               </div>
-              <div class="flex items-center gap-1">
+              <div class="file-list-item-actions">
                 <button
                   @click.stop="handleDelete(file.id)"
-                  class="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                  class="file-list-delete-btn"
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>
                 <ChevronRight class="w-4 h-4 text-slate-300" />
               </div>
             </li>
-            <li v-if="files.length === 0" class="p-6 text-center text-slate-400 text-sm">
+            <li v-if="files.length === 0" class="file-list-empty">
               暂无发票记录，请上传 PDF 文件
             </li>
           </ul>
@@ -245,28 +245,28 @@ onUnmounted(() => {
       </div>
 
       <!-- Right: Recognition Results -->
-      <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-medium text-slate-700">识别结果</h3>
+      <div class="page-right-col">
+        <div class="content-card-header">
+          <h3 class="content-card-title">识别结果</h3>
           <div v-if="selectedDetail" class="flex items-center gap-3 text-sm text-slate-500">
             <span v-if="selectedDetail.page_count">共 {{ selectedDetail.page_count }} 页</span>
             <span v-if="selectedDetail.recognition_duration">
               耗时 {{ formatDuration(selectedDetail.recognition_duration) }}
             </span>
-            <span :class="['px-2 py-0.5 rounded-full text-xs', getStatusClass(selectedDetail.status)]">
+            <span :class="getStatusClass(selectedDetail.status)">
               {{ getStatusText(selectedDetail.status) }}
             </span>
           </div>
         </div>
 
         <!-- Loading State -->
-        <div v-if="selectedDetail && selectedDetail.status === 'processing'" class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div v-if="selectedDetail && selectedDetail.status === 'processing'" class="loading-state">
           <Loader2 class="w-8 h-8 animate-spin text-rose-400" />
           <p>正在识别中，请稍候...</p>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="selectedDetail && selectedDetail.status === 'failed'" class="flex-1 flex flex-col items-center justify-center gap-3 text-red-400 p-6">
+        <div v-else-if="selectedDetail && selectedDetail.status === 'failed'" class="error-state">
           <p class="text-lg font-medium">识别失败</p>
           <p class="text-sm">{{ selectedDetail.error_msg }}</p>
         </div>
@@ -331,12 +331,12 @@ onUnmounted(() => {
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="selectedDetail && selectedDetail.results.length === 0 && selectedDetail.status === 'done'" class="flex-1 flex items-center justify-center text-slate-400">
+        <div v-else-if="selectedDetail && selectedDetail.results.length === 0 && selectedDetail.status === 'done'" class="empty-state">
           该文件未识别到发票信息
         </div>
 
         <!-- No File Selected -->
-        <div v-else class="flex-1 flex items-center justify-center text-slate-400">
+        <div v-else class="empty-state">
           请从左侧选择一个文件查看识别结果
         </div>
       </div>

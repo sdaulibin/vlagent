@@ -1,0 +1,76 @@
+@layer components {
+  /* ===== Contract Result View Layout (from ContractResultView.vue) ===== */
+  .contract-result-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .contract-result-main {
+    height: calc(100vh - 64px);
+    display: flex;
+    overflow: hidden;
+  }
+
+  .contract-doc-panes {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .contract-doc-pane-single {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: 50%;
+    background: white;
+    overflow: hidden;
+  }
+
+  .contract-doc-content-area {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  .contract-doc-content-area > div,
+  .contract-doc-content-area > iframe {
+    height: 100%;
+    width: 100%;
+  }
+
+  /* VueOfficeDocx viewer */
+  .contract-docx-viewer {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .contract-docx-viewer .docx-wrapper {
+    padding: 20px;
+    background: #f8fafc;
+  }
+
+  .contract-docx-viewer .docx {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+    padding: 40px 60px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .contract-diff-sidebar-panel {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-left: 1px solid #e2e8f0;
+    box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+}

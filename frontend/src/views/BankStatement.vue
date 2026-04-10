@@ -165,35 +165,35 @@ const goBack = () => {
 </script>
 
 <template>
-    <div class="min-h-screen p-4 md:p-8 flex flex-col">
+    <div class="page-container">
         <!-- Header -->
-        <header class="w-full max-w-6xl mx-auto mb-6">
-            <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+        <header class="page-header">
+            <button @click="goBack" class="page-back-btn">
                 <ArrowLeft class="w-5 h-5" />
                 返回首页
             </button>
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-600 p-3 rounded-xl shadow-lg">
+            <div class="page-title-group">
+                <div class="page-icon bg-blue-600">
                     <ShieldCheck class="text-white w-7 h-7" />
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-900">流水信息识别</h1>
-                    <p class="text-sm text-slate-500">智能解析银行流水 PDF，提取交易明细和汇总统计</p>
+                    <h1 class="page-title">流水信息识别</h1>
+                    <p class="page-subtitle">智能解析银行流水 PDF，提取交易明细和汇总统计</p>
                 </div>
             </div>
         </header>
 
         <!-- Main Content -->
-        <main class="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-180px)]">
+        <main class="page-main" style="height: calc(100vh - 180px)">
             <!-- Left Column -->
-            <div class="md:col-span-4 flex flex-col gap-6 h-full min-h-0">
+            <div class="page-left-col">
                 <FileUpload :onFileSelect="handleFileSelect" />
                 
                 <!-- 开始识别按钮 - 始终显示 -->
                 <button 
                     @click="handleStartRecognition"
                     :disabled="isRecognizing || !hasPendingFiles"
-                    class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-xl font-medium shadow-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="btn-gradient from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
                     <Play class="w-5 h-5" />
                     {{ isRecognizing ? '识别中...' : (hasPendingFiles ? '开始识别' : '暂无待识别文件') }}

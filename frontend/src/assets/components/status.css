@@ -1,0 +1,25 @@
+@layer components {
+  /* ===== Status Badges ===== */
+  .status-badge {
+    @apply text-xs px-2 py-0.5 rounded-full;
+  }
+
+  .status-badge--pending {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+
+  .status-badge--processing {
+    @apply bg-blue-100 text-blue-700 animate-pulse;
+  }
+
+  .status-badge--done {
+    @apply bg-green-100 text-green-700;
+  }
+
+  .status-badge--failed {
+    @apply bg-red-100 text-red-700;
+  }
+
+  /* Status helper: get class by status name */
+  /* Usage: :class="statusBadgeClass(status)" */
+}

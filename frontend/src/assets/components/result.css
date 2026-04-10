@@ -1,0 +1,92 @@
+@layer components {
+  /* ===== Result Display ===== */
+  .result-grid {
+    @apply grid grid-cols-2 md:grid-cols-3 gap-3;
+  }
+
+  .result-field {
+    @apply py-2.5 px-3 bg-gray-50 rounded-lg border border-gray-100;
+  }
+
+  .result-field-label {
+    @apply text-xs text-gray-400 mb-1;
+  }
+
+  .result-field-value {
+    @apply text-sm font-medium text-gray-700;
+  }
+
+  /* ===== Data Table ===== */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table-header {
+    @apply bg-slate-50;
+  }
+
+  .data-table-header-cell {
+    @apply px-4 py-2.5 text-left text-xs font-semibold text-slate-500;
+  }
+
+  .data-table-row {
+    @apply border-t border-slate-100 hover:bg-slate-50 transition-colors;
+  }
+
+  .data-table-cell {
+    @apply px-4 py-2.5 text-slate-700;
+  }
+
+  .data-table-cell--empty {
+    @apply px-4 py-2.5 text-slate-300;
+  }
+
+  .data-table-index {
+    @apply px-4 py-2.5 text-xs text-slate-400 w-10;
+  }
+
+  /* ===== Empty State ===== */
+  .empty-state {
+    @apply flex-1 flex items-center justify-center text-slate-400;
+  }
+
+  .empty-state--column {
+    @apply flex-1 flex flex-col items-center justify-center gap-3 text-slate-400;
+  }
+
+  /* ===== Loading State ===== */
+  .loading-state {
+    @apply flex-1 flex flex-col items-center justify-center gap-3 text-slate-400;
+  }
+
+  /* ===== Error State ===== */
+  .error-state {
+    @apply flex-1 flex flex-col items-center justify-center gap-3 text-red-400 p-6;
+  }
+
+  /* ===== Transaction Item (BankStatement) ===== */
+  .result-item {
+    @apply bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow;
+  }
+
+  .summary-section {
+    @apply bg-white border border-gray-200 rounded-xl p-4;
+  }
+
+  .summary-item {
+    @apply py-2 px-3 bg-gray-50 rounded-lg;
+  }
+
+  /* ===== View Mode Tabs ===== */
+  .view-mode-tabs {
+    @apply flex items-center gap-1 bg-slate-100 rounded-lg p-0.5;
+  }
+
+  .view-mode-tab {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-500 hover:text-slate-700;
+  }
+
+  .view-mode-tab--active {
+    @apply bg-white text-slate-700 shadow-sm;
+  }
+}

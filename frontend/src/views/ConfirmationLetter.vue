@@ -192,11 +192,11 @@ const getStatusText = (status: string) => {
 
 const getStatusClass = (status: string) => {
   switch (status) {
-    case 'pending': return 'bg-yellow-100 text-yellow-700';
-    case 'processing': return 'bg-blue-100 text-blue-700';
-    case 'done': return 'bg-green-100 text-green-700';
-    case 'failed': return 'bg-red-100 text-red-700';
-    default: return 'bg-gray-100 text-gray-700';
+    case 'pending': return 'status-badge status-badge--pending';
+    case 'processing': return 'status-badge status-badge--processing';
+    case 'done': return 'status-badge status-badge--done';
+    case 'failed': return 'status-badge status-badge--failed';
+    default: return 'status-badge';
   }
 };
 
@@ -212,30 +212,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8 flex flex-col">
+  <div class="page-container">
     <!-- Header -->
-    <header class="w-full max-w-6xl mx-auto mb-6">
-      <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+    <header class="page-header">
+      <button @click="goBack" class="page-back-btn">
         <ArrowLeft class="w-5 h-5" />
         返回首页
       </button>
       <div class="flex items-center gap-3">
-        <div class="bg-emerald-600 p-3 rounded-xl shadow-lg">
+        <div class="page-icon bg-emerald-600">
           <FileText class="text-white w-7 h-7" />
         </div>
-        <div>
-          <h1 class="text-2xl font-bold text-slate-900">询证函智能识别</h1>
-          <p class="text-sm text-slate-500">智能识别银行询证函关键字段</p>
+        <div class="page-title-group">
+          <h1 class="page-title">询证函智能识别</h1>
+          <p class="page-subtitle">智能识别银行询证函关键字段</p>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="w-full max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1">
+    <main class="page-main">
       <!-- Left: File List -->
-      <div class="md:col-span-4 flex flex-col gap-4">
+      <div class="page-left-col">
         <!-- Upload -->
-        <label class="flex items-center justify-center gap-2 bg-white border-2 border-dashed border-slate-300 hover:border-emerald-400 rounded-xl p-4 cursor-pointer transition-colors">
+        <label class="upload-zone">
           <Upload class="w-5 h-5 text-slate-400" />
           <span class="text-slate-600">{{ isUploading ? '上传中...' : '点击上传询证函 PDF' }}</span>
           <input type="file" accept=".pdf" multiple class="hidden" @change="handleFileUpload" :disabled="isUploading" />
@@ -245,30 +245,30 @@ onMounted(() => {
         <button
           @click="handleStartRecognition"
           :disabled="isRecognizing || !hasRetryableLetters"
-          class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-medium shadow-lg hover:from-emerald-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-gradient from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
         >
           <Play class="w-5 h-5" />
           {{ isRecognizing ? '识别中...' : (hasRetryableLetters ? '开始识别/重试失败' : '暂无可识别文件') }}
         </button>
 
         <!-- File List -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-auto">
-          <div class="p-3 border-b border-slate-100">
+        <div class="file-list">
+          <div class="file-list-header">
             <h3 class="font-medium text-slate-700">文件列表</h3>
           </div>
-          <ul class="divide-y divide-slate-100">
+          <ul class="file-list-items">
             <li
               v-for="letter in letters"
               :key="letter.id"
               @click="selectLetter(letter.id)"
               :class="[
-                'p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors',
-                selectedLetter?.id === letter.id ? 'bg-emerald-50' : ''
+                'file-list-item',
+                selectedLetter?.id === letter.id ? 'file-list-item--active' : ''
               ]"
             >
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-slate-700 truncate">{{ letter.filename }}</p>
-                <span :class="['text-xs px-2 py-0.5 rounded-full', getStatusClass(letter.status)]">
+                <span :class="getStatusClass(letter.status)">
                   {{ getStatusText(letter.status) }}
                 </span>
               </div>
@@ -286,7 +286,7 @@ onMounted(() => {
                 <RefreshCcw class="w-4 h-4" />
               </button>
             </li>
-            <li v-if="letters.length === 0" class="p-4 text-center text-slate-400 text-sm">
+            <li v-if="letters.length === 0" class="file-list-empty">
               暂无询证函记录
             </li>
           </ul>
@@ -294,11 +294,11 @@ onMounted(() => {
       </div>
 
       <!-- Right: Recognition Result -->
-      <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-medium text-slate-700">识别结果</h3>
+      <div class="page-right-col">
+        <div class="content-card-header">
+          <h3 class="content-card-title">识别结果</h3>
           <div v-if="selectedLetter" class="flex items-center gap-2">
-            <span :class="['text-xs px-2 py-0.5 rounded-full', getStatusClass(selectedLetter.status)]">
+            <span :class="getStatusClass(selectedLetter.status)">
               {{ getStatusText(selectedLetter.status) }}
             </span>
             <button
@@ -314,10 +314,10 @@ onMounted(() => {
         <div v-if="selectedLetter && selectedLetter.recognition" class="p-4 flex-1 overflow-auto">
           <!-- Format Check Banner -->
           <div
-            class="mb-4 p-3 rounded-lg border"
+            class="info-section"
             :class="selectedLetter.recognition.format_check_passed ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'"
           >
-            <p class="text-sm font-medium text-slate-700">
+            <p class="info-section-title">
               格式类型：{{ selectedLetter.recognition.format_type || 'unknown' }}
             </p>
             <p class="text-xs mt-1" :class="selectedLetter.recognition.format_check_passed ? 'text-emerald-700' : 'text-amber-700'">
@@ -334,16 +334,16 @@ onMounted(() => {
           </div>
 
           <!-- Summary Card -->
-          <div class="bg-white border border-slate-200 rounded-xl p-4">
+          <div class="info-section">
             <div class="flex items-center gap-2 mb-4">
               <FileText class="w-5 h-5 text-emerald-500" />
-              <h3 class="font-semibold text-gray-700">询证函信息</h3>
+              <h3 class="info-section-title">询证函信息</h3>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div v-for="field in displayFields" :key="field.key" class="py-2 px-3 bg-gray-50 rounded-lg">
-                <p class="text-xs text-gray-400 mb-1">{{ field.label }}</p>
-                <p class="text-sm font-medium text-gray-700">{{ getFieldValue(field.key) }}</p>
+            <div class="result-grid">
+              <div v-for="field in displayFields" :key="field.key" class="result-field">
+                <p class="result-field-label">{{ field.label }}</p>
+                <p class="result-field-value">{{ getFieldValue(field.key) }}</p>
               </div>
             </div>
           </div>

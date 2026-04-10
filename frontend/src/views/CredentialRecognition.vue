@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ArrowLeft, Upload, Loader2, FileCheck2 } from 'lucide-vue-next';
-import { extractCredential } from '../api';
+import { ArrowLeft, Upload, Loader2, FileCheck2, Trash2, Eye } from 'lucide-vue-next';
+import {
+  extractCredential,
+  getCredentialRecords,
+  getCredentialRecord,
+  deleteCredentialRecord,
+  getCredentialFileUrl,
+} from '../api';
 import PowerOfAttorneyResult from '../components/PowerOfAttorneyResult.vue';
 
 const router = useRouter();
@@ -18,13 +24,38 @@ const CREDENTIAL_TYPES = [
   { value: 'power_of_attorney', label: '授权委托书' }
 ];
 
+const CREDENTIAL_TYPE_LABELS: Record<string, string> = {
+  id_card: '身份证',
+  electronic_seal: '电子印章',
+  bank_card: '银行卡',
+  electronic_credential: '电子凭证',
+  online_banking_app: '网银申请书',
+  notice_illegal_activity: '违法犯罪告知书',
+  account_opening_app: '开户申请书',
+  power_of_attorney: '授权委托书'
+};
+
 const selectedType = ref('id_card');
 const isUploading = ref(false);
 const resultData = ref<any>(null);
 const errorMsg = ref('');
+const selectedRecordId = ref<number | null>(null);
+const previewUrl = ref('');
+
+// 提取记录列表
+interface CredentialRecordItem {
+  id: number;
+  filename: string;
+  credential_type: string;
+  status: string;
+  processing_duration: number | null;
+  error_msg: string | null;
+  created_at: string | null;
+}
+
+const records = ref<CredentialRecordItem[]>([]);
 
 const FIELD_LABELS: Record<string, string> = {
-  // Common / Boolean
   is_front_side: '是否为正面(人像面)',
   has_face_photo: '是否包含人脸照片',
   is_bank_card_image: '是否为银行卡影像',
@@ -33,8 +64,6 @@ const FIELD_LABELS: Record<string, string> = {
   has_fingerprint: '是否有手印',
   is_online_banking_app: '是否为网银/手机表单',
   is_illegal_activity_notice: '是否为违法告知书',
-
-  // ID Card
   name: '姓名',
   gender: '性别',
   ethnicity: '民族',
@@ -45,15 +74,9 @@ const FIELD_LABELS: Record<string, string> = {
   issuing_authority: '签发机关',
   issue_date: '签发日期',
   expiry_date: '有效期限',
-
-  // Electronic Seal
   header: '文件类型',
   seal_codes: '电子印章编码',
-
-  // Bank Card
   card_number: '银行卡号',
-
-  // Electronic Credential
   payer_name: '付款人',
   payer_account: '付款人账号',
   payee_name: '收款人',
@@ -63,8 +86,6 @@ const FIELD_LABELS: Record<string, string> = {
   serial_number: '流水号/回单号',
   purpose: '用途/附言',
   signature_content: '手写签字内容',
-
-  // Online Banking App
   enterprise_name: '企业名称',
   business_license: '营业执照号',
   other_id_number: '其他证件号码',
@@ -91,13 +112,9 @@ const FIELD_LABELS: Record<string, string> = {
   bank_handler_signature: '银行经办人',
   bank_auditor_signature: '银行审核人',
   bank_sign_date: '银行业务日期',
-
-  // Illegal Activity Notice
   bank_account: '银行账号',
   applicant_signature: '开户申请人签名',
   sign_date: '日期',
-
-  // Account Opening App
   is_account_opening_app: '是否为开户申请书',
   depositor_name_cn: '存款人名称(中)',
   depositor_type: '存款人类别',
@@ -139,8 +156,6 @@ const FIELD_LABELS: Record<string, string> = {
   legal_rep_seal: '法人名章',
   handler_signature: '经办人签名',
   bottom_line_content: '底部文字内容',
-
-  // Power of Attorney
   is_power_of_attorney: '是否为授权委托书',
   principal_name: '本人(委托人)',
   principal_id_number: '委托人证件号',
@@ -156,6 +171,63 @@ const goBack = () => {
   router.push('/');
 };
 
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'pending': return '待提取';
+    case 'processing': return '提取中';
+    case 'done': return '已完成';
+    case 'failed': return '失败';
+    default: return status;
+  }
+};
+
+const getStatusClass = (status: string) => {
+  switch (status) {
+    case 'pending': return 'status-badge status-badge--pending';
+    case 'processing': return 'status-badge status-badge--processing';
+    case 'done': return 'status-badge status-badge--done';
+    case 'failed': return 'status-badge status-badge--failed';
+    default: return 'status-badge';
+  }
+};
+
+const loadRecords = async () => {
+  try {
+    records.value = await getCredentialRecords();
+  } catch (e) {
+    console.error("加载提取记录失败", e);
+  }
+};
+
+const selectRecord = async (id: number) => {
+  selectedRecordId.value = id;
+  try {
+    const detail = await getCredentialRecord(id);
+    resultData.value = detail.result;
+    errorMsg.value = detail.error_msg || '';
+    selectedType.value = detail.credential_type;
+    previewUrl.value = getCredentialFileUrl(id);
+  } catch (e) {
+    console.error("加载记录详情失败", e);
+  }
+};
+
+const handleDeleteRecord = async (id: number) => {
+  if (!confirm('确定要删除这条提取记录吗？')) return;
+  try {
+    await deleteCredentialRecord(id);
+    if (selectedRecordId.value === id) {
+      selectedRecordId.value = null;
+      resultData.value = null;
+      errorMsg.value = '';
+      previewUrl.value = '';
+    }
+    await loadRecords();
+  } catch (e) {
+    console.error("删除失败", e);
+  }
+};
+
 const handleFileUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const fileList = target.files;
@@ -167,10 +239,17 @@ const handleFileUpload = async (event: Event) => {
   isUploading.value = true;
   resultData.value = null;
   errorMsg.value = '';
+  previewUrl.value = '';
 
   try {
     const data = await extractCredential(file, selectedType.value);
-    resultData.value = data.extracted_data;
+    resultData.value = data.result;
+    errorMsg.value = data.error_msg || '';
+    selectedRecordId.value = data.id;
+    if (data.id) {
+      previewUrl.value = getCredentialFileUrl(data.id);
+    }
+    await loadRecords();
   } catch (e: any) {
     console.error("提取失败", e);
     errorMsg.value = e.response?.data?.detail || e.message || "由于网络或服务异常，提取失败";
@@ -179,33 +258,42 @@ const handleFileUpload = async (event: Event) => {
     target.value = '';
   }
 };
+
+const isImageFile = (filename: string) => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  return ext === 'jpg' || ext === 'jpeg' || ext === 'png';
+};
+
+onMounted(() => {
+  loadRecords();
+});
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8 flex flex-col">
+  <div class="page-container">
     <!-- Header -->
-    <header class="w-full max-w-7xl mx-auto mb-6">
-      <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+    <header class="page-header">
+      <button @click="goBack" class="page-back-btn">
         <ArrowLeft class="w-5 h-5" />
         返回首页
       </button>
-      <div class="flex items-center gap-3">
-        <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-3 rounded-xl shadow-lg">
+      <div class="page-title-group">
+        <div class="page-icon bg-gradient-to-br from-indigo-500 to-purple-600">
           <FileCheck2 class="text-white w-7 h-7" />
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">类凭证识别</h1>
-          <p class="text-sm text-slate-500">上传指定格式凭证类文件，自动提取关键要素及签字信息</p>
+          <h1 class="page-title">类凭证识别</h1>
+          <p class="page-subtitle">上传指定格式凭证类文件，自动提取关键要素及签字信息</p>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1">
+    <main class="page-main">
 
-      <!-- Left: Upload & Config -->
-      <div class="md:col-span-4 flex flex-col gap-4">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <!-- Left: Upload & Config & History -->
+      <div class="page-left-col">
+        <div class="content-card p-4">
           <h3 class="font-medium text-slate-700 mb-4">1. 选择凭证类型</h3>
           <select
             v-model="selectedType"
@@ -217,10 +305,9 @@ const handleFileUpload = async (event: Event) => {
           </select>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex-1">
+        <div class="content-card p-4">
           <h3 class="font-medium text-slate-700 mb-4">2. 上传文件</h3>
-          <!-- Upload -->
-          <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl p-8 cursor-pointer transition-colors bg-slate-50">
+          <label class="upload-zone--large hover:border-indigo-400">
             <template v-if="isUploading">
               <Loader2 class="w-8 h-8 text-indigo-400 animate-spin" />
               <span class="text-slate-600 mt-2">智能解析中，请稍候...</span>
@@ -232,75 +319,150 @@ const handleFileUpload = async (event: Event) => {
             <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="handleFileUpload" :disabled="isUploading" />
           </label>
         </div>
+
+        <!-- 提取记录列表 -->
+        <div class="file-list">
+          <div class="file-list-header">
+            <h3 class="content-card-title">提取记录 ({{ records.length }})</h3>
+          </div>
+          <ul class="file-list-items">
+            <li
+              v-for="record in records"
+              :key="record.id"
+              @click="selectRecord(record.id)"
+              :class="[
+                'file-list-item',
+                selectedRecordId === record.id ? 'bg-indigo-50' : ''
+              ]"
+            >
+              <div class="file-list-item-info">
+                <p class="file-list-item-name">{{ record.filename }}</p>
+                <div class="file-list-item-meta">
+                  <span :class="getStatusClass(record.status)">
+                    {{ getStatusText(record.status) }}
+                  </span>
+                  <span class="text-xs text-slate-400">{{ CREDENTIAL_TYPE_LABELS[record.credential_type] || record.credential_type }}</span>
+                  <span v-if="record.processing_duration" class="text-xs text-slate-400">{{ record.processing_duration.toFixed(1) }}s</span>
+                </div>
+              </div>
+              <div class="file-list-item-actions">
+                <button @click.stop="handleDeleteRecord(record.id)" class="file-list-delete-btn">
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
+            </li>
+            <li v-if="records.length === 0" class="file-list-empty">
+              暂无提取记录
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <!-- Right: Recognition Results -->
-      <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-medium text-slate-700">提取结果</h3>
+      <!-- Right: File Preview + Results -->
+      <div class="page-right-col">
+        <div class="content-card-header">
+          <h3 class="content-card-title">提取结果</h3>
+          <div v-if="selectedRecordId" class="flex items-center gap-2">
+            <button
+              @click="window.open(previewUrl, '_blank')"
+              class="btn-toolbar"
+            >
+              <Eye class="w-3.5 h-3.5" />
+              新窗口预览
+            </button>
+          </div>
         </div>
 
-        <!-- Initial state -->
-        <div v-if="!resultData && !errorMsg && !isUploading" class="flex-1 flex items-center justify-center text-slate-400 p-6 text-center">
-          请在左侧选择类型并上传文件<br/>等待 AI 进行提取识别
+        <!-- Loading State -->
+        <div v-if="isUploading" class="loading-state">
+          <Loader2 class="w-8 h-8 animate-spin text-indigo-400" />
+          <p>智能解析中，请稍候...</p>
         </div>
 
-        <!-- Error State -->
-        <div v-if="errorMsg" class="flex-1 flex flex-col items-center justify-center gap-3 text-red-500 p-6 text-center">
-          <p class="text-lg font-medium">识别失败</p>
-          <p class="text-sm bg-red-50 p-3 rounded-lg border border-red-100">{{ errorMsg }}</p>
-        </div>
-
-        <!-- Results Display -->
-        <div v-if="resultData" class="flex-1 p-6 overflow-auto">
-          <!-- 授权委托书特殊展示 -->
-          <template v-if="selectedType === 'power_of_attorney'">
-            <PowerOfAttorneyResult :data="resultData" />
-          </template>
-
-          <!-- 其他凭证类型：通用展示 -->
-          <template v-else>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <template v-for="(val, key) in resultData" :key="key">
-                <div v-if="String(key) !== 'operators' && String(key) !== 'authorized_items_by_category' && val !== null" class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <p class="text-xs text-slate-400 font-mono mb-1">{{ FIELD_LABELS[key] || key }}</p>
-                  <p class="text-sm font-medium text-slate-800 break-words">
-                    <template v-if="Array.isArray(val)">
-                      <div v-for="(item, i) in val" :key="i" class="bg-indigo-50 px-2 py-1 rounded text-xs inline-block mr-2 mb-1 border border-indigo-100">
-                        {{ item }}
-                      </div>
-                      <span v-if="val.length === 0" class="text-slate-400">无</span>
-                    </template>
-                    <template v-else-if="typeof val === 'boolean'">
-                      <span :class="val ? 'text-green-600 bg-green-100 px-2 py-0.5 rounded text-xs' : 'text-slate-500 bg-slate-200 px-2 py-0.5 rounded text-xs'">
-                        {{ val ? '是 (True)' : '否 (False)' }}
-                      </span>
-                    </template>
-                    <template v-else>
-                      {{ val === '' || val === null ? '无' : val }}
-                    </template>
-                  </p>
-                </div>
-              </template>
+        <template v-else-if="selectedRecordId">
+          <!-- File Preview -->
+          <div v-if="previewUrl" class="border-b border-slate-100 bg-slate-50">
+            <div class="p-3">
+              <p class="text-xs font-medium text-slate-500 mb-2">原文预览</p>
+              <div class="rounded-lg overflow-hidden border border-slate-200 bg-white" style="max-height: 400px;">
+                <img
+                  v-if="isImageFile(previewUrl)"
+                  :src="previewUrl"
+                  class="w-full h-auto object-contain"
+                  style="max-height: 400px;"
+                />
+                <iframe
+                  v-else
+                  :src="previewUrl"
+                  class="w-full border-0"
+                  style="height: 400px;"
+                />
+              </div>
             </div>
+          </div>
 
-            <!-- Operators Array Display for Online Banking App -->
-            <div v-if="resultData.operators && resultData.operators.length > 0" class="mt-6">
-              <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作人员列表</h4>
-              <div class="space-y-3">
-                <div v-for="(op, idx) in resultData.operators" :key="idx" class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between">
-                  <div>
-                    <p class="text-xs text-blue-400 mb-1">姓名: <span class="text-sm font-medium text-slate-800">{{ op.name || '-' }}</span></p>
-                    <p class="text-xs text-blue-400">身份证: <span class="font-mono text-slate-800">{{ op.id_number || '-' }}</span></p>
+          <!-- Error State -->
+          <div v-if="errorMsg" class="error-state">
+            <p class="text-lg font-medium">识别失败</p>
+            <p class="text-sm bg-red-50 p-3 rounded-lg border border-red-100">{{ errorMsg }}</p>
+          </div>
+
+          <!-- Results Display -->
+          <div v-if="resultData" class="flex-1 p-6 overflow-auto">
+            <!-- 授权委托书特殊展示 -->
+            <template v-if="selectedType === 'power_of_attorney'">
+              <PowerOfAttorneyResult :data="resultData" />
+            </template>
+
+            <!-- 其他凭证类型：通用展示 -->
+            <template v-else>
+              <div class="result-grid">
+                <template v-for="(val, key) in resultData" :key="key">
+                  <div v-if="String(key) !== 'operators' && String(key) !== 'authorized_items_by_category' && val !== null" class="result-field">
+                    <p class="result-field-label font-mono">{{ FIELD_LABELS[key] || key }}</p>
+                    <p class="result-field-value break-words">
+                      <template v-if="Array.isArray(val)">
+                        <div v-for="(item, i) in val" :key="i" class="bg-indigo-50 px-2 py-1 rounded text-xs inline-block mr-2 mb-1 border border-indigo-100">
+                          {{ item }}
+                        </div>
+                        <span v-if="val.length === 0" class="text-slate-400">无</span>
+                      </template>
+                      <template v-else-if="typeof val === 'boolean'">
+                        <span :class="val ? 'text-green-600 bg-green-100 px-2 py-0.5 rounded text-xs' : 'text-slate-500 bg-slate-200 px-2 py-0.5 rounded text-xs'">
+                          {{ val ? '是 (True)' : '否 (False)' }}
+                        </span>
+                      </template>
+                      <template v-else>
+                        {{ val === '' || val === null ? '无' : val }}
+                      </template>
+                    </p>
                   </div>
-                  <div class="text-right">
-                    <p class="text-xs text-blue-400 mb-1">手机:</p>
-                    <p class="text-sm font-medium text-slate-800">{{ op.phone || '-' }}</p>
+                </template>
+              </div>
+
+              <!-- Operators Array Display for Online Banking App -->
+              <div v-if="resultData.operators && resultData.operators.length > 0" class="mt-6">
+                <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作人员列表</h4>
+                <div class="space-y-3">
+                  <div v-for="(op, idx) in resultData.operators" :key="idx" class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between">
+                    <div>
+                      <p class="text-xs text-blue-400 mb-1">姓名: <span class="text-sm font-medium text-slate-800">{{ op.name || '-' }}</span></p>
+                      <p class="text-xs text-blue-400">身份证: <span class="font-mono text-slate-800">{{ op.id_number || '-' }}</span></p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-xs text-blue-400 mb-1">手机:</p>
+                      <p class="text-sm font-medium text-slate-800">{{ op.phone || '-' }}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </template>
+            </template>
+          </div>
+        </template>
+
+        <!-- Initial state -->
+        <div v-else class="empty-state p-6 text-center">
+          请在左侧选择类型并上传文件<br/>等待 AI 进行提取识别
         </div>
       </div>
     </main>

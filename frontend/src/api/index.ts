@@ -212,6 +212,26 @@ export const extractCredential = async (file: File, credentialType: string) => {
   return response.data;
 };
 
+export const getCredentialRecords = async () => {
+  const response = await api.get("/credentials/list");
+  return response.data;
+};
+
+export const getCredentialRecord = async (recordId: number) => {
+  const response = await api.get(`/credentials/list/${recordId}`);
+  return response.data;
+};
+
+export const deleteCredentialRecord = async (recordId: number) => {
+  const response = await api.delete(`/credentials/${recordId}`);
+  return response.data;
+};
+
+export const getCredentialFileUrl = (recordId: number) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  return `${baseUrl}/credentials/${recordId}/file`;
+};
+
 // ===== 通用 PDF 提取 API =====
 
 export const uploadPdfExtract = async (file: File, fields: string, outputFormat: string) => {

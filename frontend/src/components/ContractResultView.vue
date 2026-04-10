@@ -114,7 +114,7 @@ const stats = computed(() => ({
 </script>
 
 <template>
-    <div class="result-container">
+    <div class="contract-result-container">
         <!-- Toolbar -->
         <div class="contract-toolbar">
             <div class="flex items-center gap-4">
@@ -130,7 +130,7 @@ const stats = computed(() => ({
                         <ChevronRight class="w-4 h-4" />
                     </button>
                 </div>
-                <button 
+                <button
                     @click="emit('update:syncScroll', !props.syncScroll)"
                     :class="['contract-sync-btn', props.syncScroll ? 'active' : '']"
                 >
@@ -145,9 +145,9 @@ const stats = computed(() => ({
                         <ZoomOut class="w-5 h-5" />
                     </button>
                 </div>
-                
+
                 <!-- 视图模式切换 -->
-                <button 
+                <button
                     @click="toggleViewMode"
                     :class="['contract-sync-btn', viewMode === 'diff' ? 'active' : '']"
                 >
@@ -162,18 +162,17 @@ const stats = computed(() => ({
         </div>
 
         <!-- Main Content -->
-        <div class="main-content">
+        <div class="contract-result-main">
             <!-- Document Panes -->
-            <div class="doc-panes-container">
+            <div class="contract-doc-panes">
                 <!-- Original Doc -->
-                <div class="doc-pane">
+                <div class="contract-doc-pane-single">
                     <div class="contract-doc-header contract-doc-header-original">
                         <span class="contract-doc-badge contract-badge-original">原</span>
                         <span class="font-medium text-slate-700 truncate">{{ props.fileAName || '原文档' }}</span>
                     </div>
-                    <div id="doc-content-a" class="doc-content">
-                        <!-- 差异视图 - 使用 Tiptap 编辑器 -->
-                        <TiptapViewer 
+                    <div id="doc-content-a" class="contract-doc-content-area">
+                        <TiptapViewer
                             v-if="viewMode === 'diff'"
                             :key="'docA-' + props.selectedDiffId"
                             :content="props.contentA"
@@ -181,23 +180,16 @@ const stats = computed(() => ({
                             :compareText="highlightTextB"
                             highlightColor="red"
                         />
-                        
-                        <!-- 格式视图 -->
                         <template v-else>
-                            <!-- PDF Viewer -->
-                            <iframe 
-                                v-if="props.fileAType === 'pdf'" 
-                                :src="props.fileAPreviewUrl" 
+                            <iframe
+                                v-if="props.fileAType === 'pdf'"
+                                :src="props.fileAPreviewUrl"
                                 class="w-full h-full border-0"
                             ></iframe>
-                            
-                            <!-- Image Viewer -->
                             <div v-else-if="props.fileAType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
                                 <img :src="props.fileAPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                             </div>
-                            
-                            <!-- Text/DOC/DOCX Viewer - 使用 Tiptap -->
-                            <TiptapViewer 
+                            <TiptapViewer
                                 v-else
                                 :content="props.contentA"
                             />
@@ -209,14 +201,13 @@ const stats = computed(() => ({
                 <div class="w-px bg-slate-300"></div>
 
                 <!-- Compare Doc -->
-                <div class="doc-pane">
+                <div class="contract-doc-pane-single">
                     <div class="contract-doc-header contract-doc-header-compare">
                         <span class="contract-doc-badge contract-badge-compare">比对</span>
                         <span class="font-medium text-slate-700 truncate">{{ props.fileBName || '比对文档' }}</span>
                     </div>
-                    <div id="doc-content-b" class="doc-content">
-                        <!-- 差异视图 - 使用 Tiptap 编辑器 -->
-                        <TiptapViewer 
+                    <div id="doc-content-b" class="contract-doc-content-area">
+                        <TiptapViewer
                             v-if="viewMode === 'diff'"
                             :key="'docB-' + props.selectedDiffId"
                             :content="props.contentB"
@@ -224,23 +215,16 @@ const stats = computed(() => ({
                             :compareText="highlightTextA"
                             highlightColor="green"
                         />
-                        
-                        <!-- 格式视图 -->
                         <template v-else>
-                            <!-- PDF Viewer -->
-                            <iframe 
-                                v-if="props.fileBType === 'pdf'" 
-                                :src="props.fileBPreviewUrl" 
+                            <iframe
+                                v-if="props.fileBType === 'pdf'"
+                                :src="props.fileBPreviewUrl"
                                 class="w-full h-full border-0"
                             ></iframe>
-                            
-                            <!-- Image Viewer -->
                             <div v-else-if="props.fileBType === 'image'" class="w-full h-full flex items-center justify-center bg-slate-100 overflow-auto p-4">
                                 <img :src="props.fileBPreviewUrl" class="max-w-full h-auto shadow-lg rounded" />
                             </div>
-                            
-                            <!-- Text/DOC/DOCX Viewer - 使用 Tiptap -->
-                            <TiptapViewer 
+                            <TiptapViewer
                                 v-else
                                 :content="props.contentB"
                             />
@@ -250,7 +234,7 @@ const stats = computed(() => ({
             </div>
 
             <!-- Diff List Sidebar -->
-            <div class="diff-sidebar">
+            <div class="contract-diff-sidebar-panel">
                 <!-- Stats Header -->
                 <div class="p-5 border-b border-slate-100 bg-slate-50/50">
                     <div class="flex items-end justify-between mb-4">
@@ -262,7 +246,7 @@ const stats = computed(() => ({
 
                     <!-- Filter Tabs -->
                     <div class="flex bg-slate-200/60 p-1 rounded-lg">
-                        <button 
+                        <button
                             v-for="tab in [
                                 { id: 'all', label: '全部', count: stats.all },
                                 { id: 'added', label: '新增', count: stats.added },
@@ -280,7 +264,7 @@ const stats = computed(() => ({
 
                 <!-- Diff Items -->
                 <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-                    <div 
+                    <div
                         v-for="diff in filteredDiffs"
                         :key="diff.id"
                         :class="['diff-item', props.selectedDiffId === diff.id ? 'ring-2 ring-orange-500' : '']"
@@ -290,7 +274,7 @@ const stats = computed(() => ({
                             <span :class="['diff-badge', `diff-badge-${diff.diff_type}`]">
                                 {{ diff.diff_type === 'added' ? '新增' : diff.diff_type === 'deleted' ? '删除' : '修改' }}
                             </span>
-                            <button 
+                            <button
                                 @click.stop="emit('ignoreDiff', diff.id)"
                                 class="text-slate-400 hover:text-slate-600 text-xs underline"
                             >
@@ -324,79 +308,3 @@ const stats = computed(() => ({
         </div>
     </div>
 </template>
-
-<style scoped>
-.result-container {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.main-content {
-    height: calc(100vh - 64px);
-    display: flex;
-    overflow: hidden;
-}
-
-.doc-panes-container {
-    flex: 1;
-    display: flex;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.doc-pane {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    max-width: 50%;
-    background: white;
-    overflow: hidden;
-}
-
-.doc-content {
-    flex: 1;
-    overflow: auto;
-    position: relative;
-}
-
-.doc-content > div,
-.doc-content > iframe {
-    height: 100%;
-    width: 100%;
-}
-
-/* VueOfficeDocx 容器样式 */
-.docx-viewer {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-}
-
-.docx-viewer :deep(.docx-wrapper) {
-    padding: 20px;
-    background: #f8fafc;
-}
-
-.docx-viewer :deep(.docx) {
-    background: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin: 0 auto;
-    padding: 40px 60px;
-    max-width: 100%;
-    overflow-x: auto;
-}
-
-.diff-sidebar {
-    width: 320px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border-left: 1px solid #e2e8f0;
-    box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-}
-</style>

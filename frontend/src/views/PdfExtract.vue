@@ -185,12 +185,13 @@ const removeField = (index: number) => {
 // 添加 object_array 子字段
 const addSubField = (fieldIndex: number) => {
   const field = fields.value[fieldIndex];
+  if (!field) return;
   if (!field.items) field.items = [];
   field.items.push({ name: '', type: 'string' });
 };
 
 const removeSubField = (fieldIndex: number, subIndex: number) => {
-  fields.value[fieldIndex].items?.splice(subIndex, 1);
+  fields.value[fieldIndex]?.items?.splice(subIndex, 1);
 };
 
 // 当字段类型变为 object_array 时初始化 items
@@ -307,25 +308,17 @@ const getStatusText = (status: string) => {
 
 const getStatusClass = (status: string) => {
   switch (status) {
-    case 'pending': return 'bg-yellow-100 text-yellow-700';
-    case 'processing': return 'bg-blue-100 text-blue-700 animate-pulse';
-    case 'done': return 'bg-green-100 text-green-700';
-    case 'failed': return 'bg-red-100 text-red-700';
-    default: return 'bg-gray-100 text-gray-700';
+    case 'pending': return 'status-badge status-badge--pending';
+    case 'processing': return 'status-badge status-badge--processing';
+    case 'done': return 'status-badge status-badge--done';
+    case 'failed': return 'status-badge status-badge--failed';
+    default: return 'status-badge';
   }
 };
 
 const formatDuration = (seconds: number | null) => {
   if (seconds === null || seconds === undefined) return '-';
   return `${seconds.toFixed(1)}s`;
-};
-
-// 格式化显示值
-const formatValue = (value: any): string => {
-  if (value === null || value === undefined) return '-';
-  if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
 };
 
 const startPolling = () => {
@@ -364,30 +357,30 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8 flex flex-col">
+  <div class="page-container">
     <!-- Header -->
-    <header class="w-full max-w-7xl mx-auto mb-6">
-      <button @click="goBack" class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
+    <header class="page-header">
+      <button @click="goBack" class="page-back-btn">
         <ArrowLeft class="w-5 h-5" />
         返回首页
       </button>
-      <div class="flex items-center gap-3">
-        <div class="bg-gradient-to-br from-cyan-500 to-blue-600 p-3 rounded-xl shadow-lg">
+      <div class="page-title-group">
+        <div class="page-icon bg-gradient-to-br from-cyan-500 to-blue-600">
           <FileScan class="text-white w-7 h-7" />
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">通用 PDF 提取</h1>
-          <p class="text-sm text-slate-500">自定义提取字段，AI 自动从 PDF 文件中提取结构化信息</p>
+          <h1 class="page-title">通用 PDF 提取</h1>
+          <p class="page-subtitle">自定义提取字段，AI 自动从 PDF 文件中提取结构化信息</p>
         </div>
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1">
+    <main class="page-main">
       <!-- Left: Config + File List -->
-      <div class="md:col-span-4 flex flex-col gap-4">
+      <div class="page-left-col">
         <!-- Field Config -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200">
+        <div class="content-card">
           <button
             @click="showConfig = !showConfig"
             class="w-full p-3 border-b border-slate-100 flex items-center justify-between"
@@ -485,38 +478,38 @@ onUnmounted(() => {
         </div>
 
         <!-- Upload -->
-        <label class="flex items-center justify-center gap-2 bg-white border-2 border-dashed border-slate-300 hover:border-cyan-400 rounded-xl p-4 cursor-pointer transition-colors">
+        <label class="upload-zone hover:border-cyan-400">
           <Upload class="w-5 h-5 text-slate-400" />
           <span class="text-slate-600">{{ isUploading ? '上传中...' : '点击上传 PDF' }}</span>
           <input type="file" accept=".pdf" multiple class="hidden" @change="handleFileUpload" :disabled="isUploading" />
         </label>
 
         <!-- Task List -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-auto">
-          <div class="p-3 border-b border-slate-100">
-            <h3 class="font-medium text-slate-700">任务列表 ({{ tasks.length }})</h3>
+        <div class="file-list">
+          <div class="file-list-header">
+            <h3 class="content-card-title">任务列表 ({{ tasks.length }})</h3>
           </div>
-          <ul class="divide-y divide-slate-100">
+          <ul class="file-list-items">
             <li
               v-for="task in tasks"
               :key="task.id"
               @click="selectTask(task.id)"
               :class="[
-                'p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors',
+                'file-list-item',
                 selectedTaskId === task.id ? 'bg-cyan-50' : ''
               ]"
             >
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-slate-700 truncate">{{ task.filename }}</p>
-                <div class="flex items-center gap-2 mt-1">
-                  <span :class="['text-xs px-2 py-0.5 rounded-full', getStatusClass(task.status)]">
+              <div class="file-list-item-info">
+                <p class="file-list-item-name">{{ task.filename }}</p>
+                <div class="file-list-item-meta">
+                  <span :class="getStatusClass(task.status)">
                     {{ getStatusText(task.status) }}
                   </span>
                   <span v-if="task.page_count" class="text-xs text-slate-400">{{ task.page_count }}页</span>
                   <span v-if="task.processing_duration" class="text-xs text-slate-400">{{ formatDuration(task.processing_duration) }}</span>
                 </div>
               </div>
-              <div class="flex items-center gap-1">
+              <div class="file-list-item-actions">
                 <button
                   v-if="task.status === 'done' && task.output_format !== 'json'"
                   @click.stop="handleDownload(task.id)"
@@ -526,14 +519,14 @@ onUnmounted(() => {
                 </button>
                 <button
                   @click.stop="handleDelete(task.id)"
-                  class="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                  class="file-list-delete-btn"
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>
                 <ChevronRight class="w-4 h-4 text-slate-300" />
               </div>
             </li>
-            <li v-if="tasks.length === 0" class="p-6 text-center text-slate-400 text-sm">
+            <li v-if="tasks.length === 0" class="file-list-empty">
               暂无提取记录，请上传 PDF 文件
             </li>
           </ul>
@@ -541,42 +534,42 @@ onUnmounted(() => {
       </div>
 
       <!-- Right: Result -->
-      <div class="md:col-span-8 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="font-medium text-slate-700">提取结果</h3>
+      <div class="page-right-col">
+        <div class="content-card-header">
+          <h3 class="content-card-title">提取结果</h3>
           <div v-if="selectedDetail" class="flex items-center gap-3 text-sm text-slate-500">
             <span v-if="selectedDetail.page_count">共 {{ selectedDetail.page_count }} 页</span>
             <span v-if="selectedDetail.processing_duration">
               耗时 {{ formatDuration(selectedDetail.processing_duration) }}
             </span>
-            <span :class="['px-2 py-0.5 rounded-full text-xs', getStatusClass(selectedDetail.status)]">
+            <span :class="getStatusClass(selectedDetail.status)">
               {{ getStatusText(selectedDetail.status) }}
             </span>
           </div>
         </div>
 
         <!-- Loading -->
-        <div v-if="selectedDetail && selectedDetail.status === 'processing'" class="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div v-if="selectedDetail && selectedDetail.status === 'processing'" class="loading-state">
           <Loader2 class="w-8 h-8 animate-spin text-cyan-400" />
           <p>正在提取中，请稍候...</p>
         </div>
 
         <!-- Error -->
-        <div v-else-if="selectedDetail && selectedDetail.status === 'failed'" class="flex-1 flex flex-col items-center justify-center gap-3 text-red-400 p-6">
+        <div v-else-if="selectedDetail && selectedDetail.status === 'failed'" class="error-state">
           <p class="text-lg font-medium">提取失败</p>
           <p class="text-sm">{{ selectedDetail.error_msg }}</p>
         </div>
 
         <!-- Result Content -->
-        <div v-else-if="selectedDetail && selectedDetail.result" class="flex-1 overflow-auto">
+        <div v-else-if="selectedDetail && selectedDetail.result" class="content-card-body">
           <!-- Toolbar -->
           <div class="px-4 pt-3 flex items-center justify-between border-b border-slate-100 pb-3">
-            <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+            <div class="view-mode-tabs">
               <button
                 @click="resultViewMode = 'table'"
                 :class="[
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                  resultViewMode === 'table' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  'view-mode-tab',
+                  resultViewMode === 'table' ? 'view-mode-tab--active' : ''
                 ]"
               >
                 <Table2 class="w-3.5 h-3.5" />
@@ -585,8 +578,8 @@ onUnmounted(() => {
               <button
                 @click="resultViewMode = 'json'"
                 :class="[
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                  resultViewMode === 'json' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  'view-mode-tab',
+                  resultViewMode === 'json' ? 'view-mode-tab--active' : ''
                 ]"
               >
                 <FileJson class="w-3.5 h-3.5" />
@@ -596,7 +589,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-2">
               <button
                 @click="downloadJson"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                class="btn-toolbar"
               >
                 <Download class="w-3.5 h-3.5" />
                 JSON
@@ -604,14 +597,14 @@ onUnmounted(() => {
               <button
                 v-if="selectedDetail.output_format !== 'json'"
                 @click="handleDownload(selectedDetail.id)"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                class="btn-toolbar"
               >
                 <Download class="w-3.5 h-3.5" />
                 {{ selectedDetail.output_format.toUpperCase() }}
               </button>
               <button
                 @click="copyResultJson"
-                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                class="btn-toolbar"
               >
                 <Check v-if="copied" class="w-3.5 h-3.5 text-green-500" />
                 <Copy v-else class="w-3.5 h-3.5" />
@@ -625,17 +618,17 @@ onUnmounted(() => {
             <!-- Scalar fields as key-value cards -->
             <div v-if="Object.keys(scalarResult).length > 0">
               <h4 class="text-sm font-medium text-slate-600 mb-3">基本信息</h4>
-              <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div class="result-grid">
                 <div
                   v-for="(value, key) in scalarResult"
                   :key="key"
-                  class="py-2.5 px-3 bg-gray-50 rounded-lg border border-gray-100"
+                  class="result-field"
                 >
-                  <p class="text-xs text-gray-400 mb-1">{{ getFieldLabel(key as string) }}</p>
-                  <p v-if="Array.isArray(value)" class="text-sm font-medium text-gray-700">
+                  <p class="result-field-label">{{ getFieldLabel(key as string) }}</p>
+                  <p v-if="Array.isArray(value)" class="result-field-value">
                     {{ value.join(', ') || '-' }}
                   </p>
-                  <p v-else class="text-sm font-medium text-gray-700 break-all">{{ value ?? '-' }}</p>
+                  <p v-else class="result-field-value break-all">{{ value ?? '-' }}</p>
                 </div>
               </div>
             </div>
@@ -647,14 +640,14 @@ onUnmounted(() => {
                 <span class="text-xs text-slate-400">共 {{ tableField.data.length }} 条</span>
               </div>
               <div class="border border-slate-200 rounded-xl overflow-hidden">
-                <table class="w-full text-sm">
+                <table class="data-table">
                   <thead>
-                    <tr class="bg-slate-50">
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 w-10">#</th>
+                    <tr class="data-table-header">
+                      <th class="data-table-index">#</th>
                       <th
                         v-for="col in tableField.columns"
                         :key="col.name"
-                        class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500"
+                        class="data-table-header-cell"
                       >
                         {{ col.description || col.name }}
                       </th>
@@ -664,18 +657,18 @@ onUnmounted(() => {
                     <tr
                       v-for="(row, rowIdx) in tableField.data"
                       :key="rowIdx"
-                      class="border-t border-slate-100 hover:bg-slate-50 transition-colors"
+                      class="data-table-row"
                     >
-                      <td class="px-4 py-2.5 text-xs text-slate-400">{{ rowIdx + 1 }}</td>
+                      <td class="data-table-index">{{ rowIdx + 1 }}</td>
                       <td
                         v-for="col in tableField.columns"
                         :key="col.name"
-                        class="px-4 py-2.5 text-slate-700"
+                        class="data-table-cell"
                       >
                         <span v-if="row[col.name] !== null && row[col.name] !== undefined">
                           {{ row[col.name] }}
                         </span>
-                        <span v-else class="text-slate-300">-</span>
+                        <span v-else class="data-table-cell--empty">-</span>
                       </td>
                     </tr>
                   </tbody>
@@ -684,7 +677,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Fallback: all scalar, no tables -->
-            <div v-if="Object.keys(scalarResult).length === 0 && tableFields.length === 0" class="text-center text-slate-400 py-8">
+            <div v-if="Object.keys(scalarResult).length === 0 && tableFields.length === 0" class="empty-state py-8">
               无结构化数据可展示
             </div>
           </div>
@@ -696,12 +689,12 @@ onUnmounted(() => {
         </div>
 
         <!-- Done but no result -->
-        <div v-else-if="selectedDetail && selectedDetail.status === 'done' && !selectedDetail.result" class="flex-1 flex items-center justify-center text-slate-400">
+        <div v-else-if="selectedDetail && selectedDetail.status === 'done' && !selectedDetail.result" class="empty-state">
           未提取到有效信息
         </div>
 
         <!-- Empty -->
-        <div v-else class="flex-1 flex items-center justify-center text-slate-400">
+        <div v-else class="empty-state">
           请从左侧选择一个任务查看提取结果
         </div>
       </div>

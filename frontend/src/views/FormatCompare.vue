@@ -248,23 +248,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen p-4 md:p-8 flex flex-col">
+  <div class="page-container">
     <!-- Header -->
-    <header class="w-full max-w-[1600px] mx-auto mb-6">
+    <header class="page-header">
       <button
         @click="goBack"
-        class="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+        class="page-back-btn"
       >
         <ArrowLeft class="w-5 h-5" />
         返回首页
       </button>
-      <div class="flex items-center gap-3">
-        <div class="bg-indigo-600 p-3 rounded-xl shadow-lg">
+      <div class="page-title-group">
+        <div class="page-icon bg-indigo-600">
           <FileSearch class="text-white w-7 h-7" />
         </div>
         <div>
-          <h1 class="text-2xl font-bold text-slate-900">询证函格式比对</h1>
-          <p class="text-sm text-slate-500">
+          <h1 class="page-title">询证函格式比对</h1>
+          <p class="page-subtitle">
             上传询证函，与标准模板比对格式差异
           </p>
         </div>
@@ -272,14 +272,11 @@ onMounted(() => {
     </header>
 
     <!-- Main Content -->
-    <main
-      class="w-full max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 flex-1"
-    >
+    <main class="page-main">
       <!-- Left: Upload + Task List -->
       <div class="md:col-span-2 flex flex-col gap-4">
         <!-- Upload -->
-        <label
-          class="flex items-center justify-center gap-2 bg-white border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl p-4 cursor-pointer transition-colors"
+        <label class="upload-zone hover:border-indigo-400"
         >
           <Upload class="w-5 h-5 text-slate-400" />
           <span class="text-slate-600">{{
@@ -296,8 +293,8 @@ onMounted(() => {
         </label>
 
         <!-- Template Links -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-          <h3 class="text-sm font-medium text-slate-700 mb-2">模板预览</h3>
+        <div class="content-card p-3">
+          <h3 class="content-card-title text-sm mb-2">模板预览</h3>
           <div class="space-y-1">
             <button
               v-for="t in templates"
@@ -312,24 +309,22 @@ onMounted(() => {
         </div>
 
         <!-- Task List -->
-        <div
-          class="bg-white rounded-xl shadow-sm border border-slate-200 flex-1 overflow-auto"
-        >
-          <div class="p-3 border-b border-slate-100">
-            <h3 class="font-medium text-slate-700">比对记录</h3>
+        <div class="file-list">
+          <div class="file-list-header">
+            <h3 class="content-card-title">比对记录</h3>
           </div>
-          <ul class="divide-y divide-slate-100">
+          <ul class="file-list-items">
             <li
               v-for="task in tasks"
               :key="task.id"
               @click="selectTask(task.id)"
               :class="[
-                'p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors',
+                'file-list-item',
                 selectedTask?.id === task.id ? 'bg-indigo-50' : '',
               ]"
             >
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-slate-700 truncate">
+              <div class="file-list-item-info">
+                <p class="file-list-item-name">
                   {{ task.filename }}
                 </p>
                 <div class="flex items-center gap-1.5 mt-1">
@@ -362,14 +357,14 @@ onMounted(() => {
               </div>
               <button
                 @click.stop="handleDelete(task.id)"
-                class="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                class="file-list-delete-btn"
               >
                 <Trash2 class="w-4 h-4" />
               </button>
             </li>
             <li
               v-if="tasks.length === 0"
-              class="p-4 text-center text-slate-400 text-sm"
+              class="file-list-empty"
             >
               暂无比对记录
             </li>

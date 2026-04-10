@@ -91,7 +91,7 @@
 
                 <!-- 类凭证识别 -->
                 <router-link to="/credential-recognition" class="scenario-card group">
-                    <div class="scenario-card-icon bg-gradient-to-br from-indigo-500 to-purple-600">
+                    <div class="scenario-card-icon icon-gradient-blue" style="background: linear-gradient(135deg, #6366f1, #9333ea);">
                         <FileCheck2 class="w-8 h-8 text-white" />
                     </div>
                     <h3 class="scenario-card-title">类凭证识别</h3>
@@ -106,7 +106,7 @@
 
                 <!-- 通用 PDF 提取 -->
                 <router-link to="/pdf-extract" class="scenario-card group">
-                    <div class="scenario-card-icon bg-gradient-to-br from-cyan-500 to-blue-600">
+                    <div class="scenario-card-icon" style="background: linear-gradient(135deg, #06b6d4, #2563eb);">
                         <FileScan class="w-8 h-8 text-white" />
                     </div>
                     <h3 class="scenario-card-title">通用 PDF 提取</h3>

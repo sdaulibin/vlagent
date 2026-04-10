@@ -1,0 +1,32 @@
+@layer components {
+  /* ===== Content Card ===== */
+  .content-card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200;
+  }
+
+  .content-card-header {
+    @apply p-4 border-b border-slate-100 flex items-center justify-between;
+  }
+
+  .content-card-title {
+    @apply font-medium text-slate-700;
+  }
+
+  .content-card-body {
+    @apply flex-1 overflow-auto;
+  }
+
+  /* Section header within cards */
+  .content-section-header {
+    @apply p-3 border-b border-slate-100;
+  }
+
+  /* Summary/info section */
+  .info-section {
+    @apply bg-white border border-slate-200 rounded-xl p-4;
+  }
+
+  .info-section-title {
+    @apply font-semibold text-gray-700 flex items-center gap-2 mb-4;
+  }
+}
