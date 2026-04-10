@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlmodel import Session
 from typing import Optional
 
@@ -223,11 +223,10 @@ async def delete_record(
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
 
-    # 删除提取结果
-    stmt_result = select(CredentialResult).where(CredentialResult.record_id == record_id)
-    res = await session.execute(stmt_result)
-    for cred_result in res.scalars().all():
-        await session.delete(cred_result)
+    # 先删除提取结果（外键约束）
+    await session.execute(
+        delete(CredentialResult).where(CredentialResult.record_id == record_id)
+    )
 
     # 删除文件
     if record.file_path and os.path.exists(record.file_path):
