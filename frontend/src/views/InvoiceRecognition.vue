@@ -6,7 +6,8 @@ import {
   uploadInvoice,
   getInvoiceFiles,
   getInvoiceResult,
-  deleteInvoiceFile
+  deleteInvoiceFile,
+  getInvoiceFileUrl
 } from '../api';
 
 interface InvoiceFileItem {
@@ -256,6 +257,27 @@ onUnmounted(() => {
             <span :class="getStatusClass(selectedDetail.status)">
               {{ getStatusText(selectedDetail.status) }}
             </span>
+          </div>
+        </div>
+
+        <!-- Original File Preview -->
+        <div v-if="selectedDetail" class="border-b border-slate-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-medium text-slate-600">原始文件</h4>
+            <span class="text-xs text-slate-400">{{ selectedDetail.filename }}</span>
+          </div>
+          <div class="file-preview-container">
+            <iframe
+              v-if="selectedDetail.filename.toLowerCase().endsWith('.pdf')"
+              :src="getInvoiceFileUrl(selectedDetail.file_id)"
+              class="file-preview-iframe"
+            ></iframe>
+            <img
+              v-else
+              :src="getInvoiceFileUrl(selectedDetail.file_id)"
+              class="file-preview-img"
+              :alt="selectedDetail.filename"
+            />
           </div>
         </div>
 

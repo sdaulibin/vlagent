@@ -202,6 +202,10 @@ export const deleteInvoiceFile = async (fileId: number) => {
   return response.data;
 };
 
+export const getInvoiceFileUrl = (fileId: number) => {
+  return `${api.defaults.baseURL}/invoice_recognition/${fileId}/file`;
+};
+
 // ===== 类凭证识别 API =====
 
 export const extractCredential = async (file: File, credentialType: string) => {

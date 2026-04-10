@@ -29,4 +29,22 @@
   .info-section-title {
     @apply font-semibold text-gray-700 flex items-center gap-2 mb-4;
   }
+
+  /* File Preview */
+  .file-preview-container {
+    @apply rounded-lg overflow-hidden border border-slate-200 bg-slate-50;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .file-preview-iframe {
+    @apply w-full border-0;
+    height: 380px;
+  }
+
+  .file-preview-img {
+    @apply max-w-full mx-auto block;
+    max-height: 380px;
+    object-fit: contain;
+  }
 }

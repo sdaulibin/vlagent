@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc
+from sqlalchemy import delete
 import os
 from datetime import datetime
 from typing import List
@@ -130,6 +132,27 @@ async def get_invoice_result(
     )
 
 
+@router.get("/{file_id}/file")
+async def get_invoice_file(
+    file_id: int,
+    db: AsyncSession = Depends(get_session)
+):
+    """获取发票原始文件"""
+    db_file = await db.get(InvoiceFile, file_id)
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not db_file.file_path or not os.path.exists(db_file.file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    media_type = "application/pdf"
+    if db_file.filename.lower().endswith(('.jpg', '.jpeg')):
+        media_type = "image/jpeg"
+    elif db_file.filename.lower().endswith('.png'):
+        media_type = "image/png"
+
+    return FileResponse(db_file.file_path, media_type=media_type, filename=db_file.filename)
+
+
 @router.delete("/{file_id}")
 async def delete_invoice_file(
     file_id: int,
@@ -142,11 +165,10 @@ async def delete_invoice_file(
     if not db_file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    # 删除关联的识别结果
-    statement = select(InvoiceResult).where(InvoiceResult.file_id == file_id)
-    results = (await db.execute(statement)).scalars().all()
-    for r in results:
-        await db.delete(r)
+    # 先删除关联的识别结果（外键约束）
+    await db.execute(
+        delete(InvoiceResult).where(InvoiceResult.file_id == file_id)
+    )
 
     # 删除磁盘上的文件
     if db_file.file_path and os.path.exists(db_file.file_path):
