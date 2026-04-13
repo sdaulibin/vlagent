@@ -1,5 +1,8 @@
 import logging
 import os
+import time
+
+import jwt
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +14,10 @@ from src.file_provider.service import init_jvm, shutdown_jvm
 from api import api_router
 
 logger = logging.getLogger(__name__)
+
+# 配置日志
+logging.getLogger("src.auth").setLevel(logging.INFO)
+logging.getLogger("src.auth").addHandler(logging.StreamHandler())
 
 
 @asynccontextmanager
@@ -62,6 +69,22 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/dev-token")
+async def dev_token():
+    """开发模式：生成测试用 JWT token（无需认证）"""
+    now = time.time()
+    payload = {
+        "user_id": "QD24000010",
+        "name": "李彬",
+        "org_id": "",
+        "user_type": "",
+        "iat": int(now),
+        "exp": int(now) + 86400,
+    }
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return {"token": token}
 
 
 if __name__ == "__main__":

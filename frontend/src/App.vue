@@ -12,6 +12,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { initAuth } from './composables/useAuth'
+import { api } from './api/index'
 
 const router = useRouter()
 const loading = ref(true)
@@ -20,7 +21,20 @@ onMounted(async () => {
     const token = await initAuth()
 
     if (token) {
+        // 主动调用后端验证 token，触发后端日志打印
+        try {
+            await api.get('/auth/me')
+        } catch {
+            // 验证失败（401）由 axios 拦截器处理
+            loading.value = false
+            router.replace('/auth-error')
+            return
+        }
         loading.value = false
+        // 认证成功但路由守卫可能已跳转到 auth-error，修正回首页
+        if (router.currentRoute.value.name === 'AuthError') {
+            router.replace('/')
+        }
     } else {
         loading.value = false
         router.replace('/auth-error')

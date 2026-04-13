@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getToken, clearAuth } from "../composables/useAuth";
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
 });
 
@@ -14,14 +14,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：401 时清除认证状态
+// 响应拦截器：401 时清除认证状态并跳转错误页面（防止死循环）
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       clearAuth();
-      // 触发路由守卫重定向到错误页面
-      window.location.href = "/auth-error";
+      if (window.location.pathname !== "/auth-error") {
+        window.location.href = "/auth-error";
+      }
     }
     return Promise.reject(error);
   }

@@ -72,3 +72,10 @@ async def verify_token(
         )
 
     return _decode_token(token)
+
+
+async def get_current_user_info(
+    payload: dict = Depends(verify_token),
+) -> dict:
+    """验证 token 并返回用户信息，用于 /auth/me 接口。"""
+    return payload

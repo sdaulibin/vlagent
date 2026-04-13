@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from src.auth import verify_token
+from src.auth import verify_token, get_current_user_info
 
 from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
@@ -44,3 +44,10 @@ api_router.include_router(file_provider_router)
 
 # 通用 PDF 提取（独立模块）
 api_router.include_router(pdf_extract_router)
+
+
+# Token 验证接口
+@api_router.get("/auth/me")
+async def auth_me(user: dict = Depends(get_current_user_info)):
+    """验证当前 token 并返回用户信息"""
+    return {"authenticated": True, "user": user}
