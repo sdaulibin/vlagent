@@ -71,12 +71,13 @@ const viewHistoryTask = async (task: TaskItem) => {
     currentTaskId.value = task.id;
     contentA.value = task.content_a || '';
     contentB.value = task.content_b || '';
-    
+
     fileA.value = { name: task.file_a_name } as File;
     fileB.value = { name: task.file_b_name } as File;
-    
+
     const diffsData = await getTaskDiffs(task.id);
     diffs.value = diffsData;
+    await loadPreviewUrls(task.id);
     
     activeView.value = 'result';
 };
@@ -96,16 +97,18 @@ const getFileType = (filename: string | undefined): 'pdf' | 'image' | 'doc' | 'u
     return 'unknown';
 };
 
-// 文件预览 URL
-const fileAPreviewUrl = computed(() => {
-    if (!currentTaskId.value) return '';
-    return getFilePreviewUrl(currentTaskId.value, 'a');
-});
+// 文件预览 URL（异步加载 blob URL）
+const fileAPreviewUrl = ref<string>('');
+const fileBPreviewUrl = ref<string>('');
 
-const fileBPreviewUrl = computed(() => {
-    if (!currentTaskId.value) return '';
-    return getFilePreviewUrl(currentTaskId.value, 'b');
-});
+const loadPreviewUrls = async (taskId: number) => {
+    try {
+        fileAPreviewUrl.value = await getFilePreviewUrl(taskId, 'a');
+        fileBPreviewUrl.value = await getFilePreviewUrl(taskId, 'b');
+    } catch (e) {
+        console.error("加载预览文件失败", e);
+    }
+};
 
 const fileAType = computed(() => getFileType(fileA.value?.name));
 const fileBType = computed(() => getFileType(fileB.value?.name));
@@ -128,7 +131,8 @@ const startCompare = async () => {
         
         const diffsData = await getTaskDiffs(result.task_id);
         diffs.value = diffsData;
-        
+        await loadPreviewUrls(result.task_id);
+
         await loadHistory();
         activeView.value = 'result';
     } catch (error: any) {

@@ -57,6 +57,8 @@ const selectedTask = ref<CompareTask | null>(null);
 const templates = ref<TemplateInfo[]>([]);
 const isUploading = ref(false);
 const isComparing = ref(false);
+const taskFileUrl = ref<string>('');
+const templateFileUrl = ref<string>('');
 
 const formatTypeLabels: Record<string, string> = {
   format_1: "格式一（银行询证函）",
@@ -84,6 +86,13 @@ const loadTemplates = async () => {
 const selectTask = async (id: number) => {
   try {
     selectedTask.value = await getFormatCompareTask(id);
+    // 异步加载预览 blob URL
+    if (selectedTask.value) {
+      taskFileUrl.value = await getFormatCompareFileUrl(selectedTask.value.id);
+      if (selectedTask.value.format_type) {
+        templateFileUrl.value = await getFormatCompareTemplateUrl(selectedTask.value.format_type);
+      }
+    }
   } catch (e) {
     console.error("加载比对详情失败", e);
   }
@@ -123,6 +132,11 @@ const handleCompare = async () => {
 
   try {
     selectedTask.value = await runFormatCompare(taskId);
+    // 重新加载预览 blob URL
+    taskFileUrl.value = await getFormatCompareFileUrl(taskId);
+    if (selectedTask.value?.format_type) {
+      templateFileUrl.value = await getFormatCompareTemplateUrl(selectedTask.value.format_type);
+    }
     await loadTasks();
   } catch (e) {
     console.error("比对失败", e);
@@ -149,13 +163,15 @@ const handleDelete = async (id: number) => {
 
 const goBack = () => router.push("/");
 
-const openUploadedFile = () => {
+const openUploadedFile = async () => {
   if (!selectedTask.value) return;
-  window.open(getFormatCompareFileUrl(selectedTask.value.id), "_blank");
+  const url = await getFormatCompareFileUrl(selectedTask.value.id);
+  window.open(url, "_blank");
 };
 
-const openTemplateFile = (formatKey: string) => {
-  window.open(getFormatCompareTemplateUrl(formatKey), "_blank");
+const openTemplateFile = async (formatKey: string) => {
+  const url = await getFormatCompareTemplateUrl(formatKey);
+  window.open(url, "_blank");
 };
 
 const getSeverityClass = (severity: string) => {
@@ -508,7 +524,7 @@ onMounted(() => {
                     selectedTask.format_type &&
                     selectedTask.format_type !== 'unknown'
                   "
-                  :src="getFormatCompareTemplateUrl(selectedTask.format_type)"
+                  :src="templateFileUrl"
                   class="w-full h-full min-h-[350px] rounded-b-xl"
                 />
                 <div
@@ -539,7 +555,7 @@ onMounted(() => {
               </div>
               <div class="flex-1 min-h-[350px]">
                 <iframe
-                  :src="getFormatCompareFileUrl(selectedTask.id)"
+                  :src="taskFileUrl"
                   class="w-full h-full min-h-[350px] rounded-b-xl"
                 />
               </div>

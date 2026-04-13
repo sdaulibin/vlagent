@@ -50,7 +50,7 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
     return str(target_path)
 
 
-@router.get("", response_model=List[FileRecord])
+@router.post("", response_model=List[FileRecord])
 async def get_files(session: AsyncSession = Depends(get_session)):
     """获取所有文件列表"""
     statement = select(FileRecord).order_by(desc(FileRecord.created_at))
@@ -58,7 +58,7 @@ async def get_files(session: AsyncSession = Depends(get_session)):
     return result.scalars().all()
 
 
-@router.get("/{file_id}", response_model=FileRecord)
+@router.post("/{file_id}", response_model=FileRecord)
 async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个文件详情"""
     statement = select(FileRecord).where(FileRecord.id == file_id)
@@ -333,7 +333,7 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{file_id}/export")
+@router.post("/{file_id}/export")
 async def export_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """导出文件交易数据为 Excel（包含汇总信息）"""
     # 获取文件信息

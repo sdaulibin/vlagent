@@ -67,7 +67,7 @@ async def upload_invoice_pdf(
     )
 
 
-@router.get("/list", response_model=List[InvoiceFileListItem])
+@router.post("/list", response_model=List[InvoiceFileListItem])
 async def list_invoice_files(
     db: AsyncSession = Depends(get_session)
 ):
@@ -90,7 +90,7 @@ async def list_invoice_files(
     ]
 
 
-@router.get("/list/{file_id}", response_model=InvoiceRecognitionResponse)
+@router.post("/list/{file_id}", response_model=InvoiceRecognitionResponse)
 async def get_invoice_result(
     file_id: int,
     db: AsyncSession = Depends(get_session)
@@ -132,7 +132,7 @@ async def get_invoice_result(
     )
 
 
-@router.get("/{file_id}/file")
+@router.post("/{file_id}/file")
 async def get_invoice_file(
     file_id: int,
     db: AsyncSession = Depends(get_session)

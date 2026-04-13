@@ -174,9 +174,9 @@ const goBack = () => {
   router.push('/');
 };
 
-const openPreview = () => {
+const openPreview = async () => {
   if (!selectedLetter.value) return;
-  const url = getConfirmationPreviewUrl(selectedLetter.value.id);
+  const url = await getConfirmationPreviewUrl(selectedLetter.value.id);
   window.open(url, '_blank');
 };
 

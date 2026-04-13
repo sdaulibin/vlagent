@@ -124,7 +124,7 @@ async def extract_credential(
         )
 
 
-@router.get("/list", response_model=list[CredentialRecordListItem])
+@router.post("/list", response_model=list[CredentialRecordListItem])
 async def list_records(
     session: AsyncSession = Depends(get_session),
 ):
@@ -146,7 +146,7 @@ async def list_records(
     ]
 
 
-@router.get("/list/{record_id}", response_model=CredentialRecordResponse)
+@router.post("/list/{record_id}", response_model=CredentialRecordResponse)
 async def get_record(
     record_id: int,
     session: AsyncSession = Depends(get_session),
@@ -177,7 +177,7 @@ async def get_record(
     )
 
 
-@router.get("/{record_id}/file")
+@router.post("/{record_id}/file")
 async def get_record_file(
     record_id: int,
     session: AsyncSession = Depends(get_session),

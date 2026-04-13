@@ -106,7 +106,7 @@ def _to_file_dto(file_obj: ConfirmationFile, rec_obj: ConfirmationResult | None)
     )
 
 
-@router.get("", response_model=List[ConfirmationFileDTO])
+@router.post("", response_model=List[ConfirmationFileDTO])
 async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     """获取所有询证函文件记录"""
     statement = (
@@ -127,7 +127,7 @@ async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     return list(response_map.values())
 
 
-@router.get("/{file_id}", response_model=ConfirmationFileDTO)
+@router.post("/{file_id}", response_model=ConfirmationFileDTO)
 async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个询证函详情（文件 + 识别结果）"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
@@ -143,7 +143,7 @@ async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(ge
     return _to_file_dto(file, recognition)
 
 
-@router.get("/{file_id}/file")
+@router.post("/{file_id}/file")
 async def preview_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """预览询证函原始文件"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)

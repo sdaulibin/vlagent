@@ -16,7 +16,7 @@ from src.banks import get_bank_handler
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
-@router.get("/{file_id}")
+@router.post("/{file_id}")
 async def get_transactions(
     file_id: int, 
     summary_id: int = None, 
@@ -41,7 +41,7 @@ async def get_transactions(
     return await handler.get_transactions(session, file_id, summary_id)
 
 
-@router.get("/{file_id}/summary")
+@router.post("/{file_id}/summary")
 async def get_summary(
     file_id: int, 
     session: AsyncSession = Depends(get_session)

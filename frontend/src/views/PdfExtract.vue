@@ -260,8 +260,8 @@ const handleDelete = async (id: number) => {
   }
 };
 
-const handleDownload = (taskId: number) => {
-  const url = downloadPdfExtract(taskId);
+const handleDownload = async (taskId: number) => {
+  const url = await downloadPdfExtract(taskId);
   window.open(url, '_blank');
 };
 

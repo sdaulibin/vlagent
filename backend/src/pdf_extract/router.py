@@ -86,7 +86,7 @@ async def upload_pdf_extract(
     )
 
 
-@router.get("/list", response_model=List[PdfExtractTaskListItem])
+@router.post("/list", response_model=List[PdfExtractTaskListItem])
 async def list_pdf_extract_tasks(
     db: AsyncSession = Depends(get_session),
 ):
@@ -108,7 +108,7 @@ async def list_pdf_extract_tasks(
     ]
 
 
-@router.get("/list/{task_id}", response_model=PdfExtractTaskResponse)
+@router.post("/list/{task_id}", response_model=PdfExtractTaskResponse)
 async def get_pdf_extract_task(
     task_id: int,
     db: AsyncSession = Depends(get_session),
@@ -139,7 +139,7 @@ async def get_pdf_extract_task(
     )
 
 
-@router.get("/download/{task_id}")
+@router.post("/download/{task_id}")
 async def download_pdf_extract(
     task_id: int,
     db: AsyncSession = Depends(get_session),

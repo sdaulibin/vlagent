@@ -47,7 +47,7 @@ api_router.include_router(pdf_extract_router)
 
 
 # Token 验证接口
-@api_router.get("/auth/me")
+@api_router.post("/auth/me")
 async def auth_me(user: dict = Depends(get_current_user_info)):
     """验证当前 token 并返回用户信息"""
     return {"authenticated": True, "user": user}

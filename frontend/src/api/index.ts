@@ -28,12 +28,10 @@ api.interceptors.response.use(
   }
 );
 
-/** 为文件预览/下载 URL 自动拼接 token 参数 */
-function appendToken(url: string): string {
-  const token = getToken();
-  if (!token) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}token=${encodeURIComponent(token)}`;
+/** 通过 POST 获取文件并返回 blob URL（用于 img/iframe src） */
+async function fetchFileAsBlobUrl(path: string): Promise<string> {
+  const response = await api.post(path, {}, { responseType: "blob" });
+  return URL.createObjectURL(response.data);
 }
 
 export const uploadFile = async (file: File) => {
@@ -44,17 +42,17 @@ export const uploadFile = async (file: File) => {
 };
 
 export const getFiles = async () => {
-  const response = await api.get("/files");
+  const response = await api.post("/files");
   return response.data;
 };
 
 export const getFileTransactions = async (fileId: number) => {
-  const response = await api.get(`/transactions/${fileId}`);
+  const response = await api.post(`/transactions/${fileId}`);
   return response.data;
 };
 
 export const getFileSummary = async (fileId: number) => {
-  const response = await api.get(`/transactions/${fileId}/summary`);
+  const response = await api.post(`/transactions/${fileId}/summary`);
   return response.data;
 };
 
@@ -69,7 +67,7 @@ export const startRecognition = async (fileId: number) => {
 };
 
 export const exportExcel = async (fileId: number, filename: string) => {
-  const response = await api.get(`/files/${fileId}/export`, {
+  const response = await api.post(`/files/${fileId}/export`, {}, {
     responseType: "blob",
   });
 
@@ -95,17 +93,17 @@ export const compareContracts = async (fileA: File, fileB: File) => {
 };
 
 export const getCompareTasks = async () => {
-  const response = await api.get("/contracts");
+  const response = await api.post("/contracts");
   return response.data;
 };
 
 export const getCompareTask = async (taskId: number) => {
-  const response = await api.get(`/contracts/${taskId}`);
+  const response = await api.post(`/contracts/${taskId}`);
   return response.data;
 };
 
 export const getTaskDiffs = async (taskId: number) => {
-  const response = await api.get(`/contracts/${taskId}/diffs`);
+  const response = await api.post(`/contracts/${taskId}/diffs`);
   return response.data;
 };
 
@@ -114,12 +112,9 @@ export const deleteCompareTask = async (taskId: number) => {
   return response.data;
 };
 
-// 获取文件预览 URL
-export const getFilePreviewUrl = (taskId: number, docType: "a" | "b") => {
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/contracts/${taskId}/file/${docType}`);
-};
+// 获取文件预览 blob URL
+export const getFilePreviewUrl = (taskId: number, docType: "a" | "b") =>
+  fetchFileAsBlobUrl(`/contracts/${taskId}/file/${docType}`);
 
 // ===== 询证函识别 API =====
 
@@ -131,12 +126,12 @@ export const uploadConfirmationLetter = async (file: File) => {
 };
 
 export const getConfirmationLetters = async () => {
-  const response = await api.get("/confirmation");
+  const response = await api.post("/confirmation");
   return response.data;
 };
 
 export const getConfirmationLetter = async (letterId: number) => {
-  const response = await api.get(`/confirmation/${letterId}`);
+  const response = await api.post(`/confirmation/${letterId}`);
   return response.data;
 };
 
@@ -145,11 +140,8 @@ export const recognizeConfirmationLetter = async (letterId: number) => {
   return response.data;
 };
 
-export const getConfirmationPreviewUrl = (letterId: number) => {
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/confirmation/${letterId}/file`);
-};
+export const getConfirmationPreviewUrl = (letterId: number) =>
+  fetchFileAsBlobUrl(`/confirmation/${letterId}/file`);
 
 export const updateConfirmationLetter = async (
   letterId: number,
@@ -174,12 +166,12 @@ export const uploadFormatCompare = async (file: File) => {
 };
 
 export const getFormatCompareTasks = async () => {
-  const response = await api.get("/format-compare");
+  const response = await api.post("/format-compare");
   return response.data;
 };
 
 export const getFormatCompareTask = async (taskId: number) => {
-  const response = await api.get(`/format-compare/${taskId}`);
+  const response = await api.post(`/format-compare/${taskId}`);
   return response.data;
 };
 
@@ -188,20 +180,14 @@ export const deleteFormatCompareTask = async (taskId: number) => {
   return response.data;
 };
 
-export const getFormatCompareFileUrl = (taskId: number) => {
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/format-compare/${taskId}/file`);
-};
+export const getFormatCompareFileUrl = (taskId: number) =>
+  fetchFileAsBlobUrl(`/format-compare/${taskId}/file`);
 
-export const getFormatCompareTemplateUrl = (formatKey: string) => {
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/format-compare/templates/${formatKey}/preview`);
-};
+export const getFormatCompareTemplateUrl = (formatKey: string) =>
+  fetchFileAsBlobUrl(`/format-compare/templates/${formatKey}/preview`);
 
 export const getFormatCompareTemplates = async () => {
-  const response = await api.get("/format-compare/templates");
+  const response = await api.post("/format-compare/templates");
   return response.data;
 };
 
@@ -220,12 +206,12 @@ export const uploadInvoice = async (file: File) => {
 };
 
 export const getInvoiceFiles = async () => {
-  const response = await api.get("/invoice_recognition/list");
+  const response = await api.post("/invoice_recognition/list");
   return response.data;
 };
 
 export const getInvoiceResult = async (fileId: number) => {
-  const response = await api.get(`/invoice_recognition/list/${fileId}`);
+  const response = await api.post(`/invoice_recognition/list/${fileId}`);
   return response.data;
 };
 
@@ -234,9 +220,8 @@ export const deleteInvoiceFile = async (fileId: number) => {
   return response.data;
 };
 
-export const getInvoiceFileUrl = (fileId: number) => {
-  return appendToken(`${api.defaults.baseURL}/invoice_recognition/${fileId}/file`);
-};
+export const getInvoiceFileUrl = (fileId: number) =>
+  fetchFileAsBlobUrl(`/invoice_recognition/${fileId}/file`);
 
 // ===== 类凭证识别 API =====
 
@@ -249,12 +234,12 @@ export const extractCredential = async (file: File, credentialType: string) => {
 };
 
 export const getCredentialRecords = async () => {
-  const response = await api.get("/credentials/list");
+  const response = await api.post("/credentials/list");
   return response.data;
 };
 
 export const getCredentialRecord = async (recordId: number) => {
-  const response = await api.get(`/credentials/list/${recordId}`);
+  const response = await api.post(`/credentials/list/${recordId}`);
   return response.data;
 };
 
@@ -263,10 +248,8 @@ export const deleteCredentialRecord = async (recordId: number) => {
   return response.data;
 };
 
-export const getCredentialFileUrl = (recordId: number) => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/credentials/${recordId}/file`);
-};
+export const getCredentialFileUrl = (recordId: number) =>
+  fetchFileAsBlobUrl(`/credentials/${recordId}/file`);
 
 // ===== 通用 PDF 提取 API =====
 
@@ -280,12 +263,12 @@ export const uploadPdfExtract = async (file: File, fields: string, outputFormat:
 };
 
 export const getPdfExtractTasks = async () => {
-  const response = await api.get("/pdf_extract/list");
+  const response = await api.post("/pdf_extract/list");
   return response.data;
 };
 
 export const getPdfExtractTask = async (taskId: number) => {
-  const response = await api.get(`/pdf_extract/list/${taskId}`);
+  const response = await api.post(`/pdf_extract/list/${taskId}`);
   return response.data;
 };
 
@@ -294,7 +277,5 @@ export const deletePdfExtractTask = async (taskId: number) => {
   return response.data;
 };
 
-export const downloadPdfExtract = (taskId: number) => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return appendToken(`${baseUrl}/pdf_extract/download/${taskId}`);
-};
+export const downloadPdfExtract = (taskId: number) =>
+  fetchFileAsBlobUrl(`/pdf_extract/download/${taskId}`);

@@ -47,6 +47,7 @@ interface InvoiceDetail {
 const router = useRouter();
 const files = ref<InvoiceFileItem[]>([]);
 const selectedDetail = ref<InvoiceDetail | null>(null);
+const invoiceFileUrl = ref<string>('');
 const selectedFileId = ref<number | null>(null);
 const isUploading = ref(false);
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
@@ -67,6 +68,10 @@ const selectFile = async (id: number) => {
   selectedFileId.value = id;
   try {
     selectedDetail.value = await getInvoiceResult(id);
+      // 异步加载文件预览 blob URL
+      if (selectedDetail.value) {
+        invoiceFileUrl.value = await getInvoiceFileUrl(selectedDetail.value.file_id);
+      }
   } catch (e) {
     console.error("加载发票识别结果失败", e);
   }
@@ -269,12 +274,12 @@ onUnmounted(() => {
           <div class="file-preview-container">
             <iframe
               v-if="selectedDetail.filename.toLowerCase().endsWith('.pdf')"
-              :src="getInvoiceFileUrl(selectedDetail.file_id)"
+              :src="invoiceFileUrl"
               class="file-preview-iframe"
             ></iframe>
             <img
               v-else
-              :src="getInvoiceFileUrl(selectedDetail.file_id)"
+              :src="invoiceFileUrl"
               class="file-preview-img"
               :alt="selectedDetail.filename"
             />

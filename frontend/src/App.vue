@@ -23,7 +23,7 @@ onMounted(async () => {
     if (token) {
         // 主动调用后端验证 token，触发后端日志打印
         try {
-            await api.get('/auth/me')
+            await api.post('/auth/me')
         } catch {
             // 验证失败（401）由 axios 拦截器处理
             loading.value = false

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/file-provider", tags=["file-provider"])
 
 
-@router.get("/status")
+@router.post("/status")
 async def get_status():
     """检查 JVM 和影像平台 SDK 状态"""
     ready = service.is_jvm_ready()

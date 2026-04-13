@@ -206,7 +206,7 @@ const selectRecord = async (id: number) => {
     resultData.value = detail.result;
     errorMsg.value = detail.error_msg || '';
     selectedType.value = detail.credential_type;
-    previewUrl.value = getCredentialFileUrl(id);
+    previewUrl.value = await getCredentialFileUrl(id);
   } catch (e) {
     console.error("加载记录详情失败", e);
   }
@@ -247,7 +247,7 @@ const handleFileUpload = async (event: Event) => {
     errorMsg.value = data.error_msg || '';
     selectedRecordId.value = data.id;
     if (data.id) {
-      previewUrl.value = getCredentialFileUrl(data.id);
+      previewUrl.value = await getCredentialFileUrl(data.id);
     }
     await loadRecords();
   } catch (e: any) {

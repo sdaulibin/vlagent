@@ -47,7 +47,7 @@ MIME_TYPES = {
 }
 
 
-@router.get("", response_model=List[CompareTask])
+@router.post("", response_model=List[CompareTask])
 async def get_compare_tasks(session: AsyncSession = Depends(get_session)):
     """获取所有比对任务列表"""
     statement = select(CompareTask).order_by(desc(CompareTask.created_at))
@@ -55,7 +55,7 @@ async def get_compare_tasks(session: AsyncSession = Depends(get_session)):
     return result.scalars().all()
 
 
-@router.get("/{task_id}", response_model=CompareTask)
+@router.post("/{task_id}", response_model=CompareTask)
 async def get_compare_task(task_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个比对任务详情"""
     statement = select(CompareTask).where(CompareTask.id == task_id)
@@ -66,7 +66,7 @@ async def get_compare_task(task_id: int, session: AsyncSession = Depends(get_ses
     return task
 
 
-@router.get("/{task_id}/diffs", response_model=List[DiffRecord])
+@router.post("/{task_id}/diffs", response_model=List[DiffRecord])
 async def get_task_diffs(task_id: int, session: AsyncSession = Depends(get_session)):
     """获取比对任务的差异列表"""
     statement = select(DiffRecord).where(DiffRecord.task_id == task_id)
@@ -74,7 +74,7 @@ async def get_task_diffs(task_id: int, session: AsyncSession = Depends(get_sessi
     return result.scalars().all()
 
 
-@router.get("/{task_id}/file/{doc_type}")
+@router.post("/{task_id}/file/{doc_type}")
 async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Depends(get_session)):
     """
     获取比对任务的原始文件

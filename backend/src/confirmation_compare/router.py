@@ -72,14 +72,14 @@ def _to_dto(task: FormatCompareTask) -> FormatCompareTaskDTO:
     )
 
 
-@router.get("/templates", response_model=list[TemplateInfo])
+@router.post("/templates", response_model=list[TemplateInfo])
 async def list_templates():
     """获取可用模板列表"""
     templates = get_template_list()
     return [TemplateInfo(**t) for t in templates]
 
 
-@router.get("/templates/{format_key}/preview")
+@router.post("/templates/{format_key}/preview")
 async def preview_template(format_key: str):
     """预览模板 PDF"""
     path = get_template_pdf_path(format_key)
@@ -155,7 +155,7 @@ async def run_compare(
     return _to_dto(task)
 
 
-@router.get("", response_model=list[FormatCompareTaskDTO])
+@router.post("", response_model=list[FormatCompareTaskDTO])
 async def list_tasks(session: AsyncSession = Depends(get_session)):
     """获取所有比对任务"""
     stmt = select(FormatCompareTask).order_by(FormatCompareTask.created_at.desc())
@@ -164,7 +164,7 @@ async def list_tasks(session: AsyncSession = Depends(get_session)):
     return [_to_dto(t) for t in tasks]
 
 
-@router.get("/{task_id}", response_model=FormatCompareTaskDTO)
+@router.post("/{task_id}", response_model=FormatCompareTaskDTO)
 async def get_task(task_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个比对任务详情"""
     task = await session.get(FormatCompareTask, task_id)
@@ -173,7 +173,7 @@ async def get_task(task_id: int, session: AsyncSession = Depends(get_session)):
     return _to_dto(task)
 
 
-@router.get("/{task_id}/file")
+@router.post("/{task_id}/file")
 async def preview_uploaded_file(task_id: int, session: AsyncSession = Depends(get_session)):
     """预览上传的询证函 PDF"""
     task = await session.get(FormatCompareTask, task_id)
