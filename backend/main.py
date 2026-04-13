@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,11 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# 允许通过环境变量添加额外的 CORS 源（逗号分隔）
+_extra_origins = os.getenv("CORS_ORIGINS", "")
+if _extra_origins:
+    origins.extend([o.strip() for o in _extra_origins.split(",") if o.strip()])
 
 app.add_middleware(
     CORSMiddleware,

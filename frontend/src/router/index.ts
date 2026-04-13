@@ -7,8 +7,16 @@ import FormatCompare from '../views/FormatCompare.vue'
 import InvoiceRecognition from '../views/InvoiceRecognition.vue'
 import CredentialRecognition from '../views/CredentialRecognition.vue'
 import PdfExtract from '../views/PdfExtract.vue'
+import AuthError from '../views/AuthError.vue'
+import { isAuthenticated } from '../composables/useAuth'
 
 const routes = [
+    {
+        path: '/auth-error',
+        name: 'AuthError',
+        component: AuthError,
+        meta: { public: true }
+    },
     {
         path: '/',
         name: 'Home',
@@ -54,6 +62,17 @@ const routes = [
 const router = createRouter({
     history: createWebHistory(),
     routes
+})
+
+// 路由守卫：未认证时重定向到错误页面
+router.beforeEach((to, _from, next) => {
+    if (to.meta.public) {
+        next()
+    } else if (!isAuthenticated()) {
+        next({ name: 'AuthError' })
+    } else {
+        next()
+    }
 })
 
 export default router

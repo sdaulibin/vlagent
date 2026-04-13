@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     ECM_USERNAME: str = "ibd"
     ECM_PASSWORD: str = ""
 
+    # JWT Authentication
+    JWT_SECRET: str = Field(default="", description="Shared secret for JWT token verification (HS256)")
+    JWT_ALGORITHM: str = "HS256"
+
     # Database
     DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
     DATABASE_ECHO: bool = False

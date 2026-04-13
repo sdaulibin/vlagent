@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from src.auth import verify_token
 
 from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
@@ -11,7 +13,7 @@ from src.credentials.router import router as credentials_router
 from src.file_provider.router import router as file_provider_router
 from src.pdf_extract.router import router as pdf_extract_router
 
-api_router = APIRouter()
+api_router = APIRouter(dependencies=[Depends(verify_token)])
 
 # 文件管理
 api_router.include_router(files_router)

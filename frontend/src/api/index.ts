@@ -1,8 +1,39 @@
 import axios from "axios";
+import { getToken, clearAuth } from "../composables/useAuth";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
 });
+
+// 请求拦截器：自动添加 Authorization header
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// 响应拦截器：401 时清除认证状态
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      clearAuth();
+      // 触发路由守卫重定向到错误页面
+      window.location.href = "/auth-error";
+    }
+    return Promise.reject(error);
+  }
+);
+
+/** 为文件预览/下载 URL 自动拼接 token 参数 */
+function appendToken(url: string): string {
+  const token = getToken();
+  if (!token) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}token=${encodeURIComponent(token)}`;
+}
 
 export const uploadFile = async (file: File) => {
   const formData = new FormData();
@@ -86,7 +117,7 @@ export const deleteCompareTask = async (taskId: number) => {
 export const getFilePreviewUrl = (taskId: number, docType: "a" | "b") => {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/contracts/${taskId}/file/${docType}`;
+  return appendToken(`${baseUrl}/contracts/${taskId}/file/${docType}`);
 };
 
 // ===== 询证函识别 API =====
@@ -116,7 +147,7 @@ export const recognizeConfirmationLetter = async (letterId: number) => {
 export const getConfirmationPreviewUrl = (letterId: number) => {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/confirmation/${letterId}/file`;
+  return appendToken(`${baseUrl}/confirmation/${letterId}/file`);
 };
 
 export const updateConfirmationLetter = async (
@@ -159,13 +190,13 @@ export const deleteFormatCompareTask = async (taskId: number) => {
 export const getFormatCompareFileUrl = (taskId: number) => {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/format-compare/${taskId}/file`;
+  return appendToken(`${baseUrl}/format-compare/${taskId}/file`);
 };
 
 export const getFormatCompareTemplateUrl = (formatKey: string) => {
   const baseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/format-compare/templates/${formatKey}/preview`;
+  return appendToken(`${baseUrl}/format-compare/templates/${formatKey}/preview`);
 };
 
 export const getFormatCompareTemplates = async () => {
@@ -203,7 +234,7 @@ export const deleteInvoiceFile = async (fileId: number) => {
 };
 
 export const getInvoiceFileUrl = (fileId: number) => {
-  return `${api.defaults.baseURL}/invoice_recognition/${fileId}/file`;
+  return appendToken(`${api.defaults.baseURL}/invoice_recognition/${fileId}/file`);
 };
 
 // ===== 类凭证识别 API =====
@@ -233,7 +264,7 @@ export const deleteCredentialRecord = async (recordId: number) => {
 
 export const getCredentialFileUrl = (recordId: number) => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/credentials/${recordId}/file`;
+  return appendToken(`${baseUrl}/credentials/${recordId}/file`);
 };
 
 // ===== 通用 PDF 提取 API =====
@@ -264,5 +295,5 @@ export const deletePdfExtractTask = async (taskId: number) => {
 
 export const downloadPdfExtract = (taskId: number) => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
-  return `${baseUrl}/pdf_extract/download/${taskId}`;
+  return appendToken(`${baseUrl}/pdf_extract/download/${taskId}`);
 };
