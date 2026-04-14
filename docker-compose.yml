@@ -1,8 +1,8 @@
 services:
   backend:
     # 使用预构建的镜像（离线部署模式）
-    image: harbor.devops.qdb.com/star/vl_flow_backend:0.1
-    container_name: vl_flow_backend
+    image: harbor.devops.qdb.com/star/vlagent_backend:0.1
+    container_name: vlagent_backend
     restart: always
     environment:
       # 数据库连接
@@ -17,24 +17,24 @@ services:
       RECOGNITION_TIMEOUT: ${RECOGNITION_TIMEOUT:-1800}
     volumes:
       # 绑定挂载：宿主机目录 -> 容器目录
-      - /root/vl_flow/backend/res:/app/res
+      - /root/vlagent/backend/res:/app/res
     ports:
       - "8000:8000"
     networks:
-      - vl_flow_net
+      - vlagent_net
 
   frontend:
     # 使用预构建的镜像（离线部署模式）
-    image: harbor.devops.qdb.com/star/vl_flow_front:0.1
-    container_name: vl_flow_frontend
+    image: harbor.devops.qdb.com/star/vlagent_front:0.1
+    container_name: vlagent_frontend
     restart: always
     ports:
       - "80:8080"
     depends_on:
       - backend
     networks:
-      - vl_flow_net
+      - vlagent_net
 
 networks:
-  vl_flow_net:
+  vlagent_net:
     driver: bridge

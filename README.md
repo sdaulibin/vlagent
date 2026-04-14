@@ -1,4 +1,4 @@
-# 🌊 vl_flow
+# 🌊 vlagent
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
@@ -6,7 +6,7 @@
 [![Vue 3.5](https://img.shields.io/badge/Vue-3.5-4FC08D.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**vl_flow** 是一个基于 **Qwen-VL** 大模型的智能文档识别与分析平台。利用多模态模型能力，实现银行流水识别、询证函识别与格式比对、证件识别、发票识别、合同比对等多种文档智能处理功能。
+**vlagent** 是一个基于 **Qwen-VL** 大模型的智能文档识别与分析平台。利用多模态模型能力，实现银行流水识别、询证函识别与格式比对、证件识别、发票识别、合同比对等多种文档智能处理功能。
 
 ---
 
@@ -97,8 +97,8 @@ AI 发票信息提取，支持多种发票类型。
 ### 1️⃣ 克隆与配置
 
 ```bash
-git clone https://github.com/your-repo/vl_flow.git
-cd vl_flow
+git clone https://github.com/your-repo/vlagent.git
+cd vlagent
 ```
 
 ### 2️⃣ 启动后端
@@ -126,7 +126,7 @@ npm run dev
 ## 📁 项目结构
 
 ```
-vl_flow/
+vlagent/
 ├── backend/                       # FastAPI 后端服务
 │   ├── src/
 │   │   ├── banks/                 # 银行流水处理器 (Strategy Pattern, 11家银行)

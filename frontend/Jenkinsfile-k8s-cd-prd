@@ -1,0 +1,134 @@
+pipeline {
+
+
+    agent {
+        node {
+            label "star"
+            customWorkspace "/home/jenkins/workspace/${env.JOB_NAME}_${env.BUILD_NUMBER}"
+        }
+    }
+
+    options{
+        skipDefaultCheckout true
+        disableConcurrentBuilds()
+    }
+
+    // 构建参数
+    parameters {
+        string(name: 'projectName', defaultValue: 'vlagent-front', description: 'project name')
+        string(name: 'tag', defaultValue: '', description: 'image tag')
+        string(name: 'ftpCredential', defaultValue: 'xyk-prd-ftp-credential', description: 'ftp credential')
+        string(name: 'ftpPath', defaultValue: '', description: 'a ftp relative path')
+        string(name: 'ftpAddr', defaultValue: '10.1.89.31', description: 'ftp ip address')
+        string(name: 'HARBOR_URL', defaultValue: 'harbor.qdccb.cn', description: 'harbor url')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
+        string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vl-flow', description: 'k8s namespace')
+        string(name: 'ingress', defaultValue: 'nginx-vl-flow-prd', description: 'ingress class name')
+        string(name: 'ingressHost', defaultValue: 'vlagent.qdccb.cn', description: 'ingress host')
+        string(name: 'replicas', defaultValue: '2', description: 'replica count')
+        string(name: 'ARCH', defaultValue: 'amd64', description: '架构')
+        string(name: 'TOLERATION_KEY', defaultValue: 'env', description: '容忍度key')
+        string(name: 'TOLERATION_OPERATOR', defaultValue: 'Equal', description: '容忍度操作符')
+        string(name: 'TOLERATION_VALUE', defaultValue: 'prd', description: '容忍度value')
+        string(name: 'TOLERATION_EFFECT', defaultValue: 'NoSchedule', description: '容忍度效果')
+    }
+    stages {
+
+        stage('Helm Deploy Application') {
+            steps {
+                script {
+                    echo "get imagefile from ftp……"
+                    withCredentials([usernamePassword(credentialsId: env.ftpCredential, usernameVariable: 'SFTP_USER', passwordVariable: 'SFTP_PASSWORD')]) {
+                        def imageDownloadCommand = """
+                            sshpass -p '${SFTP_PASSWORD}' sftp -o StrictHostKeyChecking=no ${SFTP_USER}@${env.ftpAddr} << EOF
+                            cd ${env.ftpPath}
+                            get ${env.projectName}-${env.tag}.tar
+                            bye
+                            EOF
+                        """
+                        def imageDownloadStatus = sh(script: imageDownloadCommand, returnStatus: true)
+
+                        if (imageDownloadStatus != 0) {
+                            error "Failed to download image file from SFTP server"
+                        }
+                        echo "get imagefile from ftp…… done"
+
+                        echo "get chart file from ftp……"
+                        def chartDownloadCommand = """
+                            sshpass -p '${SFTP_PASSWORD}' sftp -o StrictHostKeyChecking=no ${SFTP_USER}@${env.ftpAddr} << EOF
+                            cd ${env.ftpPath}
+                            get ${env.projectName}-${env.tag}-chart.tar.gz
+                            bye
+                            EOF
+                        """
+                        def chartDownloadStatus = sh(script: chartDownloadCommand, returnStatus: true)
+
+                        if (chartDownloadStatus != 0) {
+                            error "Failed to download chart file from SFTP server"
+                        }
+                        echo "get chart file from ftp…… done"
+                    }
+
+                    sh """
+                        export DOCKER_CONFIG="/kaniko/.docker/"
+                        nerdctl load -i ${env.projectName}-${env.tag}.tar
+                        nerdctl --insecure-registry=true push \\
+                            ${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName}:${tag}-${env.ARCH}
+
+                        tar -zxf ${env.projectName}-${env.tag}-chart.tar.gz -C .
+                    """
+
+                    def node_selected = env.SPECIFY_NODE
+                    if(node_selected == 'true') {
+                        sh """
+                            helm upgrade --install ${env.projectName} \\
+                            deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                            -f deploy/charts/values.yaml --set nodeSelector."${env.DESTINATION_KEY}"="${env.DESTINATION_VALUE}" \\
+                            --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                            --set image.tag=${tag}-${env.ARCH} \\
+                            --set ingress.className=${env.ingress} \\
+                            --set ingress.hosts[0].host=${env.ingressHost} \\
+                            --set replicaCount=${env.replicas} \\
+                            --set tolerations[0].key=${env.TOLERATION_KEY} \\
+                            --set tolerations[0].value=${env.TOLERATION_VALUE} \\
+                            --set tolerations[0].effect=${env.TOLERATION_EFFECT} \\
+                            --set tolerations[0].operator=${env.TOLERATION_OPERATOR}
+                        """
+                    } else {
+                        sh """
+                            helm upgrade --install ${env.projectName} \\
+                            deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                            -f deploy/charts/values.yaml \\
+                            --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                            --set image.tag=${tag}-${env.ARCH} \\
+                            --set ingress.className=${env.ingress} \\
+                            --set ingress.hosts[0].host=${env.ingressHost} \\
+                            --set replicaCount=${env.replicas} \\
+                            --set tolerations[0].key=${env.TOLERATION_KEY} \\
+                            --set tolerations[0].value=${env.TOLERATION_VALUE} \\
+                            --set tolerations[0].effect=${env.TOLERATION_EFFECT} \\
+                            --set tolerations[0].operator=${env.TOLERATION_OPERATOR}
+                        """
+                    }
+
+                    sh """
+                        helm get manifest --namespace ${env.HELM_NS} ${env.projectName}
+                    """
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            script {
+                cleanWs()
+            }
+        }
+    }
+
+}

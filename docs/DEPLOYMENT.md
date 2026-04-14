@@ -1,6 +1,6 @@
 # 🖥️ 虚拟机部署指南 (无 Docker)
 
-本文档介绍如何将 vl_flow 前后端程序直接部署在虚拟机中，不使用 Docker 容器。
+本文档介绍如何将 vlagent 前后端程序直接部署在虚拟机中，不使用 Docker 容器。
 
 ---
 
@@ -97,9 +97,9 @@ source ~/.bashrc
 sudo -u postgres psql
 
 # 在 PostgreSQL 命令行中执行
-CREATE DATABASE vl_flow;
-CREATE USER vl_flow_user WITH ENCRYPTED PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE vl_flow TO vl_flow_user;
+CREATE DATABASE vlagent;
+CREATE USER vlagent_user WITH ENCRYPTED PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE vlagent TO vlagent_user;
 \q
 ```
 
@@ -108,16 +108,16 @@ GRANT ALL PRIVILEGES ON DATABASE vl_flow TO vl_flow_user;
 ### 3️⃣ 克隆项目
 
 ```bash
-sudo mkdir -p /opt/vl_flow
-sudo chown $USER:$USER /opt/vl_flow
-cd /opt/vl_flow
-git clone https://github.com/your-repo/vl_flow.git .
+sudo mkdir -p /opt/vlagent
+sudo chown $USER:$USER /opt/vlagent
+cd /opt/vlagent
+git clone https://github.com/your-repo/vlagent.git .
 ```
 
 ### 4️⃣ 后端部署
 
 ```bash
-cd /opt/vl_flow/backend
+cd /opt/vlagent/backend
 
 # 配置环境变量
 cp .env.example .env
@@ -133,14 +133,14 @@ uv run python -c "import fastapi; print('FastAPI OK')"
 ### 5️⃣ 前端部署
 
 ```bash
-cd /opt/vl_flow/frontend
+cd /opt/vlagent/frontend
 npm install
 npm run build
 
 # 部署到 Nginx
-sudo mkdir -p /var/www/vl_flow
-sudo cp -r dist/* /var/www/vl_flow/
-sudo chown -R www-data:www-data /var/www/vl_flow
+sudo mkdir -p /var/www/vlagent
+sudo cp -r dist/* /var/www/vlagent/
+sudo chown -R www-data:www-data /var/www/vlagent
 ```
 
 ---
@@ -155,8 +155,8 @@ sudo chown -R www-data:www-data /var/www/vl_flow
 
 ```bash
 # 创建离线包目录
-mkdir -p ~/vl_flow_offline/{rpms,python,node,frontend}
-cd ~/vl_flow_offline
+mkdir -p ~/vlagent_offline/{rpms,python,node,frontend}
+cd ~/vlagent_offline
 
 # ===== 1. 下载 RPM 依赖包 =====
 sudo yum install -y yum-utils
@@ -185,20 +185,20 @@ wget https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-
 # wget https://github.com/astral-sh/uv/releases/latest/download/uv-aarch64-unknown-linux-gnu.tar.gz -O uv.tar.gz
 
 # ===== 5. 准备 Python 依赖包 =====
-cd /path/to/vl_flow/backend
+cd /path/to/vlagent/backend
 uv export --no-hashes > requirements.txt
-pip download -d ~/vl_flow_offline/python/packages -r requirements.txt
+pip download -d ~/vlagent_offline/python/packages -r requirements.txt
 
 # ===== 6. 准备前端依赖 =====
-cd /path/to/vl_flow/frontend
+cd /path/to/vlagent/frontend
 npm install
 npm run build
-tar -czvf ~/vl_flow_offline/frontend/node_modules.tar.gz node_modules/
-tar -czvf ~/vl_flow_offline/frontend/dist.tar.gz dist/
+tar -czvf ~/vlagent_offline/frontend/node_modules.tar.gz node_modules/
+tar -czvf ~/vlagent_offline/frontend/dist.tar.gz dist/
 
 # ===== 7. 打包离线包 =====
 cd ~
-tar -czvf vl_flow_offline.tar.gz vl_flow_offline/
+tar -czvf vlagent_offline.tar.gz vlagent_offline/
 ```
 
 ### 步骤二：传输到离线机器
@@ -206,14 +206,14 @@ tar -czvf vl_flow_offline.tar.gz vl_flow_offline/
 ```bash
 # 使用 U 盘、scp 或 ftp 传输
 cd /home/user
-tar -xzvf vl_flow_offline.tar.gz
+tar -xzvf vlagent_offline.tar.gz
 ```
 
 ### 步骤三：离线安装系统依赖
 
 ```bash
 # 安装 RPM 包
-cd /home/user/vl_flow_offline/rpms
+cd /home/user/vlagent_offline/rpms
 sudo yum localinstall -y *.rpm
 
 # 编译安装 Python 3.11
@@ -227,14 +227,14 @@ sudo ln -sf /usr/local/python3.11/bin/python3.11 /usr/local/bin/python3.11
 sudo ln -sf /usr/local/python3.11/bin/pip3.11 /usr/local/bin/pip3.11
 
 # 安装 Node.js
-cd /home/user/vl_flow_offline/node
+cd /home/user/vlagent_offline/node
 tar -xJf node-v20.18.0-linux-x64.tar.xz
 sudo mv node-v20.18.0-linux-x64 /usr/local/node
 sudo ln -sf /usr/local/node/bin/node /usr/local/bin/node
 sudo ln -sf /usr/local/node/bin/npm /usr/local/bin/npm
 
 # 安装 uv
-cd /home/user/vl_flow_offline
+cd /home/user/vlagent_offline
 tar -xzf uv.tar.gz
 sudo mv uv /usr/local/bin/
 sudo chmod +x /usr/local/bin/uv
@@ -248,16 +248,16 @@ sudo systemctl start postgresql-15
 ### 步骤四：离线部署后端
 
 ```bash
-sudo mkdir -p /opt/vl_flow
-sudo chown $USER:$USER /opt/vl_flow
-cp -r /path/to/vl_flow/* /opt/vl_flow/
+sudo mkdir -p /opt/vlagent
+sudo chown $USER:$USER /opt/vlagent
+cp -r /path/to/vlagent/* /opt/vlagent/
 
-cd /opt/vl_flow/backend
+cd /opt/vlagent/backend
 python3.11 -m venv .venv
 source .venv/bin/activate
 
 # 离线安装依赖
-pip install --no-index --find-links=/home/user/vl_flow_offline/python/packages -r requirements.txt
+pip install --no-index --find-links=/home/user/vlagent_offline/python/packages -r requirements.txt
 
 cp .env.example .env
 nano .env
@@ -266,12 +266,12 @@ nano .env
 ### 步骤五：离线部署前端
 
 ```bash
-cd /opt/vl_flow/frontend
-tar -xzf /home/user/vl_flow_offline/frontend/dist.tar.gz
+cd /opt/vlagent/frontend
+tar -xzf /home/user/vlagent_offline/frontend/dist.tar.gz
 
-sudo mkdir -p /var/www/vl_flow
-sudo cp -r dist/* /var/www/vl_flow/
-sudo chown -R nginx:nginx /var/www/vl_flow
+sudo mkdir -p /var/www/vlagent
+sudo cp -r dist/* /var/www/vlagent/
+sudo chown -R nginx:nginx /var/www/vlagent
 ```
 
 ---
@@ -291,9 +291,9 @@ After=network.target postgresql.service
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/opt/vl_flow/backend
-Environment="PATH=/opt/vl_flow/backend/.venv/bin:/usr/local/bin:/usr/bin"
-ExecStart=/opt/vl_flow/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 4
+WorkingDirectory=/opt/vlagent/backend
+Environment="PATH=/opt/vlagent/backend/.venv/bin:/usr/local/bin:/usr/bin"
+ExecStart=/opt/vlagent/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 4
 Restart=always
 RestartSec=5
 
@@ -309,14 +309,14 @@ sudo systemctl start vl-flow-backend
 
 ### Nginx 反向代理
 
-创建 `/etc/nginx/sites-available/vl_flow`:
+创建 `/etc/nginx/sites-available/vlagent`:
 
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
 
-    root /var/www/vl_flow;
+    root /var/www/vlagent;
     index index.html;
 
     gzip on;
@@ -344,7 +344,7 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/vl_flow /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/vlagent /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -406,7 +406,7 @@ curl http://localhost/
 ## 🔄 更新部署
 
 ```bash
-cd /opt/vl_flow
+cd /opt/vlagent
 git pull origin main
 
 # 更新后端
@@ -418,7 +418,7 @@ sudo systemctl restart vl-flow-backend
 cd ../frontend
 npm install
 npm run build
-sudo cp -r dist/* /var/www/vl_flow/
+sudo cp -r dist/* /var/www/vlagent/
 sudo systemctl reload nginx
 ```
 
@@ -427,7 +427,7 @@ sudo systemctl reload nginx
 ## 📊 目录结构
 
 ```
-/opt/vl_flow/                 # 项目根目录
+/opt/vlagent/                 # 项目根目录
 ├── backend/                  # 后端代码
 │   ├── .env                  # 环境配置
 │   ├── .venv/                # Python 虚拟环境
@@ -435,14 +435,14 @@ sudo systemctl reload nginx
 └── frontend/                 # 前端代码
     └── dist/                 # 构建产物
 
-/var/www/vl_flow/             # Nginx 静态文件
+/var/www/vlagent/             # Nginx 静态文件
 ```
 
 ---
 
 # 🐳 Docker 容器化部署
 
-本节介绍如何使用 Docker 容器化方式部署 vl_flow。
+本节介绍如何使用 Docker 容器化方式部署 vlagent。
 
 ---
 
@@ -599,11 +599,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: vl_flow_backend
+    container_name: vlagent_backend
     restart: always
     environment:
       # 数据库连接 (使用外部数据库服务器)
-      DATABASE_URL: postgresql+asyncpg://用户名:密码@数据库IP:5432/vl_flow
+      DATABASE_URL: postgresql+asyncpg://用户名:密码@数据库IP:5432/vlagent
       # AI 模型配置
       OPENAI_KEY: ${OPENAI_KEY}
       OPENAI_URL: ${OPENAI_URL}
@@ -613,26 +613,26 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - vl_flow_net
+      - vlagent_net
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: vl_flow_frontend
+    container_name: vlagent_frontend
     restart: always
     ports:
       - "80:80"
     depends_on:
       - backend
     networks:
-      - vl_flow_net
+      - vlagent_net
 
 volumes:
   backend_res:
 
 networks:
-  vl_flow_net:
+  vlagent_net:
     driver: bridge
 ```
 
@@ -659,12 +659,12 @@ MODEL_LOCAL=模型名称
 
 ```bash
 # 添加内部仓库
-git remote add internal http://内部GitLab/group/vl_flow.git
+git remote add internal http://内部GitLab/group/vlagent.git
 git push internal main
 
 # 在服务器上克隆
 ssh user@服务器IP
-git clone http://内部GitLab/group/vl_flow.git /opt/vl_flow
+git clone http://内部GitLab/group/vlagent.git /opt/vlagent
 ```
 
 **方案 B: 打包传输**
@@ -672,21 +672,21 @@ git clone http://内部GitLab/group/vl_flow.git /opt/vl_flow
 ```bash
 # 在开发机打包
 tar --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
-    -czvf vl_flow.tar.gz .
+    -czvf vlagent.tar.gz .
 
 # 传输到服务器
-scp vl_flow.tar.gz user@服务器IP:/opt/
+scp vlagent.tar.gz user@服务器IP:/opt/
 
 # 解压
 ssh user@服务器IP
-mkdir -p /opt/vl_flow && cd /opt/vl_flow
-tar -xzvf ../vl_flow.tar.gz
+mkdir -p /opt/vlagent && cd /opt/vlagent
+tar -xzvf ../vlagent.tar.gz
 ```
 
 ### 2. 构建并启动
 
 ```bash
-cd /opt/vl_flow
+cd /opt/vlagent
 
 # 构建镜像
 docker compose build
@@ -715,31 +715,31 @@ curl http://localhost/
 ### 在联网机器构建镜像
 
 ```bash
-cd /path/to/vl_flow
+cd /path/to/vlagent
 
 # 构建镜像
 docker compose build
 
 # 导出镜像
-docker save vl_flow-backend:latest | gzip > vl_flow_backend.tar.gz
-docker save vl_flow-frontend:latest | gzip > vl_flow_frontend.tar.gz
+docker save vlagent-backend:latest | gzip > vlagent_backend.tar.gz
+docker save vlagent-frontend:latest | gzip > vlagent_frontend.tar.gz
 ```
 
 ### 传输到内网服务器
 
 ```bash
-scp vl_flow_*.tar.gz user@内网服务器IP:/opt/vl_flow/
-scp docker-compose.yml .env user@内网服务器IP:/opt/vl_flow/
+scp vlagent_*.tar.gz user@内网服务器IP:/opt/vlagent/
+scp docker-compose.yml .env user@内网服务器IP:/opt/vlagent/
 ```
 
 ### 在内网服务器加载并启动
 
 ```bash
-cd /opt/vl_flow
+cd /opt/vlagent
 
 # 加载镜像
-gunzip -c vl_flow_backend.tar.gz | docker load
-gunzip -c vl_flow_frontend.tar.gz | docker load
+gunzip -c vlagent_backend.tar.gz | docker load
+gunzip -c vlagent_frontend.tar.gz | docker load
 
 # 启动服务
 docker compose up -d
@@ -756,7 +756,7 @@ docker compose up -d
 | 重启服务     | `docker compose restart`               |
 | 查看日志     | `docker compose logs -f backend`       |
 | 重建镜像     | `docker compose build --no-cache`      |
-| 进入容器     | `docker exec -it vl_flow_backend bash` |
+| 进入容器     | `docker exec -it vlagent_backend bash` |
 | 查看容器状态 | `docker compose ps`                    |
 
 ---

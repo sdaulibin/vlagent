@@ -30,7 +30,7 @@ from services import pdf_processor
 router = APIRouter(prefix="/files", tags=["files"])
 
 # Load config from env
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/Users/binginx/PycharmProjects/vl_flow/backend/res")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/Users/binginx/PycharmProjects/vlagent/backend/res")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

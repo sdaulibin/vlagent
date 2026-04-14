@@ -1,12 +1,12 @@
 <mxfile host="app.diagrams.net" agent="drawio" version="22.1.2" type="device">
-  <diagram name="vl_flow 架构图" id="vl_flow_architecture">
+  <diagram name="vlagent 架构图" id="vlagent_architecture">
     <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
         <!-- ==================== 标题 ==================== -->
-        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#333333;" value="vl_flow 系统架构图" vertex="1">
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#333333;" value="vlagent 系统架构图" vertex="1">
           <mxGeometry height="40" width="400" x="500" y="20" as="geometry" />
         </mxCell>
 

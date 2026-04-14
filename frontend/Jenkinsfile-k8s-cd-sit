@@ -1,0 +1,139 @@
+@Library("bqdlib") _
+
+//import
+def getcode = new org.devops.GetCode()
+def builds = new org.devops.Builds()
+def gitlab = new org.devops.Gitlab()
+
+
+pipeline {
+
+
+    agent {
+        node {
+            label "star"
+            customWorkspace "/home/jenkins/workspace/${env.JOB_NAME}_${env.BUILD_NUMBER}"
+        }
+    }
+
+    options{
+        skipDefaultCheckout true
+        disableConcurrentBuilds()
+    }
+
+    // 构建参数
+    parameters {
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'projectName', defaultValue: 'vlagent-front', description: 'project name')
+        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
+        string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
+        string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
+        string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vl-flow-sit', description: 'k8s namespace')
+        string(name: 'ingress', defaultValue: 'nginx-vl-flow-sit', description: 'ingress class name')
+        string(name: 'replicas', defaultValue: '1', description: 'replica count')
+        string(name: 'ingressHost', defaultValue: 'vlagent.devops.qdb.com', description: 'ingress host')
+        string(name: 'NPM_REGISTRY', defaultValue: 'http://10.238.145.145:4873/', description: 'npm registry proxy')
+    }
+    stages {
+
+        stage("Init"){
+            steps{
+                script{
+                    builds.InitSteps()
+                }
+            }
+        }
+
+        stage('Get sit Branches') {
+            steps {
+                script {
+                    getcode.GetCode("master", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                    getcode.GetCode("sit", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                }
+            }
+        }
+
+        stage("Get Gitlab Info") {
+            steps {
+                script {
+                    gitlab.GetBranchCommitID("sit")
+                    echo sh(script: 'env', returnStdout: true)
+                }
+            }
+        }
+
+
+        stage('Build Docker Image with nerdctl') {
+            steps {
+                script {
+                    env.RELEASE_REGISTRY = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}"
+                    env.RELEASE_VERSION = "${env.GITLAB_COMMIT_ID}"
+                    env.RELEASE_IMAGE = "${env.RELEASE_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    echo "设置环境变量："
+                    echo "RELEASE_REGISTRY: ${env.RELEASE_REGISTRY}"
+                    echo "RELEASE_VERSION: ${env.RELEASE_VERSION}"
+                    echo "RELEASE_IMAGE: ${env.RELEASE_IMAGE}"
+                    sh """
+                    export DOCKER_CONFIG="/kaniko/.docker/"
+                    export RELEASE_REGISTRY=${env.RELEASE_REGISTRY}
+                    export RELEASE_VERSION=${env.RELEASE_VERSION}
+                    export RELEASE_IMAGE=${env.RELEASE_IMAGE}
+                    export NPM_REGISTRY=${env.NPM_REGISTRY}
+                    make -e release-image.amd64
+                    nerdctl --insecure-registry=true push ${env.RELEASE_IMAGE}-amd64
+                    """
+                }
+            }
+        }
+
+        stage('Helm Deploy Application') {
+            steps {
+                script {
+                    def node_selected = env.SPECIFY_NODE
+                    if(node_selected == 'true') {
+                        sh """
+                           export DOCKER_CONFIG="/kaniko/.docker/"
+                           helm upgrade --install ${env.projectName} \\
+                           deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                           -f deploy/charts/values.yaml --set nodeSelector."${env.DESTINATION_KEY}"="${env.DESTINATION_VALUE}" \\
+                           --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                           --set image.tag=${env.RELEASE_VERSION}-amd64 \\
+                           --set ingress.className=${env.ingress} \\
+                           --set ingress.hosts[0].host=${env.ingressHost} \\
+                           --set replicaCount=${env.replicas}
+                        """
+                    } else {
+                        sh """
+                           helm upgrade --install ${env.projectName} \\
+                           deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                           -f deploy/charts/values.yaml \\
+                           --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                           --set image.tag=${env.RELEASE_VERSION}-amd64 \\
+                           --set ingress.className=${env.ingress} \\
+                           --set ingress.hosts[0].host=${env.ingressHost} \\
+                           --set replicaCount=${env.replicas}
+                        """
+                    }
+                    sh """
+                        helm get manifest --namespace ${env.HELM_NS} ${env.projectName}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                cleanWs()
+            }
+        }
+    }
+
+}

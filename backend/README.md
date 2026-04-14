@@ -33,7 +33,7 @@
    RECOGNITION_TIMEOUT=300     # 识别超时时间 (秒)
 
    # --- 数据库配置 ---
-   DATABASE_URL=postgresql+asyncpg://user:pass@localhost/vl_flow
+   DATABASE_URL=postgresql+asyncpg://user:pass@localhost/vlagent
    ```
 
 3. **运行服务**:

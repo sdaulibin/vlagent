@@ -1,0 +1,188 @@
+@Library("bqdlib") _
+
+//import
+def getcode = new org.devops.GetCode()
+def builds = new org.devops.Builds()
+def gitlab = new org.devops.Gitlab()
+def helm = new org.devops.Helmcd()
+
+
+pipeline {
+
+    agent {
+        node {
+            label "star"
+            customWorkspace "/home/jenkins/workspace/${env.JOB_NAME}_${env.BUILD_NUMBER}"
+        }
+    }
+
+    options{
+        skipDefaultCheckout true
+        disableConcurrentBuilds()
+    }
+
+    // 构建参数
+    parameters {
+        choice(choices: ['uat', 'production'], description: '部署uat或者是打出生产包', name: 'purpose')
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'projectName', defaultValue: 'vlagent-front', description: 'project name')
+        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
+        string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
+        string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url for uat')
+        string(name: 'HARBOR_PRD_URL', defaultValue: 'harbor.qdccb.cn', description: 'harbor url for production')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
+        string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vl-flow-uat', description: 'k8s namespace')
+        string(name: 'ftpCredential', defaultValue: 'devops-test-ftp-credential', description: 'ftp credential')
+        string(name: 'ftpPath', defaultValue: '', description: 'a ftp relative path')
+        string(name: 'ftpAddr', defaultValue: '10.1.89.31', description: 'ftp ip address')
+        string(name: 'ingress', defaultValue: 'nginx', description: 'ingress class name')
+        string(name: 'ingressHost', defaultValue: 'vlagent.qdccb.cn', description: 'ingress host')
+        string(name: 'replicas', defaultValue: '1', description: 'replica count')
+        string(name: 'NPM_REGISTRY', defaultValue: 'http://10.238.145.145:4873/', description: 'npm registry proxy')
+        string(name: 'TOLERATION_KEY', defaultValue: 'env', description: '容忍度key')
+        string(name: 'TOLERATION_OPERATOR', defaultValue: 'Equal', description: '容忍度操作符')
+        string(name: 'TOLERATION_VALUE', defaultValue: 'uat', description: '容忍度value')
+        string(name: 'TOLERATION_EFFECT', defaultValue: 'NoSchedule', description: '容忍度效果')
+    }
+    environment {
+        selectedBranch = ''
+    }
+    stages {
+
+        stage("Init"){
+            steps{
+                script{
+                    builds.InitSteps()
+                }
+            }
+        }
+
+        stage('Get Release Branches') {
+            steps {
+                script {
+                    getcode.GetCode("master", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                    def releaseBranches = gitlab.GetBranchesByPrefix("release")
+
+                    timeout(time: 10, unit: 'MINUTES') {
+                        selectedBranch = input(
+                            id: 'branchSelection',
+                            message: '请选择一个Release分支进行构建',
+                            parameters: [choice(name: 'BRANCH_NAME', choices: releaseBranches.join('\n'), description: '选择要构建的Release分支')]
+                        )
+                    }
+
+                    echo "用户选择的分支是: ${selectedBranch}"
+                    getcode.GetCode("${selectedBranch}", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                }
+            }
+        }
+
+        stage("Get Gitlab Info") {
+            steps {
+                script {
+                    gitlab.GetBranchCommitID("${selectedBranch}")
+                    echo sh(script: 'env', returnStdout: true)
+                }
+            }
+        }
+
+
+        stage('Build Docker Image with nerdctl') {
+            steps {
+                script {
+                    env.RELEASE_REGISTRY = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}"
+                    env.RELEASE_VERSION = "${selectedBranch}-${env.GITLAB_COMMIT_ID}"
+                    env.RELEASE_IMAGE = "${env.RELEASE_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    env.PRODUCTION_REGISTRY = "${env.HARBOR_PRD_URL}/${env.HARBOR_PROJECT}"
+                    env.PRODUCTION_IMAGE = "${env.PRODUCTION_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    echo "设置环境变量："
+                    echo "RELEASE_REGISTRY: ${env.RELEASE_REGISTRY}"
+                    echo "RELEASE_VERSION: ${env.RELEASE_VERSION}"
+                    echo "RELEASE_IMAGE: ${env.RELEASE_IMAGE}"
+                    sh """
+                    export DOCKER_CONFIG="/kaniko/.docker/"
+                    export RELEASE_REGISTRY=${env.RELEASE_REGISTRY}
+                    export RELEASE_VERSION=${env.RELEASE_VERSION}
+                    export RELEASE_IMAGE=${env.RELEASE_IMAGE}
+                    export NPM_REGISTRY=${env.NPM_REGISTRY}
+                    make -e release-image.amd64
+                    nerdctl --insecure-registry=true push ${env.RELEASE_IMAGE}-amd64
+                    """
+                    // 生产环境需要打包上传到 FTP
+                    if (env.purpose == "production") {
+                        sh """
+                            nerdctl tag ${env.RELEASE_IMAGE}-amd64 ${env.PRODUCTION_IMAGE}-amd64
+                            nerdctl --insecure-registry=true save -o ${env.projectName}-${env.RELEASE_VERSION}.tar ${env.PRODUCTION_IMAGE}-amd64
+                        """
+                        helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}.tar", "${env.ftpCredential}", "${env.ftpAddr}")
+
+                        sh """
+                            tar -czf ${env.projectName}-${env.RELEASE_VERSION}-chart.tar.gz deploy/charts/
+                        """
+                        helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}-chart.tar.gz", "${env.ftpCredential}", "${env.ftpAddr}")
+                    }
+                }
+            }
+        }
+
+        stage('Helm Deploy Application') {
+            steps {
+                script {
+                    if (env.purpose == "uat") {
+                        def node_selected = env.SPECIFY_NODE
+                        if(node_selected == 'true') {
+                            sh """
+                            export DOCKER_CONFIG="/kaniko/.docker/"
+                            helm upgrade --install ${env.projectName} \\
+                            deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                            -f deploy/charts/values.yaml --set nodeSelector."${env.DESTINATION_KEY}"="${env.DESTINATION_VALUE}" \\
+                            --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                            --set image.tag=${env.RELEASE_VERSION}-amd64 \\
+                            --set ingress.className=${env.ingress} \\
+                            --set ingress.hosts[0].host=${env.ingressHost} \\
+                            --set replicaCount=${env.replicas} \\
+                            --set tolerations[0].key=${env.TOLERATION_KEY} \\
+                            --set tolerations[0].value=${env.TOLERATION_VALUE} \\
+                            --set tolerations[0].effect=${env.TOLERATION_EFFECT} \\
+                            --set tolerations[0].operator=${env.TOLERATION_OPERATOR}
+                            """
+                        } else {
+                            sh """
+                            helm upgrade --install ${env.projectName} \\
+                            deploy/charts --namespace ${env.HELM_NS} --create-namespace \\
+                            -f deploy/charts/values.yaml \\
+                            --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \\
+                            --set image.tag=${env.RELEASE_VERSION}-amd64 \\
+                            --set ingress.className=${env.ingress} \\
+                            --set ingress.hosts[0].host=${env.ingressHost} \\
+                            --set replicaCount=${env.replicas} \\
+                            --set tolerations[0].key=${env.TOLERATION_KEY} \\
+                            --set tolerations[0].value=${env.TOLERATION_VALUE} \\
+                            --set tolerations[0].effect=${env.TOLERATION_EFFECT} \\
+                            --set tolerations[0].operator=${env.TOLERATION_OPERATOR}
+                            """
+                        }
+                        sh """
+                            helm get manifest --namespace ${env.HELM_NS} ${env.projectName}
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                cleanWs()
+            }
+        }
+    }
+
+}

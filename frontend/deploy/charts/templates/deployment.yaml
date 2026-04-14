@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vlagent-front.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vlagent-front.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "vlagent-front.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      name: {{ include "vlagent-front.fullname" . }}
+      labels:
+        {{- include "vlagent-front.labels" . | nindent 8 }}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                {{- include "vlagent-front.selectorLabels" . | nindent 16 }}
+            topologyKey: "kubernetes.io/hostname"
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- if .Values.hostNetwork }}
+      hostNetwork: {{ .Values.hostNetwork}}
+      {{- end }}
+      {{- if .Values.hostAliases }}
+      hostAliases:
+        {{- range $value := .Values.hostAliases }}
+        - ip: {{ $value.ip }}
+          hostnames:
+          {{- range $hostname := $value.hostnames }}
+          - {{ $hostname }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- range $value := .Values.tolerations }}
+        - key: {{ $value.key }}
+          operator: {{ $value.operator }}
+          value: {{ $value.value }}
+          effect: {{ $value.effect }}
+        {{- end }}
+      {{- end }}
+
+      containers:
+        - name: {{ include "vlagent-front.fullname" . }}
+          command: {{ toYaml .Values.command | nindent 12 }}
+          {{- if and .Values.args (not (empty .Values.args)) }}
+          args: {{ toYaml .Values.args | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.envs }}
+          env:
+            {{- range $value := .Values.envs }}
+            - name: {{ $value.name }}
+              value: {{ $value.value }}
+            {{- end}}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            {{- toYaml .Values.ports | nindent 12 }}
+          volumeMounts:
+            - name: timezone
+              mountPath: /etc/timezone
+              subPath: timezone
+            - name: tz-volume
+              mountPath: /etc/localtime
+              readOnly: true
+            {{- range $value := .Values.volumeMounts }}
+            - name: {{ $value.name }}
+              mountPath: {{ $value.mountPath }}
+              subPath: {{ $value.subPath }}
+            {{- end }}
+      volumes:
+        - name: tz-volume
+          hostPath:
+            path: /etc/localtime
+        - name: timezone
+          configMap:
+            name: timezone-config-vlagent-front
+            items:
+            - key: timezone
+              path: timezone
+        {{- range $value := .Values.volumes }}
+        {{- if $value.configMap }}
+        - name: {{ $value.name }}
+          configMap:
+            name: {{ $value.configMap.name }}
+        {{- end }}
+        {{- if $value.secret }}
+        - name: {{ $value.name }}
+          secret:
+            secretName: {{ $value.secret.secretName }}
+        {{- end }}
+        {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vlagent-front.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vlagent-front.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type}}
+  selector:
+    {{- include "vlagent-front.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- range $value := .Values.service.port }}
+    - name: {{ $value.name }}
+      protocol: {{ $value.protocol }}
+      port: {{ $value.port }}
+      targetPort: {{ $value.targetPort }}
+    {{- end }}

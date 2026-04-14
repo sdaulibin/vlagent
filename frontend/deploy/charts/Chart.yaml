@@ -1,0 +1,9 @@
+apiVersion: v2
+name: vlagent-front
+description: A Helm chart for vlagent frontend (Vue 3 + Vite)
+
+type: application
+
+version: 0.1.0
+
+appVersion: "v1.0.0"

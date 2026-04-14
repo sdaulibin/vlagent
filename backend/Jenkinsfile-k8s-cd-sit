@@ -26,7 +26,7 @@ pipeline {
         // =====================================================================
         // Git & Harbor 配置
         // =====================================================================
-        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vlagent/vlagent.git', description: 'Git repository URL')
         string(name: 'projectName', defaultValue: 'vlagent', description: 'project name')
         string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
         string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')

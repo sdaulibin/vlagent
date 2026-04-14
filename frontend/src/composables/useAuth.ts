@@ -8,7 +8,7 @@
  * 4. 开发模式：非 iframe 时从后端 /dev-token 获取测试 token
  */
 
-const TOKEN_KEY = "vl_flow_token";
+const TOKEN_KEY = "vlagent_token";
 
 let currentToken: string | null = null;
 let authReady = false;
@@ -144,7 +144,7 @@ export function initAuth(): Promise<string | null> {
       };
 
       window.addEventListener("message", handler);
-      window.parent.postMessage({ type: "vl_flow_ready" }, "*");
+      window.parent.postMessage({ type: "vlagent_ready" }, "*");
 
       // 超时 10 秒
       setTimeout(() => {

@@ -1,0 +1,88 @@
+replicaCount: 1
+
+image:
+  repository: harbor.devops.qdb.com/vl-flow/vlagent-front
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "vlagent-front"
+
+podAnnotations: {}
+podSecurityContext: {}
+
+hostNetwork: false
+command: ["nginx"]
+args: ["-g", "daemon off;"]
+
+# 后端 API 服务配置 (用于 nginx 反向代理)
+backendService: "vlagent"
+backendPort: "8000"
+
+ports:
+  - name: http
+    containerPort: 8001
+    protocol: TCP
+
+service:
+  type: ClusterIP
+  port:
+    - name: http
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/real-ip-header: X-Forwarded-For
+    nginx.ingress.kubernetes.io/set-real-ip-from: 0.0.0.0/0
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 2g
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: vlagent.devops.qdb.com
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePortName: http
+  tls: []
+
+resources:
+  limits:
+    cpu: 1
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+  # - key: env
+  #   operator: Equal
+  #   value: uat
+  #   effect: NoSchedule
+
+affinity: {}
+
+envs: []
+
+hostAliases: {}
+  # - hostnames:
+  #   - "backend"
+  #   ip: "10.1.82.113"
+
+volumeMounts:
+  - mountPath: /etc/nginx/conf.d/default.conf
+    name: config
+    subPath: default.conf
+
+volumes:
+  - configMap:
+      name: vlagent-front-config
+    name: config
