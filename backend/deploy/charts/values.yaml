@@ -1,0 +1,168 @@
+# ==============================================================================
+# 全局配置
+# ==============================================================================
+
+image:
+  repository: harbor.devops.qdb.com/vl-flow/vlagent
+  pullPolicy: IfNotPresent
+  # tag 必须通过 --set 显式指定，不允许使用 latest
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "vlagent"
+
+# Pod 级别安全上下文
+# 注意: uid=1000 (appuser) 和 gid=1000 (appgroup) 已在 Dockerfile 中创建
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# 容器级别安全上下文
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ==============================================================================
+# Server (FastAPI) 配置
+# ==============================================================================
+
+server:
+  replicaCount: 1
+
+  command: ["python", "-m", "uvicorn", "main:app"]
+  args: ["--host", "0.0.0.0", "--port", "8000"]
+
+  ports:
+    - name: http
+      containerPort: 8000
+      protocol: TCP
+
+  service:
+    type: ClusterIP
+    ports:
+      - name: http
+        protocol: TCP
+        port: 8000
+        targetPort: 8000
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/real-ip-header: X-Forwarded-For
+      nginx.ingress.kubernetes.io/set-real-ip-from: 0.0.0.0/0
+      nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: 2g
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "120"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      nginx.ingress.kubernetes.io/client-body-buffer-size: "128m"
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-tcp-nodelay: "true"
+      nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+      nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"
+      nginx.ingress.kubernetes.io/proxy-transfer-encoding: "true"
+    hosts:
+      - host: vlagent.devops.qdb.com
+        paths:
+          - path: /
+            pathType: Prefix
+            servicePortName: http
+    tls: []
+
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+  startupProbe:
+    httpGet:
+      path: /health
+      port: http
+      scheme: HTTP
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 30
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+      scheme: HTTP
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+  tolerations: []
+  nodeSelector: {}
+  affinity: {}
+
+  volumes: []
+
+  volumeMounts: []
+
+# ==============================================================================
+# 共享配置
+# ==============================================================================
+
+podAnnotations: {}
+configmapChecksum: '{{ include (print $.Template.BasePath "/env-configmap.yaml") . | sha256sum }}'
+
+# 环境变量配置 (ConfigMap)
+envConfig:
+  APP_ENV: "production"
+  RES_DIR: "/app/res"
+  RECOGNITION_TIMEOUT: "1800"
+  OPENAI_URL: "http://10.1.82.113:30208/v1"
+  MODEL_LOCAL: "d3vcf7gre7tl90toeog0"
+  QWEN35_URL: "http://10.1.84.77/v1"
+  QWEN35_MODEL: "llm_xindai_01"
+  DATABASE_ECHO: "false"
+  ECM_ENABLED: "false"
+  ECM_CACHE_IP: ""
+  ECM_CACHE_PORT: "8022"
+  ECM_MODEL_CODE: "RP_RB"
+  ECM_DOC_PART: "RP_RB_PART"
+  ECM_SERVER_NAME: "SunECMDM"
+  ECM_GROUP_NAME: "group107"
+  ECM_USERNAME: "ibd"
+  JWT_ALGORITHM: "HS256"
+
+# 敏感配置 (Secret)
+secret:
+  enabled: true
+  DATABASE_URL: ""
+  OPENAI_KEY: ""
+  QWEN35_KEY: ""
+  JWT_SECRET: ""
+  ECM_PASSWORD: ""
+
+# 额外的环境变量 (可选)
+envs: []

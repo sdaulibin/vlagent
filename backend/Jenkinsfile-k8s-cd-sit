@@ -1,0 +1,185 @@
+@Library("bqdlib") _
+
+//import
+def getcode = new org.devops.GetCode()
+def builds = new org.devops.Builds()
+def gitlab = new org.devops.Gitlab()
+def helm = new org.devops.Helmcd()
+
+
+pipeline {
+
+    agent {
+        node {
+            label "star"
+            customWorkspace "/home/jenkins/workspace/${env.JOB_NAME}_${env.BUILD_NUMBER}"
+        }
+    }
+
+    options{
+        skipDefaultCheckout true
+        disableConcurrentBuilds()
+    }
+
+    // 构建参数
+    parameters {
+        // =====================================================================
+        // Git & Harbor 配置
+        // =====================================================================
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'projectName', defaultValue: 'vlagent', description: 'project name')
+        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
+        string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
+        string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+
+        // =====================================================================
+        // K8s 部署配置
+        // =====================================================================
+        choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
+        string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vl-flow-sit', description: 'k8s namespace')
+        string(name: 'ingress', defaultValue: 'nginx-vl-flow-sit', description: 'ingress class name')
+        string(name: 'serverReplicas', defaultValue: '1', description: 'Server replica count')
+        string(name: 'ingressHost', defaultValue: 'vlagent.devops.qdb.com', description: 'ingress host')
+
+        // =====================================================================
+        // Docker 镜像配置
+        // =====================================================================
+        string(name: 'PYTHON_BUILDER_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-uv', description: 'Python builder image with uv')
+        string(name: 'PYTHON_RUNTIME_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime-v2', description: 'Python runtime image')
+
+        // =====================================================================
+        // PyPI 源配置 (内网 Nexus 代理)
+        // =====================================================================
+        string(name: 'PIP_INDEX_URL', defaultValue: 'https://nexus.qdb.com/repository/pypi-group/simple/', description: 'PyPI index URL (内网 Nexus)')
+        string(name: 'PIP_TRUSTED_HOST', defaultValue: 'nexus.qdb.com', description: 'PyPI trusted host')
+
+        // =====================================================================
+        // 应用配置 (ConfigMap - 非敏感)
+        // =====================================================================
+        string(name: 'APP_ENV', defaultValue: 'sit', description: 'Application environment')
+        string(name: 'OPENAI_URL', defaultValue: 'http://10.1.82.113:30208/v1', description: 'AI 模型 API URL')
+        string(name: 'MODEL_LOCAL', defaultValue: 'd3vcf7gre7tl90toeog0', description: '本地模型 ID')
+        string(name: 'QWEN35_URL', defaultValue: 'http://10.1.84.77/v1', description: 'Qwen3.5 API URL')
+        string(name: 'QWEN35_MODEL', defaultValue: 'llm_xindai_01', description: 'Qwen3.5 模型名称')
+        string(name: 'RECOGNITION_TIMEOUT', defaultValue: '1800', description: '识别超时时间(秒)')
+        string(name: 'ECM_ENABLED', defaultValue: 'false', description: '是否启用影像平台')
+        string(name: 'ECM_CACHE_IP', defaultValue: '', description: '影像平台缓存IP')
+        string(name: 'ECM_CACHE_PORT', defaultValue: '8022', description: '影像平台缓存端口')
+        string(name: 'JWT_ALGORITHM', defaultValue: 'HS256', description: 'JWT 算法')
+    }
+    stages {
+
+        stage("Init"){
+            steps{
+                script{
+                    builds.InitSteps()
+                }
+            }
+        }
+
+        stage('Get sit Branches') {
+            steps {
+                script {
+                    getcode.GetCode("master", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                    getcode.GetCode("sit", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                }
+            }
+        }
+
+        stage("Get Gitlab Info") {
+            steps {
+                script {
+                    gitlab.GetBranchCommitID("sit")
+                    echo sh(script: 'env', returnStdout: true)
+                }
+            }
+        }
+
+
+        stage('Build and Push Image') {
+            steps {
+                script {
+                    env.RELEASE_REGISTRY = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}"
+                    env.RELEASE_VERSION = "${env.GITLAB_COMMIT_ID}"
+                    env.RELEASE_IMAGE = "${env.RELEASE_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    def pipIndexUrl = params.PIP_INDEX_URL ?: 'https://nexus.qdb.com/repository/pypi-group/simple/'
+                    def pipTrustedHost = params.PIP_TRUSTED_HOST ?: 'nexus.qdb.com'
+
+                    echo "环境变量:"
+                    echo "  RELEASE_IMAGE: ${env.RELEASE_IMAGE}"
+                    echo "  PIP_INDEX_URL: ${pipIndexUrl}"
+
+                    sh """
+                    export DOCKER_CONFIG="/kaniko/.docker/"
+                    make ci-prepare PIP_INDEX_URL="${pipIndexUrl}" PIP_TRUSTED_HOST="${pipTrustedHost}"
+                    make ci-build
+                    make ci-push
+                    """
+                }
+            }
+        }
+
+        stage('Helm Deploy Application') {
+            steps {
+                script {
+                    def node_selected = env.SPECIFY_NODE
+                    def helmSetBase = """
+                        deploy/charts --namespace ${env.HELM_NS} --create-namespace \
+                        -f deploy/charts/values.yaml \
+                        --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \
+                        --set image.tag=${env.RELEASE_VERSION}-amd64 \
+                        --set server.ingress.className=${env.ingress} \
+                        --set server.ingress.hosts[0].host=${env.ingressHost} \
+                        --set server.replicaCount=${env.serverReplicas} \
+                        --set envConfig.APP_ENV="${env.APP_ENV}" \
+                        --set envConfig.OPENAI_URL="${env.OPENAI_URL}" \
+                        --set envConfig.MODEL_LOCAL="${env.MODEL_LOCAL}" \
+                        --set envConfig.QWEN35_URL="${env.QWEN35_URL}" \
+                        --set envConfig.QWEN35_MODEL="${env.QWEN35_MODEL}" \
+                        --set envConfig.RECOGNITION_TIMEOUT="${env.RECOGNITION_TIMEOUT}" \
+                        --set envConfig.ECM_ENABLED="${env.ECM_ENABLED}" \
+                        --set envConfig.ECM_CACHE_IP="${env.ECM_CACHE_IP}" \
+                        --set envConfig.ECM_CACHE_PORT="${env.ECM_CACHE_PORT}" \
+                        --set envConfig.JWT_ALGORITHM="${env.JWT_ALGORITHM}" \
+                        --set secret.enabled=true \
+                        --set secret.DATABASE_URL="${env.DATABASE_URL}" \
+                        --set secret.OPENAI_KEY="${env.OPENAI_KEY}" \
+                        --set secret.QWEN35_KEY="${env.QWEN35_KEY}" \
+                        --set secret.JWT_SECRET="${env.JWT_SECRET}" \
+                        --set secret.ECM_PASSWORD="${env.ECM_PASSWORD}"
+                    """.stripIndent().trim()
+
+                    if(node_selected == 'true') {
+                        sh """
+                           helm upgrade --install ${env.projectName} \
+                           ${helmSetBase} \
+                           --set "server.nodeSelector.${env.DESTINATION_KEY}=${env.DESTINATION_VALUE}"
+                        """
+                    } else {
+                        sh """
+                           helm upgrade --install ${env.projectName} \
+                           ${helmSetBase}
+                        """
+                    }
+                    sh """
+                        helm get manifest --namespace ${env.HELM_NS} ${env.projectName}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                cleanWs()
+            }
+        }
+    }
+
+}

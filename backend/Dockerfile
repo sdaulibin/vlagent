@@ -1,50 +1,66 @@
-FROM python:3.11-slim
+ARG PYTHON_RUNTIME_IMAGE=harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime
+
+# 构建时版本参数（通过 Makefile 传入）
+ARG VERSION=0.0.0
+ARG COMMIT_ID=unknown
+
+# -----------------------------------------------------------------------------
+# 单阶段：运行阶段 (Runtime Stage)
+# 构建工作已在 Jenkins Agent 中完成，这里只负责打包
+# -----------------------------------------------------------------------------
+FROM ${PYTHON_RUNTIME_IMAGE}
+
+# 继承构建时的版本参数
+ARG VERSION
+ARG COMMIT_ID
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONFAULTHANDLER=1 \
+    PATH="/app/.venv/bin:$PATH" \
+    # 版本信息（运行时可访问）
+    APP_VERSION=${VERSION} \
+    APP_COMMIT_ID=${COMMIT_ID}
 
 WORKDIR /app
 
-# 使用阿里云镜像源加速 apt
-RUN rm -f /etc/apt/sources.list.d/debian.sources \
-    && echo "deb https://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list \
-    && echo "deb https://mirrors.aliyun.com/debian-security bookworm-security main" >> /etc/apt/sources.list
-
-# 安装系统依赖 (poppler 用于 PDF 处理, 中文字体和 CID 映射用于正确渲染 PDF)
+# 安装 PDF 处理所需的系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
-    poppler-data \
-    fonts-wqy-zenhei \
-    fonts-noto-cjk \
-    fontconfig \
-    && fc-cache -fv \
+    ghostscript \
+    libgl1 \
+    libglib2.0-0 \
+    curl \
+    tini \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件
-COPY pyproject.toml ./
+# 创建非 root 用户运行应用（安全最佳实践）
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
 
-# 使用清华镜像源安装依赖
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    asyncpg>=0.31.0 \
-    fastapi>=0.124.2 \
-    greenlet>=3.3.0 \
-    jpype1>=1.6.0 \
-    openai>=2.9.0 \
-    openpyxl>=3.1.5 \
-    pandas>=2.3.3 \
-    pdf2image>=1.17.0 \
-    pillow>=12.0.0 \
-    pydantic>=2.12.5 \
-    pydantic-settings>=2.12.0 \
-    python-multipart>=0.0.20 \
-    sqlmodel>=0.0.27 \
-    uvicorn>=0.38.0
+# 从 Jenkins Agent 构建好的产物中复制虚拟环境（已在 ci-prepare 阶段生成并清理）
+COPY .venv /app/.venv
 
-# 复制应用代码
-COPY . .
+# 修复 .venv 内的 Python 软链接（Jenkins Agent 里的路径在 Runtime 镜像中不存在）
+RUN REAL_PYTHON=$(which python3) && \
+    ln -sf "$REAL_PYTHON" /app/.venv/bin/python && \
+    ln -sf "$REAL_PYTHON" /app/.venv/bin/python3 && \
+    ln -sf "$REAL_PYTHON" /app/.venv/bin/python3.13
 
-# 创建资源目录
-RUN mkdir -p /app/res
+# 创建上传、日志、下载目录并设置权限
+RUN mkdir -p /app/res /app/logs /app/downloads && chown -R appuser:appgroup /app
 
-# 暴露端口
+# 切换到非 root 用户
+USER appuser
+
 EXPOSE 8000
 
-# 启动命令
+# 健康检查配置
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# 使用 tini 作为 init 进程
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# 默认启动命令 (Server: FastAPI)
 CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

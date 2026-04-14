@@ -1,0 +1,50 @@
+{{- if .Values.envConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vlagent.fullname" . }}-env
+  namespace: {{ .Release.Namespace }}
+data:
+  # ==============================================================================
+  # 应用基础配置
+  # ==============================================================================
+  APP_ENV: {{ .Values.envConfig.APP_ENV | default "production" | quote }}
+  RES_DIR: {{ .Values.envConfig.RES_DIR | default "/app/res" | quote }}
+  RECOGNITION_TIMEOUT: {{ .Values.envConfig.RECOGNITION_TIMEOUT | default "1800" | quote }}
+
+  # ==============================================================================
+  # AI 模型配置 (Qwen VL - 视觉模型)
+  # ==============================================================================
+  OPENAI_URL: {{ .Values.envConfig.OPENAI_URL | default "" | quote }}
+  MODEL_LOCAL: {{ .Values.envConfig.MODEL_LOCAL | default "" | quote }}
+
+  # ==============================================================================
+  # AI 模型配置 (Qwen3.5 - 纯文本模型)
+  # ==============================================================================
+  QWEN35_URL: {{ .Values.envConfig.QWEN35_URL | default "" | quote }}
+  QWEN35_MODEL: {{ .Values.envConfig.QWEN35_MODEL | default "" | quote }}
+
+  # ==============================================================================
+  # 数据库配置
+  # ==============================================================================
+  DATABASE_ECHO: {{ .Values.envConfig.DATABASE_ECHO | default "false" | quote }}
+
+  # ==============================================================================
+  # JWT 认证配置
+  # ==============================================================================
+  JWT_ALGORITHM: {{ .Values.envConfig.JWT_ALGORITHM | default "HS256" | quote }}
+
+  # ==============================================================================
+  # 影像平台 (SunECM) 配置
+  # ==============================================================================
+  ECM_ENABLED: {{ .Values.envConfig.ECM_ENABLED | default "false" | quote }}
+  ECM_CACHE_IP: {{ .Values.envConfig.ECM_CACHE_IP | default "" | quote }}
+  ECM_CACHE_PORT: {{ .Values.envConfig.ECM_CACHE_PORT | default "8022" | quote }}
+  ECM_MODEL_CODE: {{ .Values.envConfig.ECM_MODEL_CODE | default "RP_RB" | quote }}
+  ECM_DOC_PART: {{ .Values.envConfig.ECM_DOC_PART | default "RP_RB_PART" | quote }}
+  ECM_SERVER_NAME: {{ .Values.envConfig.ECM_SERVER_NAME | default "SunECMDM" | quote }}
+  ECM_GROUP_NAME: {{ .Values.envConfig.ECM_GROUP_NAME | default "group107" | quote }}
+  ECM_USERNAME: {{ .Values.envConfig.ECM_USERNAME | default "ibd" | quote }}
+
+  # 注意: 敏感配置 (DATABASE_URL, API Key, JWT Secret) 使用 Kubernetes Secret 管理
+{{- end }}

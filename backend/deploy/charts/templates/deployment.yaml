@@ -1,0 +1,167 @@
+# ==============================================================================
+# Server Deployment (FastAPI)
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vlagent.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vlagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "vlagent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        {{- include "vlagent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        config-hash: {{ include (print $.Template.BasePath "/env-configmap.yaml") . | sha256sum }}
+        secret-hash: {{ include (print $.Template.BasePath "/env-secret.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml .Values.server.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.server.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.server.affinity }}
+      affinity:
+        {{- toYaml .Values.server.affinity | nindent 8 }}
+      {{- end }}
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: server
+          {{- if .Values.securityContext }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- end }}
+          command: {{ toYaml .Values.server.command | nindent 12 }}
+          {{- if and .Values.server.args (not (empty .Values.server.args)) }}
+          args: {{ toYaml .Values.server.args | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- if .Values.envConfig }}
+            {{- range $key, $value := .Values.envConfig }}
+            - name: {{ $key }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "vlagent.fullname" $ }}-env
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+            {{- if and .Values.secret .Values.secret.enabled }}
+            {{- range $key, $value := .Values.secret }}
+            {{- if and (ne $key "enabled") ($value) }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "vlagent.fullname" $ }}-secret
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- range $value := .Values.envs }}
+            - name: {{ $value.name }}
+              value: {{ $value.value }}
+            {{- end}}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          ports:
+            {{- toYaml .Values.server.ports | nindent 12 }}
+          {{- if .Values.server.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.server.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.server.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.server.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.server.startupProbe }}
+          startupProbe:
+            {{- toYaml .Values.server.startupProbe | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: res
+              mountPath: /app/res
+            - name: downloads
+              mountPath: /app/downloads
+            - name: timezone
+              mountPath: /etc/timezone
+              subPath: timezone
+            - name: tz-volume
+              mountPath: /etc/localtime
+              readOnly: true
+            {{- range $value := .Values.server.volumeMounts }}
+            - name: {{ $value.name }}
+              mountPath: {{ $value.mountPath }}
+              {{- if $value.subPath }}
+              subPath: {{ $value.subPath }}
+              {{- end }}
+            {{- end }}
+      volumes:
+        - name: res
+          hostPath:
+            path: /data/vlagent/res
+            type: DirectoryOrCreate
+        - name: downloads
+          hostPath:
+            path: /data/vlagent/downloads
+            type: DirectoryOrCreate
+        - name: tz-volume
+          hostPath:
+            path: /etc/localtime
+        - name: timezone
+          configMap:
+            name: timezone-config-vlagent
+            items:
+            - key: timezone
+              path: timezone
+        {{- range $value := .Values.server.volumes }}
+        {{- if $value.configMap }}
+        - name: {{ $value.name }}
+          configMap:
+            name: {{ $value.configMap.name }}
+        {{- end }}
+        {{- end }}
+
+---
+# ==============================================================================
+# Server Service
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vlagent.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vlagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.server.service.type }}
+  selector:
+    {{- include "vlagent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  ports:
+    {{- range $value := .Values.server.service.ports }}
+    - name: {{ $value.name }}
+      protocol: {{ $value.protocol }}
+      port: {{ $value.port }}
+      targetPort: {{ $value.targetPort }}
+    {{- end }}

@@ -1,0 +1,232 @@
+@Library("bqdlib") _
+
+//import
+def getcode = new org.devops.GetCode()
+def builds = new org.devops.Builds()
+def gitlab = new org.devops.Gitlab()
+def helm = new org.devops.Helmcd()
+
+
+pipeline {
+
+    agent {
+        node {
+            label "star"
+            customWorkspace "/home/jenkins/workspace/${env.JOB_NAME}_${env.BUILD_NUMBER}"
+        }
+    }
+
+    options{
+        skipDefaultCheckout true
+        disableConcurrentBuilds()
+    }
+
+    // 构建参数
+    parameters {
+        choice(choices: ['uat', 'production'], description: '部署uat或者是打出生产包', name: 'purpose')
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'projectName', defaultValue: 'vlagent', description: 'project name')
+        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
+        string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
+        string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url')
+        string(name: 'HARBOR_PRD_URL', defaultValue: 'harbor.qdccb.cn', description: 'harbor url for production')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
+        string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vl-flow-uat', description: 'k8s namespace')
+        string(name: 'ftpCredential', defaultValue: 'devops-test-ftp-credential', description: 'ftp credential')
+        string(name: 'ftpPath', defaultValue: '', description: 'a ftp relative path')
+        string(name: 'ftpAddr', defaultValue: '10.1.89.31', description: 'ftp ip address')
+        string(name: 'ingress', defaultValue: 'nginx', description: 'ingress class name')
+        string(name: 'ingressHost', defaultValue: 'vlagent.qdccb.cn', description: 'ingress host')
+        string(name: 'serverReplicas', defaultValue: '1', description: 'Server replica count')
+
+        // =====================================================================
+        // Docker 镜像配置
+        // =====================================================================
+        string(name: 'PYTHON_BUILDER_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-uv', description: 'Python builder image with uv')
+        string(name: 'PYTHON_RUNTIME_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime-v2', description: 'Python runtime image')
+
+        // =====================================================================
+        // PyPI 源配置 (内网 Nexus 代理)
+        // =====================================================================
+        string(name: 'PIP_INDEX_URL', defaultValue: 'https://nexus.qdb.com/repository/pypi-group/simple/', description: 'PyPI index URL (内网 Nexus)')
+        string(name: 'PIP_TRUSTED_HOST', defaultValue: 'nexus.qdb.com', description: 'PyPI trusted host')
+
+        // =====================================================================
+        // 容忍度配置
+        // =====================================================================
+        string(name: 'TOLERATION_KEY', defaultValue: 'env', description: '容忍度key')
+        string(name: 'TOLERATION_OPERATOR', defaultValue: 'Equal', description: '容忍度操作符')
+        string(name: 'TOLERATION_VALUE', defaultValue: 'uat', description: '容忍度value')
+        string(name: 'TOLERATION_EFFECT', defaultValue: 'NoSchedule', description: '容忍度效果')
+
+        // =====================================================================
+        // 应用配置 (ConfigMap - 非敏感)
+        // =====================================================================
+        string(name: 'APP_ENV', defaultValue: 'uat', description: 'Application environment')
+        string(name: 'OPENAI_URL', defaultValue: 'http://10.1.82.113:30208/v1', description: 'AI 模型 API URL')
+        string(name: 'MODEL_LOCAL', defaultValue: 'd3vcf7gre7tl90toeog0', description: '本地模型 ID')
+        string(name: 'QWEN35_URL', defaultValue: 'http://10.1.84.77/v1', description: 'Qwen3.5 API URL')
+        string(name: 'QWEN35_MODEL', defaultValue: 'llm_xindai_01', description: 'Qwen3.5 模型名称')
+        string(name: 'RECOGNITION_TIMEOUT', defaultValue: '1800', description: '识别超时时间(秒)')
+        string(name: 'ECM_ENABLED', defaultValue: 'false', description: '是否启用影像平台')
+        string(name: 'ECM_CACHE_IP', defaultValue: '', description: '影像平台缓存IP')
+        string(name: 'ECM_CACHE_PORT', defaultValue: '8022', description: '影像平台缓存端口')
+        string(name: 'JWT_ALGORITHM', defaultValue: 'HS256', description: 'JWT 算法')
+    }
+    environment {
+        selectedBranch = ''
+    }
+    stages {
+
+        stage("Init"){
+            steps{
+                script{
+                    builds.InitSteps()
+                }
+            }
+        }
+
+        stage('Get Release Branches') {
+            steps {
+                script {
+                    getcode.GetCode("master", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                    def releaseBranches = gitlab.GetBranchesByPrefix("release")
+
+                    timeout(time: 10, unit: 'MINUTES') {
+                        selectedBranch = input(
+                            id: 'branchSelection',
+                            message: '请选择一个Release分支进行构建',
+                            parameters: [choice(name: 'BRANCH_NAME', choices: releaseBranches.join('\n'), description: '选择要构建的Release分支')]
+                        )
+                    }
+
+                    echo "用户选择的分支是: ${selectedBranch}"
+                    getcode.GetCode("${selectedBranch}", "${params.srcUrl}", env.gitlabTokenByUserPassword)
+                }
+            }
+        }
+
+        stage("Get Gitlab Info") {
+            steps {
+                script {
+                    gitlab.GetBranchCommitID("${selectedBranch}")
+                    echo sh(script: 'env', returnStdout: true)
+                }
+            }
+        }
+
+
+        stage('Build and Push Image') {
+            steps {
+                script {
+                    env.RELEASE_REGISTRY = "${env.HARBOR_URL}/${env.HARBOR_PROJECT}"
+                    env.RELEASE_VERSION = "${selectedBranch}-${env.GITLAB_COMMIT_ID}"
+                    env.RELEASE_IMAGE = "${env.RELEASE_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    env.PRODUCTION_REGISTRY = "${env.HARBOR_PRD_URL}/${env.HARBOR_PROJECT}"
+                    env.PRODUCTION_IMAGE = "${env.PRODUCTION_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
+
+                    def pipIndexUrl = params.PIP_INDEX_URL ?: 'https://nexus.qdb.com/repository/pypi-group/simple/'
+                    def pipTrustedHost = params.PIP_TRUSTED_HOST ?: 'nexus.qdb.com'
+
+                    echo "环境变量:"
+                    echo "  RELEASE_IMAGE: ${env.RELEASE_IMAGE}"
+                    echo "  PIP_INDEX_URL: ${pipIndexUrl}"
+                    echo "  PIP_TRUSTED_HOST: ${pipTrustedHost}"
+
+                    sh """
+                    make ci-prepare PIP_INDEX_URL="${pipIndexUrl}" PIP_TRUSTED_HOST="${pipTrustedHost}"
+                    """
+
+                    sh """
+                    export DOCKER_CONFIG="/kaniko/.docker/"
+                    make ci-build
+                    make ci-push
+                    """
+
+                    // 生产环境需要打包上传到 FTP
+                    if (env.purpose == "production") {
+                        sh """
+                        nerdctl tag ${env.RELEASE_IMAGE}-amd64 ${env.PRODUCTION_IMAGE}-amd64
+                        """
+                        env.PRODUCTION_IMAGE = "${env.PRODUCTION_IMAGE}-amd64"
+                        sh "make ci-export"
+                        helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}.tar", "${env.ftpCredential}", "${env.ftpAddr}")
+
+                        sh "make ci-chart"
+                        helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}-chart.tar.gz", "${env.ftpCredential}", "${env.ftpAddr}")
+                    }
+                }
+            }
+        }
+
+        stage('Helm Deploy Application') {
+            steps {
+                script {
+                    if (env.purpose == "uat") {
+                        def node_selected = env.SPECIFY_NODE
+                        def helmSetBase = """
+                            deploy/charts --namespace ${env.HELM_NS} --create-namespace \
+                            -f deploy/charts/values.yaml \
+                            --set image.repository=${env.HARBOR_URL}/${env.HARBOR_PROJECT}/${env.projectName} \
+                            --set image.tag=${env.RELEASE_VERSION}-amd64 \
+                            --set server.ingress.className=${env.ingress} \
+                            --set server.ingress.hosts[0].host=${env.ingressHost} \
+                            --set server.replicaCount=${env.serverReplicas} \
+                            --set server.tolerations[0].key="${env.TOLERATION_KEY}" \
+                            --set server.tolerations[0].operator="${env.TOLERATION_OPERATOR}" \
+                            --set server.tolerations[0].value="${env.TOLERATION_VALUE}" \
+                            --set server.tolerations[0].effect="${env.TOLERATION_EFFECT}" \
+                            --set envConfig.APP_ENV="${env.APP_ENV}" \
+                            --set envConfig.OPENAI_URL="${env.OPENAI_URL}" \
+                            --set envConfig.MODEL_LOCAL="${env.MODEL_LOCAL}" \
+                            --set envConfig.QWEN35_URL="${env.QWEN35_URL}" \
+                            --set envConfig.QWEN35_MODEL="${env.QWEN35_MODEL}" \
+                            --set envConfig.RECOGNITION_TIMEOUT="${env.RECOGNITION_TIMEOUT}" \
+                            --set envConfig.ECM_ENABLED="${env.ECM_ENABLED}" \
+                            --set envConfig.ECM_CACHE_IP="${env.ECM_CACHE_IP}" \
+                            --set envConfig.ECM_CACHE_PORT="${env.ECM_CACHE_PORT}" \
+                            --set envConfig.JWT_ALGORITHM="${env.JWT_ALGORITHM}" \
+                            --set secret.enabled=true \
+                            --set secret.DATABASE_URL="${env.DATABASE_URL}" \
+                            --set secret.OPENAI_KEY="${env.OPENAI_KEY}" \
+                            --set secret.QWEN35_KEY="${env.QWEN35_KEY}" \
+                            --set secret.JWT_SECRET="${env.JWT_SECRET}" \
+                            --set secret.ECM_PASSWORD="${env.ECM_PASSWORD}"
+                        """.stripIndent().trim()
+
+                        if(node_selected == 'true') {
+                            sh """
+                               helm upgrade --install ${env.projectName} \
+                               ${helmSetBase} \
+                               --set "server.nodeSelector.${env.DESTINATION_KEY}=${env.DESTINATION_VALUE}"
+                            """
+                        } else {
+                            sh """
+                               helm upgrade --install ${env.projectName} \
+                               ${helmSetBase}
+                            """
+                        }
+                        sh """
+                            helm get manifest --namespace ${env.HELM_NS} ${env.projectName}
+                        """
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            script {
+                cleanWs()
+            }
+        }
+    }
+
+}
