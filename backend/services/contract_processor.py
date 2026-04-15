@@ -15,13 +15,13 @@ import os
 import json
 from pathlib import Path
 from pdf2image import convert_from_path
-from src.config import MODEL_LOCAL, RES_DIR
+from src.config import MODEL_LOCAL, UPLOAD_DIR, DOWNLOAD_DIR
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 from services.pdf_processor import load_schema
 
 # 合同比对输出目录
-CONTRACT_OUTPUT_DIR = os.path.join(RES_DIR, "contracts")
+CONTRACT_OUTPUT_DIR = os.path.join(DOWNLOAD_DIR, "contracts")
 os.makedirs(CONTRACT_OUTPUT_DIR, exist_ok=True)
 
 
@@ -478,8 +478,8 @@ def compare_documents_with_content(file_a_path: str, file_b_path: str) -> dict:
 
 if __name__ == "__main__":
     # 测试代码
-    test_a = os.path.join(RES_DIR, "contracts/test_a.pdf")
-    test_b = os.path.join(RES_DIR, "contracts/test_b.pdf")
+    test_a = os.path.join(UPLOAD_DIR, "contracts/test_a.pdf")
+    test_b = os.path.join(UPLOAD_DIR, "contracts/test_b.pdf")
     
     if os.path.exists(test_a) and os.path.exists(test_b):
         result = compare_documents(test_a, test_b)

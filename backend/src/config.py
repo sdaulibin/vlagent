@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     QWEN35_MODEL: str = "Qwen3.5-122B"
     
     # App Configuration
-    RES_DIR: str = "res"
+    UPLOAD_DIR: str = "upload"
+    DOWNLOAD_DIR: str = "download"
     RECOGNITION_TIMEOUT: int = 1800  # 自动停止识别任务的超时时间（秒）30分钟
     
     # Image Platform (SunECM)
@@ -58,7 +59,8 @@ MODEL_LOCAL = settings.MODEL_LOCAL
 QWEN35_KEY = settings.QWEN35_KEY
 QWEN35_URL = settings.QWEN35_URL
 QWEN35_MODEL = settings.QWEN35_MODEL
-RES_DIR = settings.RES_DIR
+UPLOAD_DIR = settings.UPLOAD_DIR
+DOWNLOAD_DIR = settings.DOWNLOAD_DIR
 RECOGNITION_TIMEOUT = settings.RECOGNITION_TIMEOUT
 
 # 其他模型常量（不通过环境变量配置）

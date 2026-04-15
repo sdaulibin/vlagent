@@ -193,7 +193,7 @@ const goBack = () => {
                 <button 
                     @click="handleStartRecognition"
                     :disabled="isRecognizing || !hasPendingFiles"
-                    class="btn-gradient from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    class="btn-gradient bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
                     <Play class="w-5 h-5" />
                     {{ isRecognizing ? '识别中...' : (hasPendingFiles ? '开始识别' : '暂无待识别文件') }}

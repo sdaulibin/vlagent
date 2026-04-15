@@ -48,7 +48,7 @@ RUN REAL_PYTHON=$(which python3) && \
     ln -sf "$REAL_PYTHON" /app/.venv/bin/python3.13
 
 # 创建上传、日志、下载目录并设置权限
-RUN mkdir -p /app/res /app/logs /app/downloads && chown -R appuser:appgroup /app
+RUN mkdir -p /app/upload /app/download /app/logs && chown -R appuser:appgroup /app
 
 # 切换到非 root 用户
 USER appuser

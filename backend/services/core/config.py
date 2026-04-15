@@ -20,4 +20,4 @@ MODEL_QWEN_MAX = "qwen3-max-2025-09-23"
 MODEL_QWEN_8B = "qwen3-8b"
 MODEL_QWEN_FLASH = "qwen-flash"
 
-RES_DIR = "res"
+UPLOAD_DIR = "upload"

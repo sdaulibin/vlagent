@@ -21,10 +21,12 @@ from src.pdf_extract.exporter import export_csv, export_xlsx
 
 router = APIRouter(prefix="/pdf_extract", tags=["PDF Extract"])
 
-UPLOAD_DIR = os.path.join(os.getcwd(), "downloads", "pdf_extract_uploads")
+UPLOAD_DIR = os.getenv("PDF_EXTRACT_UPLOAD_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "pdf_extract"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads", "pdf_extract_exports")
+DOWNLOAD_DIR = os.getenv("PDF_EXTRACT_DOWNLOAD_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "download", "pdf_extract"))
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 

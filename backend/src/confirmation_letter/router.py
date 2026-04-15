@@ -33,8 +33,8 @@ from src.confirmation_letter.service import process_confirmation_letter
 router = APIRouter(prefix="/confirmation", tags=["confirmation_letter"])
 
 # 配置上传目录
-UPLOAD_DIR = os.getenv("CONFIRMATION_UPLOAD_DIR", 
-                       os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "res", "confirmation"))
+UPLOAD_DIR = os.getenv("CONFIRMATION_UPLOAD_DIR",
+                       os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "confirmation"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

@@ -98,10 +98,10 @@ spec:
             {{- toYaml .Values.server.startupProbe | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - name: res
-              mountPath: /app/res
-            - name: downloads
-              mountPath: /app/downloads
+            - name: upload
+              mountPath: /app/upload
+            - name: download
+              mountPath: /app/download
             - name: timezone
               mountPath: /etc/timezone
               subPath: timezone
@@ -116,13 +116,13 @@ spec:
               {{- end }}
             {{- end }}
       volumes:
-        - name: res
+        - name: upload
           hostPath:
-            path: /data/vlagent/res
+            path: /data/vlagent/upload
             type: DirectoryOrCreate
-        - name: downloads
+        - name: download
           hostPath:
-            path: /data/vlagent/downloads
+            path: /data/vlagent/download
             type: DirectoryOrCreate
         - name: tz-volume
           hostPath:

@@ -138,7 +138,8 @@ configmapChecksum: '{{ include (print $.Template.BasePath "/env-configmap.yaml")
 # 环境变量配置 (ConfigMap)
 envConfig:
   APP_ENV: "production"
-  RES_DIR: "/app/res"
+  UPLOAD_DIR: "/app/upload"
+  DOWNLOAD_DIR: "/app/download"
   RECOGNITION_TIMEOUT: "1800"
   OPENAI_URL: "http://10.1.82.113:30208/v1"
   MODEL_LOCAL: "d3vcf7gre7tl90toeog0"

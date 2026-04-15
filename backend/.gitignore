@@ -32,7 +32,8 @@ env.bak/
 venv.bak/
 
 # Project Specific
-res/
+upload/
+download/
 *.log
 
 # IDEs

@@ -29,7 +29,7 @@ router = APIRouter(prefix="/credentials", tags=["credentials"])
 # 配置上传目录
 UPLOAD_DIR = os.getenv(
     "CREDENTIAL_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "res", "credentials"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "credentials"),
 )
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 

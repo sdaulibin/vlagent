@@ -30,7 +30,7 @@ from services import pdf_processor
 router = APIRouter(prefix="/files", tags=["files"])
 
 # Load config from env
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/Users/binginx/PycharmProjects/vlagent/backend/res")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "bank_statement"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -58,38 +58,27 @@ async def get_files(session: AsyncSession = Depends(get_session)):
     return result.scalars().all()
 
 
-@router.post("/{file_id}", response_model=FileRecord)
-async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
-    """获取单个文件详情"""
-    statement = select(FileRecord).where(FileRecord.id == file_id)
-    result = await session.execute(statement)
-    file = result.scalar_one_or_none()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-    return file
-
-
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
     """上传文件（仅保存，不处理）"""
     try:
         # 1. 验证文件格式（仅支持 PDF）
         from services.pdf.file_validator import validate_pdf_format
-        
+
         # 读取文件头部用于验证
         file_header = await file.read(1024)
         await file.seek(0)  # 重置文件指针
-        
+
         is_valid, error_msg = validate_pdf_format(file.filename, file_header)
         if not is_valid:
             raise HTTPException(status_code=400, detail=error_msg)
-        
+
         file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
 
         # 保存文件
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         # 创建文件记录 - 状态为 pending（待处理）
         db_file = FileRecord(filename=file.filename, file_path=file_path, status="pending")
         session.add(db_file)
@@ -109,6 +98,17 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{file_id}", response_model=FileRecord)
+async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
+    """获取单个文件详情"""
+    statement = select(FileRecord).where(FileRecord.id == file_id)
+    result = await session.execute(statement)
+    file = result.scalar_one_or_none()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    return file
 
 
 @router.post("/{file_id}/recognize")

@@ -17,7 +17,8 @@ from services import contract_processor
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
-UPLOAD_DIR = "/Users/binginx/PycharmProjects/vlagent/backend/res/contracts"
+UPLOAD_DIR = os.getenv("CONTRACT_UPLOAD_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "contracts"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

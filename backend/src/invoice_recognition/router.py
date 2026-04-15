@@ -20,7 +20,8 @@ from src.invoice_recognition.service import process_invoice_recognitions
 router = APIRouter(prefix="/invoice_recognition", tags=["Invoice Recognition"])
 
 # 上传目录
-UPLOAD_DIR = os.path.join(os.getcwd(), "downloads", "invoice_uploads")
+UPLOAD_DIR = os.getenv("INVOICE_UPLOAD_DIR",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "invoice"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload", response_model=InvoiceRecognitionResponse)

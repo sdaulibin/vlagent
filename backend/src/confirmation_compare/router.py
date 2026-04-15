@@ -22,7 +22,7 @@ router = APIRouter(prefix="/format-compare", tags=["格式比对"])
 # 上传目录
 UPLOAD_DIR = os.getenv(
     "FORMAT_COMPARE_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "res", "format_compare")
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "upload", "format_compare")
 )
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 

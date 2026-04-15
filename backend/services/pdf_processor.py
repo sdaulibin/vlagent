@@ -4,7 +4,7 @@
 import os
 import json
 import shutil
-from src.config import RES_DIR
+from src.config import UPLOAD_DIR
 from src.json_repair import fix_json
 from .pdf.pdf_utils import split_pdf_to_images, batch_resize_images, resize_image_high_quality
 from .pdf.bank_detector import (
@@ -51,7 +51,7 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     
     # 1. 准备任务目录
     pdf_filename = os.path.splitext(os.path.basename(pdf_path))[0]
-    task_dir = os.path.join(RES_DIR, f"task_{pdf_filename}")
+    task_dir = os.path.join(UPLOAD_DIR, "bank_statement", f"task_{pdf_filename}")
     os.makedirs(task_dir, exist_ok=True)
 
     # 2. 拆分 PDF 为图片
@@ -216,4 +216,4 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
     }
 
 if __name__ == "__main__":
-    process_pdf_to_excel(f"{RES_DIR}/3莱商银行.pdf", 10)
+    process_pdf_to_excel(f"{UPLOAD_DIR}/bank_statement/3莱商银行.pdf", 10)

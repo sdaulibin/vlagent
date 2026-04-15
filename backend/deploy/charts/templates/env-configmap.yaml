@@ -9,7 +9,8 @@ data:
   # 应用基础配置
   # ==============================================================================
   APP_ENV: {{ .Values.envConfig.APP_ENV | default "production" | quote }}
-  RES_DIR: {{ .Values.envConfig.RES_DIR | default "/app/res" | quote }}
+  UPLOAD_DIR: {{ .Values.envConfig.UPLOAD_DIR | default "/app/upload" | quote }}
+  DOWNLOAD_DIR: {{ .Values.envConfig.DOWNLOAD_DIR | default "/app/download" | quote }}
   RECOGNITION_TIMEOUT: {{ .Values.envConfig.RECOGNITION_TIMEOUT | default "1800" | quote }}
 
   # ==============================================================================
