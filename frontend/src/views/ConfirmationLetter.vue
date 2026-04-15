@@ -242,7 +242,7 @@ onMounted(() => {
         <button
           @click="handleStartRecognition"
           :disabled="isRecognizing"
-          class="btn-gradient from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+          class="btn-gradient bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
         >
           <Play class="w-5 h-5" />
           {{ isRecognizing ? '识别中...' : '开始识别 / 重试失败' }}
