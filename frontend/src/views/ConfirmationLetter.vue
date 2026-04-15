@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { FileText, ArrowLeft, Play, Trash2, Upload, RefreshCcw, ExternalLink } from 'lucide-vue-next';
+import { FileText, ArrowLeft, Play, Trash2, Upload, RefreshCcw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
   uploadConfirmationLetter,
@@ -49,6 +49,7 @@ interface ConfirmationLetterItem {
 const router = useRouter();
 const letters = ref<ConfirmationLetterItem[]>([]);
 const selectedLetter = ref<ConfirmationLetterItem | null>(null);
+const previewUrl = ref('');
 const isUploading = ref(false);
 const isRecognizing = ref(false);
 
@@ -85,6 +86,7 @@ const loadLetters = async () => {
 const selectLetter = async (id: number) => {
   try {
     selectedLetter.value = await getConfirmationLetter(id);
+    previewUrl.value = await getConfirmationPreviewUrl(id);
   } catch (e) {
     console.error("加载询证函详情失败", e);
   }
@@ -163,6 +165,7 @@ const handleDelete = async (id: number) => {
     await deleteConfirmationLetter(id);
     if (selectedLetter.value?.id === id) {
       selectedLetter.value = null;
+      previewUrl.value = '';
     }
     await loadLetters();
   } catch (e) {
@@ -172,12 +175,6 @@ const handleDelete = async (id: number) => {
 
 const goBack = () => {
   router.push('/');
-};
-
-const openPreview = async () => {
-  if (!selectedLetter.value) return;
-  const url = await getConfirmationPreviewUrl(selectedLetter.value.id);
-  window.open(url, '_blank');
 };
 
 const getStatusText = (status: string) => {
@@ -244,11 +241,11 @@ onMounted(() => {
         <!-- Start Recognition -->
         <button
           @click="handleStartRecognition"
-          :disabled="isRecognizing || !hasRetryableLetters"
+          :disabled="isRecognizing"
           class="btn-gradient from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
         >
           <Play class="w-5 h-5" />
-          {{ isRecognizing ? '识别中...' : (hasRetryableLetters ? '开始识别/重试失败' : '暂无可识别文件') }}
+          {{ isRecognizing ? '识别中...' : '开始识别 / 重试失败' }}
         </button>
 
         <!-- File List -->
@@ -301,17 +298,19 @@ onMounted(() => {
             <span :class="getStatusClass(selectedLetter.status)">
               {{ getStatusText(selectedLetter.status) }}
             </span>
-            <button
-              @click="openPreview"
-              class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <ExternalLink class="w-4 h-4" />
-              预览原文
-            </button>
           </div>
         </div>
 
         <div v-if="selectedLetter && selectedLetter.recognition" class="p-4 flex-1 overflow-auto">
+          <!-- 原文预览 -->
+          <div v-if="previewUrl" class="border-b border-slate-100 bg-slate-50 mb-4">
+            <div class="p-3">
+              <p class="text-xs font-medium text-slate-500 mb-2">原文预览</p>
+              <div class="rounded-lg overflow-hidden border border-slate-200 bg-white" style="max-height: 400px;">
+                <iframe :src="previewUrl" class="w-full border-0" style="height: 400px;" />
+              </div>
+            </div>
+          </div>
           <!-- Format Check Banner -->
           <div
             class="info-section"

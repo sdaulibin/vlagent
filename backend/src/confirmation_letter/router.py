@@ -127,6 +127,44 @@ async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
     return list(response_map.values())
 
 
+@router.post("/upload")
+async def upload_confirmation_file(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session)
+):
+    """上传询证函文件"""
+    try:
+        # 验证文件格式
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
+
+        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
+
+        # 保存文件
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # 创建文件记录
+        conf_file = ConfirmationFile(filename=file.filename, file_path=file_path)
+        session.add(conf_file)
+        await session.commit()
+        await session.refresh(conf_file)
+
+        return {
+            "status": "success",
+            "file_id": conf_file.id,
+            "filename": file.filename,
+            "message": "询证函上传成功，请点击开始识别"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/{file_id}", response_model=ConfirmationFileDTO)
 async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个询证函详情（文件 + 识别结果）"""
@@ -161,44 +199,6 @@ async def preview_confirmation_file(file_id: int, session: AsyncSession = Depend
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"},
     )
-
-
-@router.post("/upload")
-async def upload_confirmation_file(
-    file: UploadFile = File(...), 
-    session: AsyncSession = Depends(get_session)
-):
-    """上传询证函文件"""
-    try:
-        # 验证文件格式
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
-        
-        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
-        
-        # 保存文件
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # 创建文件记录
-        conf_file = ConfirmationFile(filename=file.filename, file_path=file_path)
-        session.add(conf_file)
-        await session.commit()
-        await session.refresh(conf_file)
-        
-        return {
-            "status": "success",
-            "file_id": conf_file.id,
-            "filename": file.filename,
-            "message": "询证函上传成功，请点击开始识别"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{file_id}/recognize")
