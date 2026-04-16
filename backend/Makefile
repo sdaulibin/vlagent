@@ -103,7 +103,8 @@ ci-prepare:
 		PIP_EXTRA_INDEX_URL="$(PIP_EXTRA_INDEX_URL)" \
 		PIP_TRUSTED_HOST="$(PIP_TRUSTED_HOST)" \
 		UV_INDEX_URL="$(PIP_INDEX_URL)" \
-		UV_EXTRA_INDEX_URL="$(PIP_EXTRA_INDEX_URL)" && \
+		UV_EXTRA_INDEX_URL="$(PIP_EXTRA_INDEX_URL)" \
+		UV_PYTHON_PREFERENCE=only-system && \
 	uv sync --no-dev
 	@echo "🧹 清理 .venv 缓存以减小镜像体积..."
 	@find .venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
