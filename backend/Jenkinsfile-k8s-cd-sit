@@ -54,7 +54,7 @@ pipeline {
         // =====================================================================
         // PyPI 源配置 (内网 Nexus 代理)
         // =====================================================================
-        string(name: 'PIP_INDEX_URL', defaultValue: 'https://nexus.qdb.com/repository/pypi-group/simple/', description: 'PyPI index URL (内网 Nexus)')
+        string(name: 'PIP_INDEX_URL', defaultValue: 'http://nexus.qdb.com/repository/pypi-group/simple/', description: 'PyPI index URL (内网 Nexus)')
         string(name: 'PIP_TRUSTED_HOST', defaultValue: 'nexus.qdb.com', description: 'PyPI trusted host')
 
         // =====================================================================
@@ -107,7 +107,7 @@ pipeline {
                     env.RELEASE_VERSION = "${env.GITLAB_COMMIT_ID}"
                     env.RELEASE_IMAGE = "${env.RELEASE_REGISTRY}/${env.projectName}:${env.RELEASE_VERSION}"
 
-                    def pipIndexUrl = params.PIP_INDEX_URL ?: 'https://nexus.qdb.com/repository/pypi-group/simple/'
+                    def pipIndexUrl = params.PIP_INDEX_URL ?: 'http://nexus.qdb.com/repository/pypi-group/simple/'
                     def pipTrustedHost = params.PIP_TRUSTED_HOST ?: 'nexus.qdb.com'
 
                     echo "环境变量:"
