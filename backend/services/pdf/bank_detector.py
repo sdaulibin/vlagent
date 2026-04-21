@@ -1,6 +1,5 @@
 import os
 import json
-from src.config import MODEL_LOCAL
 from services.core.request_ai import request_qwen35
 
 # 多银行 Schema 目录

@@ -28,7 +28,7 @@ FULL_IMAGE_NAME = $(if $(REGISTRY),$(REGISTRY)/$(IMAGE_NAME):$(TAG),$(IMAGE_NAME
 
 # Python 基础镜像
 PYTHON_BUILDER_IMAGE ?= harbor.devops.qdb.com/star/python:3.13-bullseye-uv
-PYTHON_RUNTIME_IMAGE ?= harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime
+PYTHON_RUNTIME_IMAGE ?= harbor.devops.qdb.com/star/vlagent-backend-runtime:1.0
 
 # 应用端口
 APP_PORT ?= 8000
@@ -104,7 +104,9 @@ ci-prepare:
 		PIP_TRUSTED_HOST="$(PIP_TRUSTED_HOST)" \
 		UV_INDEX_URL="$(PIP_INDEX_URL)" \
 		UV_EXTRA_INDEX_URL="$(PIP_EXTRA_INDEX_URL)" \
-		UV_PYTHON_PREFERENCE=only-system && \
+		UV_PYTHON_PREFERENCE="managed" && \
+	rm -f uv.lock && \
+	uv lock && \
 	uv sync --no-dev
 	@echo "🧹 清理 .venv 缓存以减小镜像体积..."
 	@find .venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

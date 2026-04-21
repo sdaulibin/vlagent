@@ -1,4 +1,4 @@
-ARG PYTHON_RUNTIME_IMAGE=harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime
+ARG PYTHON_RUNTIME_IMAGE=harbor.devops.qdb.com/star/vlagent-backend-runtime:1.0
 
 # 构建时版本参数（通过 Makefile 传入）
 ARG VERSION=0.0.0
@@ -24,22 +24,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 安装 PDF 处理所需的系统依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    poppler-utils \
-    ghostscript \
-    libgl1 \
-    libglib2.0-0 \
-    curl \
-    tini \
-    && rm -rf /var/lib/apt/lists/*
-
-# 创建非 root 用户运行应用（安全最佳实践）
+# 创建非 root 用户运行应用
 RUN groupadd --gid 1000 appgroup && \
     useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser
 
 # 从 Jenkins Agent 构建好的产物中复制虚拟环境（已在 ci-prepare 阶段生成并清理）
 COPY .venv /app/.venv
+
+# 复制应用源代码
+COPY main.py api.py /app/
+COPY src /app/src
+COPY config /app/config
+COPY lib /app/lib
+COPY services /app/services
+COPY scripts /app/scripts
 
 # 修复 .venv 内的 Python 软链接（Jenkins Agent 里的路径在 Runtime 镜像中不存在）
 RUN REAL_PYTHON=$(which python3) && \

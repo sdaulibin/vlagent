@@ -4,21 +4,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "vlagent.fullname" . }}-server
+  name: {{ include "vlagent-backend.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "vlagent.labels" . | nindent 4 }}
+    {{- include "vlagent-backend.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
 spec:
   replicas: {{ .Values.server.replicaCount }}
   selector:
     matchLabels:
-      {{- include "vlagent.selectorLabels" . | nindent 6 }}
+      {{- include "vlagent-backend.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        {{- include "vlagent.labels" . | nindent 8 }}
+        {{- include "vlagent-backend.labels" . | nindent 8 }}
         app.kubernetes.io/component: server
       annotations:
         {{- with .Values.podAnnotations }}
@@ -62,7 +62,7 @@ spec:
             - name: {{ $key }}
               valueFrom:
                 configMapKeyRef:
-                  name: {{ include "vlagent.fullname" $ }}-env
+                  name: {{ include "vlagent-backend.fullname" $ }}-env
                   key: {{ $key }}
             {{- end }}
             {{- end }}
@@ -72,7 +72,7 @@ spec:
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "vlagent.fullname" $ }}-secret
+                  name: {{ include "vlagent-backend.fullname" $ }}-secret
                   key: {{ $key }}
             {{- end }}
             {{- end }}
@@ -117,19 +117,17 @@ spec:
             {{- end }}
       volumes:
         - name: upload
-          hostPath:
-            path: /data/vlagent/upload
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: {{ include "vlagent-backend.fullname" . }}-upload
         - name: download
-          hostPath:
-            path: /data/vlagent/download
-            type: DirectoryOrCreate
+          persistentVolumeClaim:
+            claimName: {{ include "vlagent-backend.fullname" . }}-download
         - name: tz-volume
           hostPath:
             path: /etc/localtime
         - name: timezone
           configMap:
-            name: timezone-config-vlagent
+            name: timezone-config-vlagent-backend
             items:
             - key: timezone
               path: timezone
@@ -148,15 +146,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "vlagent.fullname" . }}-server
+  name: {{ include "vlagent-backend.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "vlagent.labels" . | nindent 4 }}
+    {{- include "vlagent-backend.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
 spec:
   type: {{ .Values.server.service.type }}
   selector:
-    {{- include "vlagent.selectorLabels" . | nindent 4 }}
+    {{- include "vlagent-backend.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: server
   ports:
     {{- range $value := .Values.server.service.ports }}

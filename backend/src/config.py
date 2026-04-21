@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     """应用配置"""
     
     # AI Model Configuration (Qwen VL - 视觉模型)
-    OPENAI_KEY: str = Field(..., description="Required. Read from environment variable OPENAI_KEY")
-    OPENAI_URL: str = "http://10.1.82.113:30208/v1"
-    MODEL_LOCAL: str = "d3vcf7gre7tl90toeog0"
+    # OPENAI_KEY: str = Field(..., description="Required. Read from environment variable OPENAI_KEY")
+    # OPENAI_URL: str = "http://10.1.82.113:30208/v1"
+    # MODEL_LOCAL: str = "d3vcf7gre7tl90toeog0"
     
     # AI Model Configuration (Qwen3.5 - 纯文本模型)
     QWEN35_KEY: str = Field(default="", description="Qwen3.5 API Key")
@@ -51,9 +51,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 向后兼容的模块级变量 (Qwen VL)
-OPENAI_KEY = settings.OPENAI_KEY
-OPENAI_URL = settings.OPENAI_URL
-MODEL_LOCAL = settings.MODEL_LOCAL
+# OPENAI_KEY = settings.OPENAI_KEY
+# OPENAI_URL = settings.OPENAI_URL
+# MODEL_LOCAL = settings.MODEL_LOCAL
 
 # Qwen3.5 纯文本模型
 QWEN35_KEY = settings.QWEN35_KEY

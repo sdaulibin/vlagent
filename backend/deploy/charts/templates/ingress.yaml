@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "vlagent.fullname" . }}-server
+  name: {{ .Values.server.ingress.name | default (include "vlagent-backend.fullname" .) }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "vlagent.labels" . | nindent 4 }}
+    {{- include "vlagent-backend.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
   annotations:
     {{- if .Values.server.ingress.annotations }}
@@ -23,7 +23,7 @@ spec:
             pathType: {{ .pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ $.Values.fullnameOverride }}-server
+                name: {{ .serviceName | default $.Values.fullnameOverride }}
                 port:
                   name: {{ .servicePortName }}
           {{- end }}

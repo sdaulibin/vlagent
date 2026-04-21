@@ -81,8 +81,8 @@ export function isAuthenticated(): boolean {
 async function fetchDevToken(): Promise<string | null> {
   try {
     const baseUrl = import.meta.env.VITE_API_BASE_URL
-      ? import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, "")
-      : "http://localhost:8000";
+      ? import.meta.env.VITE_API_BASE_URL
+      : "http://localhost:8000/api";
     const res = await fetch(`${baseUrl}/dev-token`, { method: "POST" });
     if (!res.ok) return null;
     const data = await res.json();

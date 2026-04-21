@@ -12,7 +12,6 @@ from typing import Any, List
 
 from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
-from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.invoice_recognition.models import InvoiceFile, InvoiceResult

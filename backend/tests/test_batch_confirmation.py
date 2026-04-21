@@ -18,7 +18,6 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 from src.confirmation_letter.service import (
     FIELD_EXTRACTION_PROMPT,

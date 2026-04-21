@@ -1,8 +1,7 @@
 import os
 import json
 import concurrent.futures
-from src.config import MODEL_LOCAL
-from services.core.request_ai import request_stream, request_qwen35
+from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 
 # Schema 配置文件路径

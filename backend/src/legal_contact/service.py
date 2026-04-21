@@ -11,7 +11,6 @@ from typing import Any
 
 from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
-from src.config import MODEL_LOCAL
 from src.json_repair import fix_json
 
 # 字段提取提示词

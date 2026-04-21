@@ -71,7 +71,7 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/dev-token")
+@app.post("/api/dev-token")
 async def dev_token():
     """开发模式：生成测试用 JWT token（无需认证）"""
     now = time.time()

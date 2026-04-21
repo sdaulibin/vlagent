@@ -15,7 +15,7 @@ import os
 import json
 from pathlib import Path
 from pdf2image import convert_from_path
-from src.config import MODEL_LOCAL, UPLOAD_DIR, DOWNLOAD_DIR
+from src.config import UPLOAD_DIR, DOWNLOAD_DIR
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 from services.pdf_processor import load_schema

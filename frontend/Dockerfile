@@ -2,20 +2,23 @@
 FROM harbor.devops.qdb.com/devops/node:lts-bullseye as builder
 WORKDIR /app
 ARG NPM_REGISTRY
-
+ARG RELEASE_VERSION
+ARG ENV_CONFIG
 COPY . .
-
 RUN npm config set fetch-timeout 600000 && \
     npm config set registry ${NPM_REGISTRY} && \
-    npm install && \
-    npm run build:docker
+    npm install --loglevel verbose || (cat /root/.npm/_logs/*.log && exit 1)
+RUN RELEASE_VERSION=${RELEASE_VERSION} npm run ${ENV_CONFIG}
 
-# 第二阶段：nginx 静态服务
-FROM nginx:alpine
+# 第二阶段：配置OpenResty
+FROM harbor.devops.qdb.com/devops/openresty:1.17.8.2-lua-4
+# 复制前端构建产物
+COPY --from=builder /app/dist /usr/local/openresty/nginx/html/
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 复制 Nginx 配置
+# RUN mkdir -p /usr/local/openresty/nginx/conf/conf.d
+# COPY nginx.conf /usr/local/openresty/nginx/conf/conf.d/default.conf
 
 EXPOSE 8001
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/usr/local/openresty/bin/openresty", "-g", "daemon off;"]

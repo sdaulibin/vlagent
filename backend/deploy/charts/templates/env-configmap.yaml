@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "vlagent.fullname" . }}-env
+  name: {{ include "vlagent-backend.fullname" . }}-env
   namespace: {{ .Release.Namespace }}
 data:
   # ==============================================================================
@@ -16,8 +16,8 @@ data:
   # ==============================================================================
   # AI 模型配置 (Qwen VL - 视觉模型)
   # ==============================================================================
-  OPENAI_URL: {{ .Values.envConfig.OPENAI_URL | default "" | quote }}
-  MODEL_LOCAL: {{ .Values.envConfig.MODEL_LOCAL | default "" | quote }}
+  # OPENAI_URL: {{ .Values.envConfig.OPENAI_URL | default "" | quote }}
+  # MODEL_LOCAL: {{ .Values.envConfig.MODEL_LOCAL | default "" | quote }}
 
   # ==============================================================================
   # AI 模型配置 (Qwen3.5 - 纯文本模型)

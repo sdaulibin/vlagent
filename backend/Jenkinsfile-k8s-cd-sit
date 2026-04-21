@@ -26,22 +26,22 @@ pipeline {
         // =====================================================================
         // Git & Harbor 配置
         // =====================================================================
-        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vlagent/vlagent.git', description: 'Git repository URL')
-        string(name: 'projectName', defaultValue: 'vlagent', description: 'project name')
-        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/star/vlagent-backend.git', description: 'Git repository URL')
+        string(name: 'projectName', defaultValue: 'vlagent-backend', description: 'project name')
+        string(name: 'groupName', defaultValue: 'star', description: 'Git group name, Need full path include sub group')
         string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
         string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
         string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url')
-        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'star', description: 'harbor project name')
 
         // =====================================================================
         // K8s 部署配置
         // =====================================================================
         choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
         string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
-        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
-        string(name: 'HELM_NS', defaultValue: 'vl-flow-sit', description: 'k8s namespace')
-        string(name: 'ingress', defaultValue: 'nginx-vl-flow-sit', description: 'ingress class name')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vlagent-backend', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vlagent-backend-sit', description: 'k8s namespace')
+        string(name: 'ingress', defaultValue: 'nginx-vlagent-backend-sit', description: 'ingress class name')
         string(name: 'serverReplicas', defaultValue: '1', description: 'Server replica count')
         string(name: 'ingressHost', defaultValue: 'vlagent.devops.qdb.com', description: 'ingress host')
 
@@ -61,15 +61,16 @@ pipeline {
         // 应用配置 (ConfigMap - 非敏感)
         // =====================================================================
         string(name: 'APP_ENV', defaultValue: 'sit', description: 'Application environment')
-        string(name: 'OPENAI_URL', defaultValue: 'http://10.1.82.113:30208/v1', description: 'AI 模型 API URL')
-        string(name: 'MODEL_LOCAL', defaultValue: 'd3vcf7gre7tl90toeog0', description: '本地模型 ID')
         string(name: 'QWEN35_URL', defaultValue: 'http://10.1.84.77/v1', description: 'Qwen3.5 API URL')
         string(name: 'QWEN35_MODEL', defaultValue: 'llm_xindai_01', description: 'Qwen3.5 模型名称')
+        string(name: 'QWEN35_KEY', defaultValue: '72cf9079-f206-40f0-bd33-3957099a571c', description: 'Qwen3.5 API Key')
         string(name: 'RECOGNITION_TIMEOUT', defaultValue: '1800', description: '识别超时时间(秒)')
         string(name: 'ECM_ENABLED', defaultValue: 'false', description: '是否启用影像平台')
         string(name: 'ECM_CACHE_IP', defaultValue: '', description: '影像平台缓存IP')
         string(name: 'ECM_CACHE_PORT', defaultValue: '8022', description: '影像平台缓存端口')
         string(name: 'JWT_ALGORITHM', defaultValue: 'HS256', description: 'JWT 算法')
+        string(name: 'JWT_SECRET', defaultValue: 'ioa', description: 'JWT 密钥')
+        string(name: 'DATABASE_URL', defaultValue: 'postgresql+asyncpg://postgres:123456@localhost/vlagent', description: '数据库 URL')
     }
     stages {
 
@@ -137,8 +138,6 @@ pipeline {
                         --set server.ingress.hosts[0].host=${env.ingressHost} \
                         --set server.replicaCount=${env.serverReplicas} \
                         --set envConfig.APP_ENV="${env.APP_ENV}" \
-                        --set envConfig.OPENAI_URL="${env.OPENAI_URL}" \
-                        --set envConfig.MODEL_LOCAL="${env.MODEL_LOCAL}" \
                         --set envConfig.QWEN35_URL="${env.QWEN35_URL}" \
                         --set envConfig.QWEN35_MODEL="${env.QWEN35_MODEL}" \
                         --set envConfig.RECOGNITION_TIMEOUT="${env.RECOGNITION_TIMEOUT}" \
@@ -148,7 +147,6 @@ pipeline {
                         --set envConfig.JWT_ALGORITHM="${env.JWT_ALGORITHM}" \
                         --set secret.enabled=true \
                         --set secret.DATABASE_URL="${env.DATABASE_URL}" \
-                        --set secret.OPENAI_KEY="${env.OPENAI_KEY}" \
                         --set secret.QWEN35_KEY="${env.QWEN35_KEY}" \
                         --set secret.JWT_SECRET="${env.JWT_SECRET}" \
                         --set secret.ECM_PASSWORD="${env.ECM_PASSWORD}"
@@ -181,5 +179,4 @@ pipeline {
             }
         }
     }
-
 }

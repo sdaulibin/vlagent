@@ -103,7 +103,6 @@ def process_pdf_to_excel(pdf_path, max_workers=4):
                 # 先检查页脚是否包含"第1页"或"第 1 页"
                 # 使用简单的提示词检测页码
                 from .pdf.data_extractor import request_qwen35
-                from src.config import MODEL_LOCAL
                 
                 page_check_prompt = """
                 Check if this page's footer contains "第1页" or "第 1 页" (meaning "Page 1").

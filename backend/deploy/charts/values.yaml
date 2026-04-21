@@ -3,14 +3,14 @@
 # ==============================================================================
 
 image:
-  repository: harbor.devops.qdb.com/vl-flow/vlagent
+  repository: harbor.devops.qdb.com/star/vlagent-backend
   pullPolicy: IfNotPresent
   # tag 必须通过 --set 显式指定，不允许使用 latest
   tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
-fullnameOverride: "vlagent"
+fullnameOverride: "vlagent-backend"
 
 # Pod 级别安全上下文
 # 注意: uid=1000 (appuser) 和 gid=1000 (appgroup) 已在 Dockerfile 中创建
@@ -55,6 +55,7 @@ server:
 
   ingress:
     enabled: true
+    name: "vlagent"
     className: "nginx"
     annotations:
       nginx.ingress.kubernetes.io/real-ip-header: X-Forwarded-For
@@ -72,10 +73,14 @@ server:
       nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"
       nginx.ingress.kubernetes.io/proxy-transfer-encoding: "true"
     hosts:
-      - host: vlagent.devops.qdb.com
+      - host: vlagent.sit.qdb.com
         paths:
+          - path: /api
+            pathType: Prefix
+            servicePortName: http
           - path: /
             pathType: Prefix
+            serviceName: vlagent-frontend
             servicePortName: http
     tls: []
 
@@ -141,8 +146,8 @@ envConfig:
   UPLOAD_DIR: "/app/upload"
   DOWNLOAD_DIR: "/app/download"
   RECOGNITION_TIMEOUT: "1800"
-  OPENAI_URL: "http://10.1.82.113:30208/v1"
-  MODEL_LOCAL: "d3vcf7gre7tl90toeog0"
+  # OPENAI_URL: "http://10.1.82.113:30208/v1"
+  # MODEL_LOCAL: "d3vcf7gre7tl90toeog0"
   QWEN35_URL: "http://10.1.84.77/v1"
   QWEN35_MODEL: "llm_xindai_01"
   DATABASE_ECHO: "false"
@@ -160,10 +165,17 @@ envConfig:
 secret:
   enabled: true
   DATABASE_URL: ""
-  OPENAI_KEY: ""
   QWEN35_KEY: ""
   JWT_SECRET: ""
   ECM_PASSWORD: ""
 
 # 额外的环境变量 (可选)
 envs: []
+
+# 持久化存储 (PVC)
+persistence:
+  enabled: true
+  storageClass: "nfs-client"        # 留空使用集群默认 StorageClass
+  accessMode: ReadWriteOnce
+  uploadSize: 10Gi
+  downloadSize: 10Gi

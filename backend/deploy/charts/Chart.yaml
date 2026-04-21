@@ -1,6 +1,6 @@
 apiVersion: v2
-name: vlagent
-description: 智能文档识别平台 - 基于 AI 大模型的智能文档信息提取服务
+name: vlagent-backend
+description: 智能文档识别平台 - 基于AI大模型的智能文档信息提取服务
 
 type: application
 

@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "vlagent-front.fullname" . }}
+  name: {{ include "vlagent-frontend.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "vlagent-front.labels" . | nindent 4 }}
+    {{- include "vlagent-frontend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "vlagent-front.selectorLabels" . | nindent 6 }}
+      {{- include "vlagent-frontend.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      name: {{ include "vlagent-front.fullname" . }}
+      name: {{ include "vlagent-frontend.fullname" . }}
       labels:
-        {{- include "vlagent-front.labels" . | nindent 8 }}
+        {{- include "vlagent-frontend.labels" . | nindent 8 }}
     spec:
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
           - labelSelector:
               matchLabels:
-                {{- include "vlagent-front.selectorLabels" . | nindent 16 }}
+                {{- include "vlagent-frontend.selectorLabels" . | nindent 16 }}
             topologyKey: "kubernetes.io/hostname"
       dnsPolicy: ClusterFirstWithHostNet
       {{- if .Values.hostNetwork }}
@@ -52,7 +52,7 @@ spec:
       {{- end }}
 
       containers:
-        - name: {{ include "vlagent-front.fullname" . }}
+        - name: {{ include "vlagent-frontend.fullname" . }}
           command: {{ toYaml .Values.command | nindent 12 }}
           {{- if and .Values.args (not (empty .Values.args)) }}
           args: {{ toYaml .Values.args | nindent 12 }}
@@ -88,7 +88,7 @@ spec:
             path: /etc/localtime
         - name: timezone
           configMap:
-            name: timezone-config-vlagent-front
+            name: timezone-config-vlagent-frontend
             items:
             - key: timezone
               path: timezone
@@ -109,14 +109,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "vlagent-front.fullname" . }}
+  name: {{ include "vlagent-frontend.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "vlagent-front.labels" . | nindent 4 }}
+    {{- include "vlagent-frontend.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type}}
   selector:
-    {{- include "vlagent-front.selectorLabels" . | nindent 4 }}
+    {{- include "vlagent-frontend.selectorLabels" . | nindent 4 }}
   ports:
     {{- range $value := .Values.service.port }}
     - name: {{ $value.name }}

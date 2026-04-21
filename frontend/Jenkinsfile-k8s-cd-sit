@@ -23,18 +23,18 @@ pipeline {
 
     // 构建参数
     parameters {
-        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/vl-flow/vl_flow.git', description: 'Git repository URL')
+        string(name: 'srcUrl', defaultValue: 'http://gitlab.qdccb.cn/star/vlagent-frontend.git', description: 'Git repository URL')
         string(name: 'projectName', defaultValue: 'vlagent-front', description: 'project name')
-        string(name: 'groupName', defaultValue: 'vl-flow', description: 'Git group name, Need full path include sub group')
+        string(name: 'groupName', defaultValue: 'star', description: 'Git group name, Need full path include sub group')
         string(name: 'scmUrl', defaultValue: 'gitlab.qdccb.cn', description: 'Git URL')
         string(name: 'gitlabTokenByUserPassword', defaultValue: '', description: 'gitlab credential')
         string(name: 'HARBOR_URL', defaultValue: 'harbor.devops.qdb.com', description: 'harbor url')
-        string(name: 'HARBOR_PROJECT', defaultValue: 'vl-flow', description: 'harbor project name')
+        string(name: 'HARBOR_PROJECT', defaultValue: 'vlagent-frontend', description: 'harbor project name')
         choice(choices: ['false', 'true'], description: '是否指定机器部署', name: 'SPECIFY_NODE')
         string(name: 'DESTINATION_KEY', defaultValue: 'qdccb.cn/role', description: '要部署的目标机器')
-        string(name: 'DESTINATION_VALUE', defaultValue: 'vl-flow', description: '要部署的目标机器')
-        string(name: 'HELM_NS', defaultValue: 'vl-flow-sit', description: 'k8s namespace')
-        string(name: 'ingress', defaultValue: 'nginx-vl-flow-sit', description: 'ingress class name')
+        string(name: 'DESTINATION_VALUE', defaultValue: 'vlagent-frontend', description: '要部署的目标机器')
+        string(name: 'HELM_NS', defaultValue: 'vlagent-frontend-sit', description: 'k8s namespace')
+        string(name: 'ingress', defaultValue: 'nginx-vlagent-frontend-sit', description: 'ingress class name')
         string(name: 'replicas', defaultValue: '1', description: 'replica count')
         string(name: 'ingressHost', defaultValue: 'vlagent.devops.qdb.com', description: 'ingress host')
         string(name: 'NPM_REGISTRY', defaultValue: 'http://10.238.145.145:4873/', description: 'npm registry proxy')
@@ -95,6 +95,7 @@ pipeline {
         stage('Helm Deploy Application') {
             steps {
                 script {
+                    sh "kubectl delete configmap vlagent-frontend-config -n ${env.HELM_NS} --ignore-not-found=true --kubeconfig /etc/kubeconfig || true"
                     def node_selected = env.SPECIFY_NODE
                     if(node_selected == 'true') {
                         sh """

@@ -6,7 +6,6 @@
 2. 银行流水验证 - 使用 AI 判断文档是否为银行流水
 """
 import json
-from src.config import MODEL_LOCAL
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
 
