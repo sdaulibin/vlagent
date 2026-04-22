@@ -4,7 +4,7 @@ from src.auth import verify_token, get_current_user_info
 
 from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
-from src.contracts.router import router as contracts_router
+from src.documents.router import router as documents_router
 from src.confirmation_letter.router import router as confirmation_router
 from src.confirmation_compare.router import router as format_compare_router
 from src.invoice_recognition.router import router as invoice_router
@@ -21,8 +21,8 @@ api_router.include_router(files_router)
 # 交易记录
 api_router.include_router(transactions_router)
 
-# 合同比对
-api_router.include_router(contracts_router)
+# 文档比对
+api_router.include_router(documents_router)
 
 # 询证函识别（独立模块）
 api_router.include_router(confirmation_router)

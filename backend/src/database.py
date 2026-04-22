@@ -33,7 +33,7 @@ async def init_db():
         CgbSummary, CgbTransaction,
         PsbcSummary, PsbcTransaction,
     )
-    from src.contracts.models import CompareTask, DiffRecord
+    from src.documents.models import DocumentCompareTask, DocumentPageDiff
     from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult
     from src.confirmation_compare.models import FormatCompareTask
     from src.invoice_recognition.models import InvoiceFile, InvoiceResult

@@ -82,39 +82,38 @@ export const exportExcel = async (fileId: number, filename: string) => {
   window.URL.revokeObjectURL(url);
 };
 
-// ===== 合同比对 API =====
+// ===== 文档比对 API =====
 
-export const compareContracts = async (fileA: File, fileB: File) => {
+export const compareDocuments = async (fileA: File, fileB: File) => {
   const formData = new FormData();
   formData.append("file_a", fileA);
   formData.append("file_b", fileB);
-  const response = await api.post("/contracts/compare", formData);
+  const response = await api.post("/documents/compare", formData);
   return response.data;
 };
 
-export const getCompareTasks = async () => {
-  const response = await api.post("/contracts");
+export const getDocumentTasks = async () => {
+  const response = await api.post("/documents/list");
   return response.data;
 };
 
-export const getCompareTask = async (taskId: number) => {
-  const response = await api.post(`/contracts/${taskId}`);
+export const getDocumentTask = async (taskId: number) => {
+  const response = await api.post(`/documents/list/${taskId}`);
   return response.data;
 };
 
-export const getTaskDiffs = async (taskId: number) => {
-  const response = await api.post(`/contracts/${taskId}/diffs`);
+export const getDocumentTaskStatus = async (taskId: number) => {
+  const response = await api.post(`/documents/${taskId}/status`);
   return response.data;
 };
 
-export const deleteCompareTask = async (taskId: number) => {
-  const response = await api.delete(`/contracts/${taskId}`);
+export const deleteDocumentTask = async (taskId: number) => {
+  const response = await api.delete(`/documents/${taskId}`);
   return response.data;
 };
 
-// 获取文件预览 blob URL
-export const getFilePreviewUrl = (taskId: number, docType: "a" | "b") =>
-  fetchFileAsBlobUrl(`/contracts/${taskId}/file/${docType}`);
+export const getDocumentFileUrl = (taskId: number, docType: "a" | "b") =>
+  fetchFileAsBlobUrl(`/documents/${taskId}/file/${docType}`);
 
 // ===== 询证函识别 API =====
 

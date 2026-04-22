@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
 import BankStatement from '../views/BankStatement.vue'
-import ContractCompare from '../views/ContractCompare.vue'
+import DocumentCompare from '../views/DocumentCompare.vue'
 import ConfirmationLetter from '../views/ConfirmationLetter.vue'
 import FormatCompare from '../views/FormatCompare.vue'
 import InvoiceRecognition from '../views/InvoiceRecognition.vue'
@@ -29,8 +29,12 @@ const routes = [
     },
     {
         path: '/contract-compare',
-        name: 'ContractCompare',
-        component: ContractCompare
+        redirect: '/document-compare'
+    },
+    {
+        path: '/document-compare',
+        name: 'DocumentCompare',
+        component: DocumentCompare
     },
     {
         path: '/confirmation-letter',

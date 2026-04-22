@@ -44,14 +44,14 @@
                     </div>
                 </router-link>
 
-                <!-- 合同比对 -->
-                <router-link to="/contract-compare" class="scenario-card group">
+                <!-- 文档比对 -->
+                <router-link to="/document-compare" class="scenario-card group">
                     <div class="scenario-card-icon icon-gradient-orange">
                         <FileDiff class="w-8 h-8 text-white" />
                     </div>
-                    <h3 class="scenario-card-title">合同比对</h3>
+                    <h3 class="scenario-card-title">文档比对</h3>
                     <p class="scenario-card-desc">
-                        智能对比两份文档差异，自动识别新增、删除、修改的内容
+                        智能对比两份文档差异，逐页标注新增、删除、修改的内容
                     </p>
                     <div class="scenario-card-link group-hover:text-orange-300">
                         立即使用
