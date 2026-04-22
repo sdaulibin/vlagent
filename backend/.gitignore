@@ -47,3 +47,4 @@ download/
 .AppleDouble
 .LSOverride
 ._*
+uv.lock
