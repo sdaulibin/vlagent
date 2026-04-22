@@ -56,6 +56,83 @@ async def get_compare_tasks(session: AsyncSession = Depends(get_session)):
     return result.scalars().all()
 
 
+@router.post("/compare")
+async def compare_contracts(
+    file_a: UploadFile = File(...),
+    file_b: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session)
+):
+    """上传两份文档并进行比对"""
+    try:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        file_a_path = _build_safe_upload_path(UPLOAD_DIR, file_a.filename, prefix="a_")
+        file_b_path = _build_safe_upload_path(UPLOAD_DIR, file_b.filename, prefix="b_")
+
+        with open(file_a_path, "wb") as buffer:
+            shutil.copyfileobj(file_a.file, buffer)
+
+        with open(file_b_path, "wb") as buffer:
+            shutil.copyfileobj(file_b.file, buffer)
+
+        task = CompareTask(
+            file_a_name=file_a.filename,
+            file_a_path=file_a_path,
+            file_b_name=file_b.filename,
+            file_b_path=file_b_path,
+            status="processing"
+        )
+        session.add(task)
+        await session.commit()
+        await session.refresh(task)
+
+        try:
+            result_data = await run_in_threadpool(
+                contract_processor.compare_documents_with_content,
+                file_a_path,
+                file_b_path,
+            )
+
+            content_a = result_data.get("content_a", "")
+            content_b = result_data.get("content_b", "")
+            diffs = result_data.get("diffs", [])
+
+            task.content_a = content_a
+            task.content_b = content_b
+
+            for diff_data in diffs:
+                diff = DiffRecord(
+                    task_id=task.id,
+                    diff_type=diff_data.get("type", "modified"),
+                    original_text=diff_data.get("original", ""),
+                    comparison_text=diff_data.get("comparison", ""),
+                    location=diff_data.get("location", "")
+                )
+                session.add(diff)
+
+            task.status = "done"
+            await session.commit()
+
+            return {
+                "status": "success",
+                "task_id": task.id,
+                "diff_count": len(diffs),
+                "content_a": content_a,
+                "content_b": content_b
+            }
+
+        except Exception as e_compare:
+            task.status = "failed"
+            task.error_msg = str(e_compare)
+            await session.commit()
+            raise e_compare
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/{task_id}", response_model=CompareTask)
 async def get_compare_task(task_id: int, session: AsyncSession = Depends(get_session)):
     """获取单个比对任务详情"""
@@ -84,10 +161,10 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
     statement = select(CompareTask).where(CompareTask.id == task_id)
     result = await session.execute(statement)
     task = result.scalar_one_or_none()
-    
+
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     if doc_type == 'a':
         file_path = task.file_a_path
         filename = task.file_a_name
@@ -96,15 +173,13 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
         filename = task.file_b_name
     else:
         raise HTTPException(status_code=400, detail="doc_type must be 'a' or 'b'")
-    
+
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
-    
-    # 获取文件扩展名和 MIME 类型
+
     ext = os.path.splitext(filename)[1].lower()
     media_type = MIME_TYPES.get(ext, 'application/octet-stream')
-    
-    # URL 编码文件名以处理中文字符
+
     encoded_filename = quote(filename)
 
     return FileResponse(
@@ -114,88 +189,6 @@ async def get_task_file(task_id: int, doc_type: str, session: AsyncSession = Dep
             "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"
         }
     )
-
-@router.post("/compare")
-async def compare_contracts(
-    file_a: UploadFile = File(...),
-    file_b: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session)
-):
-    """上传两份文档并进行比对"""
-    try:
-        # 确保目录存在
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        
-        # 保存文件
-        file_a_path = _build_safe_upload_path(UPLOAD_DIR, file_a.filename, prefix="a_")
-        file_b_path = _build_safe_upload_path(UPLOAD_DIR, file_b.filename, prefix="b_")
-        
-        with open(file_a_path, "wb") as buffer:
-            shutil.copyfileobj(file_a.file, buffer)
-        
-        with open(file_b_path, "wb") as buffer:
-            shutil.copyfileobj(file_b.file, buffer)
-        
-        # 创建比对任务
-        task = CompareTask(
-            file_a_name=file_a.filename,
-            file_a_path=file_a_path,
-            file_b_name=file_b.filename,
-            file_b_path=file_b_path,
-            status="processing"
-        )
-        session.add(task)
-        await session.commit()
-        await session.refresh(task)
-        
-        try:
-            # 执行比对并获取内容
-            result_data = await run_in_threadpool(
-                contract_processor.compare_documents_with_content,
-                file_a_path,
-                file_b_path,
-            )
-            
-            content_a = result_data.get("content_a", "")
-            content_b = result_data.get("content_b", "")
-            diffs = result_data.get("diffs", [])
-            
-            # 更新任务内容
-            task.content_a = content_a
-            task.content_b = content_b
-            
-            # 保存差异记录
-            for diff_data in diffs:
-                diff = DiffRecord(
-                    task_id=task.id,
-                    diff_type=diff_data.get("type", "modified"),
-                    original_text=diff_data.get("original", ""),
-                    comparison_text=diff_data.get("comparison", ""),
-                    location=diff_data.get("location", "")
-                )
-                session.add(diff)
-            
-            task.status = "done"
-            await session.commit()
-            
-            return {
-                "status": "success",
-                "task_id": task.id,
-                "diff_count": len(diffs),
-                "content_a": content_a,
-                "content_b": content_b
-            }
-            
-        except Exception as e_compare:
-            task.status = "failed"
-            task.error_msg = str(e_compare)
-            await session.commit()
-            raise e_compare
-    
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{task_id}")
