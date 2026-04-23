@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
+import { computed, ref, shallowRef, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-vue-next';
-import DiffTextView from './DiffTextView.vue';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PageDiff {
   id: number;
@@ -10,10 +13,13 @@ interface PageDiff {
   diff_type: string;
   text_a: string | null;
   text_b: string | null;
+  html_a: string | null;
+  html_b: string | null;
   diff_ops_json: string | null;
 }
 
 interface Props {
+  taskId: number;
   fileAName: string;
   fileBName: string;
   fileAPageCount: number | null;
@@ -25,16 +31,30 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const emit = defineEmits<{
-  (e: 'back'): void;
-}>();
+const emit = defineEmits<{ (e: 'back'): void }>();
 
 const currentPageIndex = ref(0);
 const filter = ref('all');
-const syncScroll = ref(true);
-const docContentA = ref<HTMLDivElement | null>(null);
-const docContentB = ref<HTMLDivElement | null>(null);
+const pdfLoading = ref(false);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pdfDocA = shallowRef<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pdfDocB = shallowRef<any>(null);
+
+const containerA = ref<HTMLDivElement | null>(null);
+const containerB = ref<HTMLDivElement | null>(null);
+const canvasA = ref<HTMLCanvasElement | null>(null);
+const canvasB = ref<HTMLCanvasElement | null>(null);
+const highlightA = ref<HTMLDivElement | null>(null);
+const highlightB = ref<HTMLDivElement | null>(null);
+const docHtmlA = ref<HTMLDivElement | null>(null);
+const docHtmlB = ref<HTMLDivElement | null>(null);
+
+const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+const isPdfA = computed(() => props.fileAName.toLowerCase().endsWith('.pdf'));
+const isPdfB = computed(() => props.fileBName.toLowerCase().endsWith('.pdf'));
 
 const filteredPages = computed(() => {
   if (filter.value === 'all') return props.pages;
@@ -64,6 +84,344 @@ const goToPage = (index: number) => {
   currentPageIndex.value = index;
 };
 
+// ---- PDF loading ----
+
+async function loadPdfs() {
+  if (!isPdfA.value && !isPdfB.value) return;
+  pdfLoading.value = true;
+
+  const promises: Promise<void>[] = [];
+
+  if (isPdfA.value) {
+    promises.push(
+      pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/a`).promise
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((doc: any) => { pdfDocA.value = doc; })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .catch((e: any) => console.error('Failed to load PDF A:', e))
+    );
+  }
+  if (isPdfB.value) {
+    promises.push(
+      pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/b`).promise
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((doc: any) => { pdfDocB.value = doc; })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .catch((e: any) => console.error('Failed to load PDF B:', e))
+    );
+  }
+
+  await Promise.all(promises);
+  pdfLoading.value = false;
+}
+
+// ---- PDF page rendering with highlight ----
+
+interface TextItem {
+  str: string;
+  transform: number[];
+  width: number;
+  itemIdx: number;
+}
+
+async function renderPdfPage(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pdfDoc: any,
+  pageNum: number,
+  canvasEl: HTMLCanvasElement,
+  highlightEl: HTMLDivElement,
+  containerEl: HTMLDivElement,
+  diffOps: { op: number; text: string }[],
+  side: 'a' | 'b'
+) {
+  const page = await pdfDoc.getPage(pageNum);
+  const baseViewport = page.getViewport({ scale: 1 });
+  const containerWidth = containerEl.clientWidth - 32;
+  const scale = containerWidth / baseViewport.width;
+  const viewport = page.getViewport({ scale });
+
+  // HiDPI canvas
+  const dpr = window.devicePixelRatio || 1;
+  canvasEl.width = Math.floor(viewport.width * dpr);
+  canvasEl.height = Math.floor(viewport.height * dpr);
+  canvasEl.style.width = `${Math.floor(viewport.width)}px`;
+  canvasEl.style.height = `${Math.floor(viewport.height)}px`;
+
+  const ctx = canvasEl.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Clear highlight layer
+  highlightEl.innerHTML = '';
+  highlightEl.style.width = `${viewport.width}px`;
+  highlightEl.style.height = `${viewport.height}px`;
+
+  // Get text content items with positions
+  const textContent = await page.getTextContent();
+  const allItems: { str: string; transform: number[]; width: number }[] = [];
+  for (let i = 0; i < textContent.items.length; i++) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = textContent.items[i] as any;
+    if (raw.str && raw.str.trim()) {
+      allItems.push({ str: raw.str, transform: raw.transform, width: raw.width });
+    }
+  }
+
+  const targetOp = side === 'a' ? -1 : 1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const segments = (diffOps as any[]).filter(d => d.op === targetOp && d.text && d.text.trim());
+
+  if (allItems.length === 0 || segments.length === 0) return;
+
+  // Sort items into reading order: top-to-bottom (PDF Y descending), left-to-right (X ascending)
+  allItems.sort((a, b) => {
+    const ay = a.transform[5];
+    const by = b.transform[5];
+    if (Math.abs(ay - by) > 3) return by - ay; // higher PDF Y = higher on page = read first
+    return a.transform[4] - b.transform[4];
+  });
+
+  // Build stripped text (remove ALL whitespace) — matches backend's _strip_all_whitespace
+  let normText = '';
+  const charToItem: number[] = [];
+  for (let i = 0; i < allItems.length; i++) {
+    const stripped = allItems[i].str.replace(/\s/g, '');
+    for (const ch of stripped) {
+      charToItem.push(i);
+      normText += ch;
+    }
+  }
+
+  const offsetKey = side === 'a' ? 'offsetA' : 'offsetB';
+  const bgColor = side === 'a' ? 'rgba(254,202,202,0.5)' : 'rgba(187,247,208,0.5)';
+  let totalMatches = 0;
+  const highlighted = new Set<number>();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const seg of segments as any[]) {
+    // Strip whitespace from segment — same as backend
+    const segNorm = seg.text.replace(/\s/g, '');
+    if (segNorm.length < 2) continue;
+
+    const expectedOffset: number = seg[offsetKey] ?? 0;
+
+    // Find all occurrences, pick the one closest to the backend offset
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    let searchFrom = 0;
+    while (searchFrom < normText.length) {
+      const idx = normText.indexOf(segNorm, searchFrom);
+      if (idx === -1) break;
+      const dist = Math.abs(idx - expectedOffset);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = idx;
+      }
+      searchFrom = idx + 1;
+    }
+
+    if (bestIdx === -1) continue;
+
+    // Map character range to item indices
+    const endIdx = bestIdx + segNorm.length;
+    for (let c = bestIdx; c < endIdx && c < charToItem.length; c++) {
+      const itemIdx = charToItem[c];
+      if (itemIdx < 0 || highlighted.has(itemIdx)) continue;
+      highlighted.add(itemIdx);
+
+      const item = allItems[itemIdx];
+      const tx = item.transform;
+      const [vx, vy] = viewport.convertToViewportPoint(tx[4], tx[5]);
+      const fontSize = Math.sqrt(tx[0] ** 2 + tx[1] ** 2) * viewport.scale;
+      const w = Math.abs(item.width || fontSize * item.str.length * 0.6) * viewport.scale;
+      const h = fontSize * 1.3;
+
+      if (w < 1 || h < 1) continue;
+
+      const rect = document.createElement('div');
+      rect.style.cssText = `position:absolute;left:${vx}px;top:${vy - h}px;width:${w}px;height:${h}px;background:${bgColor};border-radius:2px;`;
+      highlightEl.appendChild(rect);
+      totalMatches++;
+    }
+  }
+
+  // Debug info
+  const debugBlock = document.createElement('div');
+  debugBlock.style.cssText = 'position:absolute;left:10px;top:10px;background:rgba(0,0,0,0.6);color:white;font-size:11px;z-index:999;padding:2px 6px;border-radius:2px;';
+  debugBlock.textContent = `${side.toUpperCase()}: items=${allItems.length} segs=${segments.length} matches=${totalMatches}`;
+  highlightEl.appendChild(debugBlock);
+}
+
+// ---- Render current page ----
+
+async function renderCurrentPage() {
+  const page = currentPage.value;
+  if (!page) return;
+
+  const diffOps = parseDiffOps(page.diff_ops_json);
+
+  const renderA = async () => {
+    if (!pdfDocA.value || !page!.page_a || !canvasA.value || !highlightA.value || !containerA.value) return;
+    await renderPdfPage(pdfDocA.value, page!.page_a, canvasA.value, highlightA.value, containerA.value, diffOps, 'a');
+  };
+
+  const renderB = async () => {
+    if (!pdfDocB.value || !page!.page_b || !canvasB.value || !highlightB.value || !containerB.value) return;
+    await renderPdfPage(pdfDocB.value, page!.page_b, canvasB.value, highlightB.value, containerB.value, diffOps, 'b');
+  };
+
+  await Promise.all([renderA(), renderB()]);
+
+  // DOCX: apply diff highlights in HTML via DOM manipulation
+  const htmlDiffOps = parseDiffOps(page.diff_ops_json);
+  if (htmlDiffOps.length > 0 && page.diff_type === 'modified') {
+    await nextTick();
+    if (docHtmlA.value) highlightHtmlDiffs(docHtmlA.value, htmlDiffOps, 'a');
+    if (docHtmlB.value) highlightHtmlDiffs(docHtmlB.value, htmlDiffOps, 'b');
+  }
+}
+
+// ---- HTML diff highlighting for DOCX ----
+
+function highlightHtmlDiffs(
+  container: HTMLElement,
+  diffOps: { op: number; text: string }[],
+  side: 'a' | 'b'
+) {
+  const targetOp = side === 'a' ? -1 : 1;
+  const segments = diffOps.filter(d => d.op === targetOp && d.text.trim());
+  if (segments.length === 0) return;
+
+  // Collect all text nodes
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+  // Build full text from nodes
+  let fullText = '';
+  const charToNode: { node: Text; offset: number }[] = [];
+  for (const node of textNodes) {
+    const text = node.textContent || '';
+    for (let i = 0; i < text.length; i++) {
+      charToNode.push({ node, offset: i });
+      fullText += text[i];
+    }
+  }
+
+  // Strip whitespace for matching
+  const stripped = fullText.replace(/\s/g, '');
+
+  const cls = side === 'a' ? 'html-highlight-del' : 'html-highlight-ins';
+
+  for (const seg of segments) {
+    const segStripped = seg.text.replace(/\s/g, '');
+    if (segStripped.length < 2) continue;
+
+    // Find in stripped text, then map back to original positions
+    let searchFrom = 0;
+    while (searchFrom < stripped.length) {
+      const idx = stripped.indexOf(segStripped, searchFrom);
+      if (idx === -1) break;
+
+      // Collect original char positions for this match
+      // We need a mapping from stripped index to original index
+      const origPositions: number[] = [];
+      let si = 0;
+      for (let oi = 0; oi < fullText.length; oi++) {
+        if (/\s/.test(fullText[oi])) continue;
+        if (si === idx) {
+          // Start collecting from here
+          for (let k = oi; k < fullText.length && origPositions.length < segStripped.length; k++) {
+            if (!/\s/.test(fullText[k])) {
+              origPositions.push(k);
+            }
+          }
+          break;
+        }
+        si++;
+      }
+
+      // Group consecutive positions by text node and wrap
+      const nodeGroups = new Map<Text, { start: number; end: number }>();
+      for (const pos of origPositions) {
+        if (pos >= charToNode.length) continue;
+        const { node, offset } = charToNode[pos];
+        const existing = nodeGroups.get(node);
+        if (existing) {
+          existing.end = Math.max(existing.end, offset + 1);
+        } else {
+          nodeGroups.set(node, { start: offset, end: offset + 1 });
+        }
+      }
+
+      for (const [node, { start, end }] of nodeGroups) {
+        try {
+          const range = document.createRange();
+          range.setStart(node, start);
+          range.setEnd(node, Math.min(end, (node.textContent || '').length));
+          const mark = document.createElement('mark');
+          mark.className = cls;
+          range.surroundContents(mark);
+        } catch {
+          // Cross-node range, skip
+        }
+      }
+
+      searchFrom = idx + segStripped.length;
+    }
+  }
+}
+
+// ---- Parse diff ops ----
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseDiffOps(json: string | null): any[] {
+  if (!json) return [];
+  try {
+    const raw = JSON.parse(json);
+    if (!Array.isArray(raw)) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return raw.map((item: any) => {
+      if (Array.isArray(item)) {
+        const entry: Record<string, any> = { op: item[0] as number, text: item[1] as string };
+        if (item.length >= 4) {
+          entry.offsetA = item[2] as number;
+          entry.offsetB = item[3] as number;
+        }
+        return entry;
+      }
+      return item;
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ---- Watchers ----
+
+watch(currentPageIndex, () => { nextTick(renderCurrentPage); });
+
+watch(() => props.status, async (s) => {
+  if (s === 'done') {
+    await loadPdfs();
+    nextTick(renderCurrentPage);
+  }
+});
+
+watch(filter, () => { currentPageIndex.value = 0; });
+
+onMounted(async () => {
+  if (props.status === 'done') {
+    await loadPdfs();
+    nextTick(renderCurrentPage);
+  }
+});
+
+onUnmounted(() => {
+  pdfDocA.value?.destroy();
+  pdfDocB.value?.destroy();
+});
+
 const typeLabel: Record<string, string> = {
   equal: '相同',
   modified: '有差异',
@@ -77,21 +435,6 @@ const typeBadgeClass: Record<string, string> = {
   added: 'bg-green-100 text-green-700',
   deleted: 'bg-red-100 text-red-700',
 };
-
-// 同步滚动
-const handleScrollA = () => {
-  if (!syncScroll.value || !docContentA.value || !docContentB.value) return;
-  const ratio = docContentA.value.scrollTop / (docContentA.value.scrollHeight - docContentA.value.clientHeight || 1);
-  docContentB.value.scrollTop = ratio * (docContentB.value.scrollHeight - docContentB.value.clientHeight);
-};
-const handleScrollB = () => {
-  if (!syncScroll.value || !docContentA.value || !docContentB.value) return;
-  const ratio = docContentB.value.scrollTop / (docContentB.value.scrollHeight - docContentB.value.clientHeight || 1);
-  docContentA.value.scrollTop = ratio * (docContentA.value.scrollHeight - docContentA.value.clientHeight);
-};
-
-// 切换过滤时重置页码
-watch(filter, () => { currentPageIndex.value = 0; });
 </script>
 
 <template>
@@ -110,80 +453,102 @@ watch(filter, () => { currentPageIndex.value = 0; });
 
       <div class="flex items-center gap-3">
         <span v-if="comparisonDuration" class="text-xs text-slate-400">耗时 {{ comparisonDuration }}s</span>
-
         <button @click="goPrev" :disabled="!hasPrev"
           class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
           <ChevronLeft class="w-4 h-4" />
         </button>
         <span class="text-sm text-slate-600 min-w-[80px] text-center">
-          {{ currentPage ? `第 ${currentPageIndex + 1} / ${filteredPages.length} 页` : '-' }}
+          {{ currentPage ? `第 ${currentPageIndex + 1} / ${filteredPages.length} 组` : '-' }}
         </span>
         <button @click="goNext" :disabled="!hasNext"
           class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
           <ChevronRight class="w-4 h-4" />
-        </button>
-
-        <button @click="syncScroll = !syncScroll"
-          :class="['document-sync-btn', { active: syncScroll }]">
-          同步滚动
         </button>
       </div>
     </div>
 
     <!-- 主体 -->
     <div class="document-result-main">
-      <!-- 文档面板 -->
+      <!-- PDF 文档面板 -->
       <div class="document-doc-panes">
-        <template v-if="currentPage">
-        <!-- 文档 A -->
-        <div class="document-doc-pane">
-          <div class="document-doc-header document-doc-header-original">
-            <span class="document-doc-badge document-badge-original">原文档</span>
-            <span v-if="currentPage.page_a" class="text-xs text-slate-500">第 {{ currentPage.page_a }} 页</span>
-            <span v-else class="text-xs text-slate-400">-</span>
+        <!-- 处理中 -->
+        <template v-if="status === 'processing' || status === 'pending'">
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+              <p class="text-slate-500 text-sm">正在比对中...</p>
+            </div>
           </div>
-          <div ref="docContentA" @scroll="handleScrollA" class="document-doc-content">
-            <template v-if="currentPage.diff_type === 'added'">
-              <div class="flex items-center justify-center h-full text-slate-400 text-sm">
-                比对文档新增页，原文档中无对应内容
-              </div>
-            </template>
-            <template v-else-if="currentPage.diff_type === 'equal'">
-              <div class="text-slate-500">{{ currentPage.text_a || '（空白页）' }}</div>
-            </template>
-            <template v-else>
-              <DiffTextView
-                :diff-ops-json="currentPage.diff_ops_json"
-                :raw-text="currentPage.text_a"
-                side="a" />
-            </template>
-          </div>
-        </div>
+        </template>
 
-        <!-- 文档 B -->
-        <div class="document-doc-pane">
-          <div class="document-doc-header document-doc-header-compare">
-            <span class="document-doc-badge document-badge-compare">比对文档</span>
-            <span v-if="currentPage.page_b" class="text-xs text-slate-500">第 {{ currentPage.page_b }} 页</span>
-            <span v-else class="text-xs text-slate-400">-</span>
+        <!-- PDF 加载中 -->
+        <template v-else-if="pdfLoading">
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+              <p class="text-slate-500 text-sm">正在加载文档...</p>
+            </div>
           </div>
-          <div ref="docContentB" @scroll="handleScrollB" class="document-doc-content">
-            <template v-if="currentPage.diff_type === 'deleted'">
-              <div class="flex items-center justify-center h-full text-slate-400 text-sm">
-                原文档页面已删除，比对文档中无对应内容
-              </div>
-            </template>
-            <template v-else-if="currentPage.diff_type === 'equal'">
-              <div class="text-slate-500">{{ currentPage.text_b || '（空白页）' }}</div>
-            </template>
-            <template v-else>
-              <DiffTextView
-                :diff-ops-json="currentPage.diff_ops_json"
-                :raw-text="currentPage.text_b"
-                side="b" />
-            </template>
+        </template>
+
+        <!-- 文档内容 -->
+        <template v-else-if="currentPage">
+          <!-- 文档 A -->
+          <div class="document-doc-pane">
+            <div class="document-doc-header document-doc-header-original">
+              <span class="document-doc-badge document-badge-original">原文档</span>
+              <span v-if="currentPage.page_a" class="text-xs text-slate-500">第 {{ currentPage.page_a }} 页</span>
+              <span v-else class="text-xs text-slate-400">-</span>
+            </div>
+            <div ref="containerA" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
+              <template v-if="currentPage.diff_type === 'added'">
+                <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+                  比对文档新增页，原文档中无对应内容
+                </div>
+              </template>
+              <template v-else-if="isPdfA && pdfDocA">
+                <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
+                  <canvas ref="canvasA" />
+                  <div ref="highlightA" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
+                </div>
+              </template>
+              <template v-else>
+                <div ref="docHtmlA" class="doc-html-view p-4" v-html="currentPage.html_a || ''"></div>
+              </template>
+            </div>
           </div>
-        </div>
+
+          <!-- 文档 B -->
+          <div class="document-doc-pane">
+            <div class="document-doc-header document-doc-header-compare">
+              <span class="document-doc-badge document-badge-compare">比对文档</span>
+              <span v-if="currentPage.page_b" class="text-xs text-slate-500">第 {{ currentPage.page_b }} 页</span>
+              <span v-else class="text-xs text-slate-400">-</span>
+            </div>
+            <div ref="containerB" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
+              <template v-if="currentPage.diff_type === 'deleted'">
+                <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+                  原文档页面已删除，比对文档中无对应内容
+                </div>
+              </template>
+              <template v-else-if="isPdfB && pdfDocB">
+                <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
+                  <canvas ref="canvasB" />
+                  <div ref="highlightB" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
+                </div>
+              </template>
+              <template v-else>
+                <div ref="docHtmlB" class="doc-html-view p-4" v-html="currentPage.html_b || ''"></div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- 失败 -->
+        <template v-else-if="status === 'failed'">
+          <div class="flex-1 flex items-center justify-center">
+            <p class="text-red-500 text-sm">{{ errorMsg || '比对失败' }}</p>
+          </div>
         </template>
       </div>
 
@@ -217,24 +582,133 @@ watch(filter, () => { currentPageIndex.value = 0; });
             :key="page.id"
             @click="goToPage(idx)"
             :class="[
-              'diff-item cursor-pointer',
-              idx === currentPageIndex ? 'border-orange-300 bg-orange-50/30' : ''
+              'diff-item cursor-pointer rounded-lg border p-2.5 transition-colors',
+              idx === currentPageIndex ? 'border-orange-300 bg-orange-50/50' : 'border-transparent hover:bg-slate-50'
             ]"
           >
             <div class="flex items-center gap-2 mb-1">
-              <span :class="['diff-badge', typeBadgeClass[page.diff_type]]">{{ typeLabel[page.diff_type] }}</span>
+              <span :class="['diff-badge text-xs px-1.5 py-0.5 rounded font-medium', typeBadgeClass[page.diff_type]]">{{ typeLabel[page.diff_type] }}</span>
               <span class="text-xs text-slate-400">
                 <template v-if="page.page_a && page.page_b">A:{{ page.page_a }} / B:{{ page.page_b }}</template>
                 <template v-else-if="page.page_a">A:{{ page.page_a }}</template>
                 <template v-else>B:{{ page.page_b }}</template>
               </span>
             </div>
-            <p v-if="page.diff_type === 'modified' && page.diff_ops_json" class="text-xs text-slate-500 truncate">
-              页面内容有修改
-            </p>
+
+            <template v-if="page.diff_type === 'modified' && page.diff_ops_json">
+              <div class="text-xs leading-relaxed mt-1.5 line-clamp-3">
+                <template v-for="(seg, si) in parseDiffOps(page.diff_ops_json)" :key="si">
+                  <span v-if="seg.op === -1" class="diff-text-del">{{ seg.text }}</span>
+                  <span v-else-if="seg.op === 1" class="diff-text-ins">{{ seg.text }}</span>
+                  <span v-else class="text-slate-400">{{ seg.text }}</span>
+                </template>
+              </div>
+            </template>
+
+            <p v-else-if="page.diff_type === 'equal'" class="text-xs text-slate-400 mt-1">页面内容一致</p>
+            <p v-else-if="page.diff_type === 'added'" class="text-xs text-green-600 mt-1">比对文档中新增的页面</p>
+            <p v-else-if="page.diff_type === 'deleted'" class="text-xs text-red-600 mt-1">原文档中已删除的页面</p>
           </div>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style>
+/* PDF viewer */
+.document-pdf-content {
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.document-pdf-page {
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.pdf-highlight-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pdf-highlight-layer .pdf-highlight-del {
+  position: absolute;
+  background-color: rgba(254, 202, 202, 0.5);
+  border-radius: 2px;
+}
+
+.pdf-highlight-layer .pdf-highlight-ins {
+  position: absolute;
+  background-color: rgba(187, 247, 208, 0.5);
+  border-radius: 2px;
+}
+
+/* DOCX HTML view */
+.doc-html-view {
+  max-width: 800px;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #334155;
+}
+.doc-html-view h1, .doc-html-view h2, .doc-html-view h3 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+}
+.doc-html-view h1 { font-size: 1.5em; }
+.doc-html-view h2 { font-size: 1.25em; }
+.doc-html-view h3 { font-size: 1.1em; }
+.doc-html-view p { margin: 0.5em 0; }
+.doc-html-view table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+.doc-html-view td, .doc-html-view th {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  text-align: left;
+}
+.doc-html-view th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+
+/* HTML diff highlights (DOCX) */
+mark.html-highlight-del {
+  background: rgba(254, 202, 202, 0.6);
+  text-decoration: line-through;
+  text-decoration-color: #ef4444;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+mark.html-highlight-ins {
+  background: rgba(187, 247, 208, 0.6);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+/* Sidebar diff text */
+.diff-text-del {
+  background: #fecaca;
+  text-decoration: line-through;
+  text-decoration-color: #ef4444;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.diff-text-ins {
+  background: #bbf7d0;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+</style>

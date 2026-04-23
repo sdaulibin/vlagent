@@ -21,6 +21,7 @@ from src.documents.models import (
 from src.documents.service import process_document_comparison
 
 router = APIRouter(prefix="/documents", tags=["文档比对"])
+public_router = APIRouter(tags=["文档比对-文件访问"])
 
 UPLOAD_DIR = os.getenv(
     "DOCUMENT_UPLOAD_DIR",
@@ -108,23 +109,10 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_session)):
 
     pages_stmt = select(DocumentPageDiff).where(DocumentPageDiff.task_id == task_id).order_by(DocumentPageDiff.id)
     pages_result = await db.execute(pages_stmt)
-    raw_pages = pages_result.scalars().all()
-    for p in raw_pages[:5]:
-        print(f"[DEBUG] PageDiff id={p.id} type={p.diff_type} text_a={len(p.text_a or '')}chars text_b={len(p.text_b or '')}chars ops={'null' if p.diff_ops_json is None else f'{len(p.diff_ops_json)}chars'}")
-    pages = [DocumentPageDiffItem.model_validate(p) for p in raw_pages]
+    pages = [DocumentPageDiffItem.model_validate(p) for p in pages_result.scalars().all()]
 
     resp = DocumentCompareResponse.model_validate(task)
     resp.pages = pages
-
-    # Debug: check serialized response
-    resp_dict = resp.model_dump()
-    print(f"[DEBUG] Response: {len(resp_dict.get('pages', []))} pages")
-    for p in resp_dict.get('pages', [])[:3]:
-        ta = p.get('text_a') or ''
-        tb = p.get('text_b') or ''
-        ops = p.get('diff_ops_json') or ''
-        print(f"[DEBUG]   Resp page: type={p.get('diff_type')} text_a={len(ta)}chars text_b={len(tb)}chars ops={len(ops)}chars")
-
     return resp
 
 
@@ -137,9 +125,8 @@ async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session))
     return DocumentTaskStatusResponse.model_validate(task)
 
 
-@router.post("/{task_id}/file/{doc_type}")
-async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session)):
-    """获取原始文件"""
+async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
+    """文件服务内部方法"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -163,6 +150,18 @@ async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(
         media_type=media_type,
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"},
     )
+
+
+@router.post("/{task_id}/file/{doc_type}")
+async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session)):
+    """获取原始文件（POST，需认证）"""
+    return await _serve_task_file(task_id, doc_type, db)
+
+
+@public_router.get("/documents/{task_id}/file/{doc_type}")
+async def get_task_file_public(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session)):
+    """获取原始文件（GET，无需认证，用于 iframe 嵌入，支持 #page=N 页码跳转）"""
+    return await _serve_task_file(task_id, doc_type, db)
 
 
 @router.delete("/{task_id}")

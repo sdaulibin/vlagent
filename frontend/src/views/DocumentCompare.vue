@@ -208,6 +208,7 @@ onUnmounted(() => {
     <!-- Result View -->
     <DocumentResultView
       v-else-if="taskDetail"
+      :taskId="taskDetail.id"
       :fileAName="taskDetail.file_a_name"
       :fileBName="taskDetail.file_b_name"
       :fileAPageCount="taskDetail.file_a_page_count"

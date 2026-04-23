@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from src.database import init_db
 from src.config import settings
 from src.file_provider.service import init_jvm, shutdown_jvm
-from api import api_router
+from api import api_router, public_api_router
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,7 @@ app.add_middleware(
 
 # Include API Router
 app.include_router(api_router, prefix="/api")
+app.include_router(public_api_router, prefix="/api")
 
 
 @app.get("/")

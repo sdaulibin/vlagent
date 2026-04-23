@@ -64,6 +64,12 @@ async def init_db():
             "ALTER TABLE format_compare_tasks "
             "ADD COLUMN IF NOT EXISTS extracted_content_json TEXT"
         ))
+        # 文档比对：补充 HTML 展示字段
+        for col in [("html_a", "TEXT"), ("html_b", "TEXT")]:
+            await conn.execute(text(
+                f"ALTER TABLE document_page_diffs "
+                f"ADD COLUMN IF NOT EXISTS {col[0]} {col[1]}"
+            ))
         # 发票识别：补充 invoice_results 缺失字段（幂等）
         for col in [
             ("invoice_no", "VARCHAR"),

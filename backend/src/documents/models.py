@@ -36,8 +36,10 @@ class DocumentPageDiff(SQLModel, table=True):
     page_a: Optional[int] = Field(default=None, description="文档A页码(1-based)，整页新增时为null")
     page_b: Optional[int] = Field(default=None, description="文档B页码(1-based)，整页删除时为null")
     diff_type: str = Field(description="equal/modified/added/deleted")
-    text_a: Optional[str] = Field(default=None, description="文档A该页文本")
-    text_b: Optional[str] = Field(default=None, description="文档B该页文本")
+    text_a: Optional[str] = Field(default=None, description="文档A该页纯文本（用于 diff 计算）")
+    text_b: Optional[str] = Field(default=None, description="文档B该页纯文本")
+    html_a: Optional[str] = Field(default=None, description="文档A该页 HTML（用于格式化展示）")
+    html_b: Optional[str] = Field(default=None, description="文档B该页 HTML")
     diff_ops_json: Optional[str] = Field(default=None, description="diff-match-patch 操作 JSON")
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -72,6 +74,8 @@ class DocumentPageDiffItem(SQLModel):
     diff_type: str
     text_a: Optional[str] = None
     text_b: Optional[str] = None
+    html_a: Optional[str] = None
+    html_b: Optional[str] = None
     diff_ops_json: Optional[str] = None
 
 

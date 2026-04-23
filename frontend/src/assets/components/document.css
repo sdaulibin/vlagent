@@ -51,14 +51,6 @@
     @apply h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shadow-sm;
   }
 
-  .document-sync-btn {
-    @apply flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors bg-slate-100 text-slate-600;
-  }
-
-  .document-sync-btn.active {
-    @apply bg-orange-100 text-orange-700;
-  }
-
   /* ===== Document Pane ===== */
   .document-doc-pane {
     @apply flex-1 flex flex-col h-full bg-white;
@@ -90,7 +82,7 @@
   }
 
   .document-doc-content {
-    @apply flex-1 overflow-y-auto p-6 leading-relaxed text-slate-800;
+    @apply flex-1 overflow-hidden leading-relaxed text-slate-800 bg-slate-50;
     min-height: 0;
   }
 
