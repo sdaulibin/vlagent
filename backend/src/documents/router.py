@@ -126,7 +126,7 @@ async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session))
 
 
 async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
-    """文件服务内部方法"""
+    """文件服务内部方法。DOCX/DOC 自动转 PDF 后返回，转换结果缓存到同目录"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -142,6 +142,17 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
         raise HTTPException(status_code=404, detail="文件不存在")
 
     ext = os.path.splitext(filename)[1].lower()
+
+    # DOCX/DOC → PDF 转换（缓存到同目录，下次直接返回）
+    if ext in (".docx", ".doc"):
+        pdf_path = os.path.splitext(file_path)[0] + ".pdf"
+        if not os.path.exists(pdf_path):
+            from src.documents.service import docx_to_pdf
+            docx_to_pdf(file_path, output_dir=os.path.dirname(file_path))
+        file_path = pdf_path
+        ext = ".pdf"
+        filename = os.path.splitext(filename)[0] + ".pdf"
+
     media_type = MIME_TYPES.get(ext, "application/octet-stream")
     encoded_filename = quote(filename)
 

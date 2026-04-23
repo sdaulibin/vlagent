@@ -1,16 +1,18 @@
 """
 文档比对核心服务
 
-流程：纯文本提取（pdfplumber） → 页级对齐 → 逐页 diff → 结果入库
+流程：DOCX 先转 PDF（LibreOffice）→ 纯文本提取（pdfplumber）→ 页级对齐 → 逐页 diff → 结果入库
 """
 import json
+import os
 import re
+import subprocess
+import sys
 import time
 import logging
 import unicodedata
 
 import pdfplumber
-import mammoth
 from difflib import SequenceMatcher
 from diff_match_patch import diff_match_patch
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -20,6 +22,40 @@ from src.documents.models import DocumentCompareTask, DocumentPageDiff
 logger = logging.getLogger(__name__)
 
 dmp = diff_match_patch()
+
+
+def _find_soffice() -> str:
+    """查找 soffice 可执行文件路径"""
+    if sys.platform == "darwin":
+        path = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        if os.path.isfile(path):
+            return path
+    # Linux 或 Darwin 回退
+    return "soffice"
+
+
+def docx_to_pdf(docx_path: str, output_dir: str | None = None) -> str:
+    """用 LibreOffice headless 模式将 DOCX 转为 PDF，返回 PDF 文件路径"""
+    soffice = _find_soffice()
+    if output_dir is None:
+        output_dir = os.path.dirname(docx_path)
+
+    cmd = [
+        soffice,
+        "--headless",
+        "--convert-to", "pdf",
+        "--outdir", output_dir,
+        docx_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        raise RuntimeError(f"LibreOffice 转换失败: {result.stderr}")
+
+    pdf_name = os.path.splitext(os.path.basename(docx_path))[0] + ".pdf"
+    pdf_path = os.path.join(output_dir, pdf_name)
+    if not os.path.isfile(pdf_path):
+        raise FileNotFoundError(f"转换后未找到 PDF: {pdf_path}")
+    return pdf_path
 
 
 def _normalize_text(text: str) -> str:
@@ -37,20 +73,6 @@ def _strip_all_whitespace(text: str) -> str:
     return re.sub(r'\s+', '', text)
 
 
-def _html_to_text(html: str) -> str:
-    """从 mammoth HTML 中提取纯文本"""
-    text = re.sub(r'<br\s*/?>', '\n', html)
-    text = re.sub(r'<[^>]+>', '', text)
-    text = re.sub(r'&nbsp;', ' ', text)
-    text = re.sub(r'&amp;', '&', text)
-    text = re.sub(r'&lt;', '<', text)
-    text = re.sub(r'&gt;', '>', text)
-    text = re.sub(r'&#x([0-9a-fA-F]+);', lambda m: chr(int(m.group(1), 16)), text)
-    text = re.sub(r'&#(\d+);', lambda m: chr(int(m.group(1))), text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    return text.strip()
-
-
 # ---- PDF 提取（pdfplumber）----
 
 def extract_pages_from_pdf(file_path: str) -> list[str]:
@@ -63,29 +85,16 @@ def extract_pages_from_pdf(file_path: str) -> list[str]:
     return text_pages
 
 
-# ---- DOCX 提取（mammoth）----
-
-def extract_pages_from_docx(file_path: str) -> tuple[list[str], list[str]]:
-    """用 mammoth 将 DOCX 转为纯文本和 HTML，整体视为单页。
-    返回 (text_pages, html_pages)
-    """
-    with open(file_path, "rb") as f:
-        result = mammoth.convert_to_html(f)
-    html = result.value
-    text = _html_to_text(html)
-    return [text], [html]
-
-
 def extract_pages(file_path: str) -> tuple[list[str], list[str]]:
     """根据文件类型分发提取，返回 (text_pages, html_pages)
-    PDF: text_pages 有内容，html_pages 为空（前端用 PDF.js 渲染）
-    DOCX: text_pages 和 html_pages 都有内容
+    PDF/DOCX/DOC: 统一走 pdfplumber，html_pages 为空（前端用 PDF.js 渲染）
     """
     lower = file_path.lower()
     if lower.endswith(".pdf"):
         return extract_pages_from_pdf(file_path), []
     elif lower.endswith((".docx", ".doc")):
-        return extract_pages_from_docx(file_path)
+        pdf_path = docx_to_pdf(file_path)
+        return extract_pages_from_pdf(pdf_path), []
     else:
         raise ValueError(f"不支持的文件格式: {file_path}")
 
@@ -197,9 +206,6 @@ async def process_document_comparison(db: AsyncSession, task: DocumentCompareTas
             text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
             text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
 
-            html_a = html_a_pages[page_a_idx] if page_a_idx is not None and html_a_pages else None
-            html_b = html_b_pages[page_b_idx] if page_b_idx is not None and html_b_pages else None
-
             diff_ops = None
             if diff_type == "modified" and text_a is not None and text_b is not None:
                 ops = compute_text_diff(text_a, text_b)
@@ -216,8 +222,6 @@ async def process_document_comparison(db: AsyncSession, task: DocumentCompareTas
                 diff_type=diff_type,
                 text_a=text_a,
                 text_b=text_b,
-                html_a=html_a,
-                html_b=html_b,
                 diff_ops_json=diff_ops,
             )
             db.add(page_diff)

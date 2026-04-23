@@ -13,8 +13,6 @@ interface PageDiff {
   diff_type: string;
   text_a: string | null;
   text_b: string | null;
-  html_a: string | null;
-  html_b: string | null;
   diff_ops_json: string | null;
 }
 
@@ -48,13 +46,8 @@ const canvasA = ref<HTMLCanvasElement | null>(null);
 const canvasB = ref<HTMLCanvasElement | null>(null);
 const highlightA = ref<HTMLDivElement | null>(null);
 const highlightB = ref<HTMLDivElement | null>(null);
-const docHtmlA = ref<HTMLDivElement | null>(null);
-const docHtmlB = ref<HTMLDivElement | null>(null);
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-
-const isPdfA = computed(() => props.fileAName.toLowerCase().endsWith('.pdf'));
-const isPdfB = computed(() => props.fileBName.toLowerCase().endsWith('.pdf'));
 
 const filteredPages = computed(() => {
   if (filter.value === 'all') return props.pages;
@@ -87,29 +80,24 @@ const goToPage = (index: number) => {
 // ---- PDF loading ----
 
 async function loadPdfs() {
-  if (!isPdfA.value && !isPdfB.value) return;
   pdfLoading.value = true;
 
   const promises: Promise<void>[] = [];
 
-  if (isPdfA.value) {
-    promises.push(
-      pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/a`).promise
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((doc: any) => { pdfDocA.value = doc; })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .catch((e: any) => console.error('Failed to load PDF A:', e))
-    );
-  }
-  if (isPdfB.value) {
-    promises.push(
-      pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/b`).promise
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .then((doc: any) => { pdfDocB.value = doc; })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .catch((e: any) => console.error('Failed to load PDF B:', e))
-    );
-  }
+  promises.push(
+    pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/a`).promise
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((doc: any) => { pdfDocA.value = doc; })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((e: any) => console.error('Failed to load PDF A:', e))
+  );
+  promises.push(
+    pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/b`).promise
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((doc: any) => { pdfDocB.value = doc; })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((e: any) => console.error('Failed to load PDF B:', e))
+  );
 
   await Promise.all(promises);
   pdfLoading.value = false;
@@ -271,105 +259,6 @@ async function renderCurrentPage() {
   };
 
   await Promise.all([renderA(), renderB()]);
-
-  // DOCX: apply diff highlights in HTML via DOM manipulation
-  const htmlDiffOps = parseDiffOps(page.diff_ops_json);
-  if (htmlDiffOps.length > 0 && page.diff_type === 'modified') {
-    await nextTick();
-    if (docHtmlA.value) highlightHtmlDiffs(docHtmlA.value, htmlDiffOps, 'a');
-    if (docHtmlB.value) highlightHtmlDiffs(docHtmlB.value, htmlDiffOps, 'b');
-  }
-}
-
-// ---- HTML diff highlighting for DOCX ----
-
-function highlightHtmlDiffs(
-  container: HTMLElement,
-  diffOps: { op: number; text: string }[],
-  side: 'a' | 'b'
-) {
-  const targetOp = side === 'a' ? -1 : 1;
-  const segments = diffOps.filter(d => d.op === targetOp && d.text.trim());
-  if (segments.length === 0) return;
-
-  // Collect all text nodes
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  const textNodes: Text[] = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
-
-  // Build full text from nodes
-  let fullText = '';
-  const charToNode: { node: Text; offset: number }[] = [];
-  for (const node of textNodes) {
-    const text = node.textContent || '';
-    for (let i = 0; i < text.length; i++) {
-      charToNode.push({ node, offset: i });
-      fullText += text[i];
-    }
-  }
-
-  // Strip whitespace for matching
-  const stripped = fullText.replace(/\s/g, '');
-
-  const cls = side === 'a' ? 'html-highlight-del' : 'html-highlight-ins';
-
-  for (const seg of segments) {
-    const segStripped = seg.text.replace(/\s/g, '');
-    if (segStripped.length < 2) continue;
-
-    // Find in stripped text, then map back to original positions
-    let searchFrom = 0;
-    while (searchFrom < stripped.length) {
-      const idx = stripped.indexOf(segStripped, searchFrom);
-      if (idx === -1) break;
-
-      // Collect original char positions for this match
-      // We need a mapping from stripped index to original index
-      const origPositions: number[] = [];
-      let si = 0;
-      for (let oi = 0; oi < fullText.length; oi++) {
-        if (/\s/.test(fullText[oi])) continue;
-        if (si === idx) {
-          // Start collecting from here
-          for (let k = oi; k < fullText.length && origPositions.length < segStripped.length; k++) {
-            if (!/\s/.test(fullText[k])) {
-              origPositions.push(k);
-            }
-          }
-          break;
-        }
-        si++;
-      }
-
-      // Group consecutive positions by text node and wrap
-      const nodeGroups = new Map<Text, { start: number; end: number }>();
-      for (const pos of origPositions) {
-        if (pos >= charToNode.length) continue;
-        const { node, offset } = charToNode[pos];
-        const existing = nodeGroups.get(node);
-        if (existing) {
-          existing.end = Math.max(existing.end, offset + 1);
-        } else {
-          nodeGroups.set(node, { start: offset, end: offset + 1 });
-        }
-      }
-
-      for (const [node, { start, end }] of nodeGroups) {
-        try {
-          const range = document.createRange();
-          range.setStart(node, start);
-          range.setEnd(node, Math.min(end, (node.textContent || '').length));
-          const mark = document.createElement('mark');
-          mark.className = cls;
-          range.surroundContents(mark);
-        } catch {
-          // Cross-node range, skip
-        }
-      }
-
-      searchFrom = idx + segStripped.length;
-    }
-  }
 }
 
 // ---- Parse diff ops ----
@@ -506,14 +395,11 @@ const typeBadgeClass: Record<string, string> = {
                   比对文档新增页，原文档中无对应内容
                 </div>
               </template>
-              <template v-else-if="isPdfA && pdfDocA">
+              <template v-else-if="pdfDocA">
                 <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
                   <canvas ref="canvasA" />
                   <div ref="highlightA" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
                 </div>
-              </template>
-              <template v-else>
-                <div ref="docHtmlA" class="doc-html-view p-4" v-html="currentPage.html_a || ''"></div>
               </template>
             </div>
           </div>
@@ -531,14 +417,11 @@ const typeBadgeClass: Record<string, string> = {
                   原文档页面已删除，比对文档中无对应内容
                 </div>
               </template>
-              <template v-else-if="isPdfB && pdfDocB">
+              <template v-else-if="pdfDocB">
                 <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
                   <canvas ref="canvasB" />
                   <div ref="highlightB" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
                 </div>
-              </template>
-              <template v-else>
-                <div ref="docHtmlB" class="doc-html-view p-4" v-html="currentPage.html_b || ''"></div>
               </template>
             </div>
           </div>
@@ -650,51 +533,6 @@ const typeBadgeClass: Record<string, string> = {
   position: absolute;
   background-color: rgba(187, 247, 208, 0.5);
   border-radius: 2px;
-}
-
-/* DOCX HTML view */
-.doc-html-view {
-  max-width: 800px;
-  width: 100%;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #334155;
-}
-.doc-html-view h1, .doc-html-view h2, .doc-html-view h3 {
-  margin: 1em 0 0.5em;
-  font-weight: 600;
-}
-.doc-html-view h1 { font-size: 1.5em; }
-.doc-html-view h2 { font-size: 1.25em; }
-.doc-html-view h3 { font-size: 1.1em; }
-.doc-html-view p { margin: 0.5em 0; }
-.doc-html-view table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.5em 0;
-}
-.doc-html-view td, .doc-html-view th {
-  border: 1px solid #e2e8f0;
-  padding: 6px 10px;
-  text-align: left;
-}
-.doc-html-view th {
-  background: #f1f5f9;
-  font-weight: 600;
-}
-
-/* HTML diff highlights (DOCX) */
-mark.html-highlight-del {
-  background: rgba(254, 202, 202, 0.6);
-  text-decoration: line-through;
-  text-decoration-color: #ef4444;
-  border-radius: 2px;
-  padding: 1px 2px;
-}
-mark.html-highlight-ins {
-  background: rgba(187, 247, 208, 0.6);
-  border-radius: 2px;
-  padding: 1px 2px;
 }
 
 /* Sidebar diff text */
