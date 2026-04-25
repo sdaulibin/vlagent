@@ -27,7 +27,3 @@ dependencies = [
     "sqlmodel>=0.0.27",
     "uvicorn>=0.38.0",
 ]
-
-[[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-default = true

@@ -1,4 +1,4 @@
-ARG PYTHON_RUNTIME_IMAGE=harbor.devops.qdb.com/star/vlagent-backend-runtime:1.0
+ARG PYTHON_RUNTIME_IMAGE=harbor.devops.qdb.com/star/vlagent-backend-runtime:1.1
 
 # 构建时版本参数（通过 Makefile 传入）
 ARG VERSION=0.0.0

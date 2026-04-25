@@ -82,6 +82,7 @@ def _normalize_amount(value: str) -> str:
         return match.group(1)
     return ""
 
+import asyncio
 import time
 
 def _extract_invoice_info(image_path: str) -> dict:
@@ -148,10 +149,11 @@ async def process_invoice_recognitions(db: AsyncSession, file_record: InvoiceFil
             
         file_record.page_count = len(image_paths)
         
-        # 2. 对每页单独识别
+        # 2. 对每页单独识别（在线程池中执行，避免同步 HTTP 调用阻塞事件循环）
+        loop = asyncio.get_event_loop()
         for i, img_path in enumerate(image_paths):
             print(f"  后台任务: 正在分析第 {i + 1}/{len(image_paths)} 页发票...")
-            page_data = _extract_invoice_info(img_path)
+            page_data = await loop.run_in_executor(None, _extract_invoice_info, img_path)
             
             print(f"  后台任务 => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')}, 金额: {page_data.get('invoice_amount')}, 耗时: {page_data.get('duration')}s")
             

@@ -169,27 +169,29 @@ async function renderPdfPage(
     return a.transform[4] - b.transform[4];
   });
 
-  // Build stripped text (remove ALL whitespace) — matches backend's _strip_all_whitespace
+  // Build stripped text — matches backend's _strip_all_whitespace
+  // Track original char position within each text item for precise highlighting
   let normText = '';
-  const charToItem: number[] = [];
+  const charMap: { itemIdx: number; charInItem: number }[] = [];
   for (let i = 0; i < allItems.length; i++) {
-    const stripped = allItems[i].str.replace(/\s/g, '');
-    for (const ch of stripped) {
-      charToItem.push(i);
-      normText += ch;
+    const str = allItems[i].str;
+    for (let c = 0; c < str.length; c++) {
+      if (/\s/.test(str[c])) continue;
+      charMap.push({ itemIdx: i, charInItem: c });
+      normText += str[c];
     }
   }
 
   const offsetKey = side === 'a' ? 'offsetA' : 'offsetB';
-  const bgColor = side === 'a' ? 'rgba(254,202,202,0.5)' : 'rgba(187,247,208,0.5)';
+  const bgColor = side === 'a' ? 'rgba(239,68,68,0.35)' : 'rgba(34,197,94,0.35)';
   let totalMatches = 0;
-  const highlighted = new Set<number>();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Collect highlighted character positions per text item
+  const itemCharPositions = new Map<number, number[]>();
+
   for (const seg of segments as any[]) {
-    // Strip whitespace from segment — same as backend
     const segNorm = seg.text.replace(/\s/g, '');
-    if (segNorm.length < 2) continue;
+    if (!segNorm) continue;
 
     const expectedOffset: number = seg[offsetKey] ?? 0;
 
@@ -210,34 +212,54 @@ async function renderPdfPage(
 
     if (bestIdx === -1) continue;
 
-    // Map character range to item indices
+    // Record each matched character's original position within its text item
     const endIdx = bestIdx + segNorm.length;
-    for (let c = bestIdx; c < endIdx && c < charToItem.length; c++) {
-      const itemIdx = charToItem[c];
-      if (itemIdx < 0 || highlighted.has(itemIdx)) continue;
-      highlighted.add(itemIdx);
+    for (let c = bestIdx; c < endIdx && c < charMap.length; c++) {
+      const { itemIdx, charInItem } = charMap[c];
+      if (!itemCharPositions.has(itemIdx)) {
+        itemCharPositions.set(itemIdx, []);
+      }
+      itemCharPositions.get(itemIdx)!.push(charInItem);
+    }
+  }
 
-      const item = allItems[itemIdx];
-      const tx = item.transform;
-      const [vx, vy] = viewport.convertToViewportPoint(tx[4], tx[5]);
-      const fontSize = Math.sqrt(tx[0] ** 2 + tx[1] ** 2) * viewport.scale;
-      const w = Math.abs(item.width || fontSize * item.str.length * 0.6) * viewport.scale;
-      const h = fontSize * 1.3;
+  // Render character-precise highlight rectangles
+  for (const [itemIdx, chars] of itemCharPositions) {
+    const item = allItems[itemIdx];
+    const tx = item.transform;
+    const [vx, vy] = viewport.convertToViewportPoint(tx[4], tx[5]);
+    const fontSize = Math.sqrt(tx[0] ** 2 + tx[1] ** 2) * viewport.scale;
+    const fullW = Math.abs(item.width || fontSize * item.str.length * 0.6) * viewport.scale;
+    const h = fontSize * 1.3;
+    const strLen = item.str.length;
+    if (strLen === 0 || fullW < 1 || h < 1) continue;
 
-      if (w < 1 || h < 1) continue;
+    // Sort positions and find contiguous ranges
+    chars.sort((a, b) => a - b);
+    const ranges: [number, number][] = [];
+    let rs = chars[0], re = chars[0];
+    for (let i = 1; i < chars.length; i++) {
+      if (chars[i] <= re + 1) {
+        re = chars[i];
+      } else {
+        ranges.push([rs, re]);
+        rs = chars[i];
+        re = chars[i];
+      }
+    }
+    ranges.push([rs, re]);
 
+    // Create a highlight rectangle for each contiguous range
+    for (const [start, end] of ranges) {
+      const left = vx + (start / strLen) * fullW;
+      const width = ((end - start + 1) / strLen) * fullW;
+      if (width < 1) continue;
       const rect = document.createElement('div');
-      rect.style.cssText = `position:absolute;left:${vx}px;top:${vy - h}px;width:${w}px;height:${h}px;background:${bgColor};border-radius:2px;`;
+      rect.style.cssText = `position:absolute;left:${left}px;top:${vy - h}px;width:${width}px;height:${h}px;background:${bgColor};border-radius:2px;`;
       highlightEl.appendChild(rect);
       totalMatches++;
     }
   }
-
-  // Debug info
-  const debugBlock = document.createElement('div');
-  debugBlock.style.cssText = 'position:absolute;left:10px;top:10px;background:rgba(0,0,0,0.6);color:white;font-size:11px;z-index:999;padding:2px 6px;border-radius:2px;';
-  debugBlock.textContent = `${side.toUpperCase()}: items=${allItems.length} segs=${segments.length} matches=${totalMatches}`;
-  highlightEl.appendChild(debugBlock);
 }
 
 // ---- Render current page ----
@@ -537,15 +559,15 @@ const typeBadgeClass: Record<string, string> = {
 
 /* Sidebar diff text */
 .diff-text-del {
-  background: #fecaca;
+  background: #fca5a5;
   text-decoration: line-through;
-  text-decoration-color: #ef4444;
+  text-decoration-color: #dc2626;
   border-radius: 2px;
   padding: 0 1px;
 }
 
 .diff-text-ins {
-  background: #bbf7d0;
+  background: #86efac;
   border-radius: 2px;
   padding: 0 1px;
 }

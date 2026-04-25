@@ -1,6 +1,6 @@
 # ⚙️ Backend Service
 
-基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，支持银行流水识别、询证函识别与格式比对、证件识别、发票识别、合同比对等多种文档智能处理功能。
+基于 **FastAPI** + **Python 3.11** 构建的高性能后端服务，集成了 **Qwen-VL** 多模态大模型，支持银行流水识别、询证函识别与格式比对、证件识别、发票识别、文档比对等多种文档智能处理功能。
 
 ---
 
@@ -111,7 +111,10 @@ backend/
 │   ├── native_statement/     # 📊 原生电子流水解析模块
 │   │   ├── router.py         #   API 路由
 │   │   └── service.py        #   PDF 原生解析逻辑
-│   ├── contracts/            # 📄 合同比对模块
+│   ├── documents/            # 📄 文档比对模块
+│   │   ├── models.py         #   DocumentCompareTask + DocumentPageDiff
+│   │   ├── router.py         #   API 路由（含公开文件访问）
+│   │   └── service.py        #   文档提取、页级对齐、diff 计算
 │   ├── legal_contact/        # 📋 律师联系方式提取
 │   ├── file_provider/        # 📦 ECM 影像平台文件服务
 │   │   ├── router.py         #   API 路由
@@ -171,11 +174,15 @@ backend/
 - `GET /api/invoice_recognition/list/{file_id}`: 获取指定发票识别结果。
 - `DELETE /api/invoice_recognition/{file_id}`: 删除发票及结果。
 
-### 📄 合同比对模块
+### 📄 文档比对模块
 
-- `POST /api/contracts/upload`: 上传待比对合同。
-- `POST /api/contracts/{id}/compare`: 执行合同差异比对。
-- `GET /api/contracts/{id}`: 获取比对结果。
+- `POST /api/documents/compare`: 上传两份文档并启动异步比对。
+- `POST /api/documents/list`: 获取所有比对任务列表。
+- `POST /api/documents/list/{task_id}`: 获取任务详情（含页级 diff）。
+- `POST /api/documents/{task_id}/status`: 轮询任务状态。
+- `POST /api/documents/{task_id}/file/{doc_type}`: 获取原始文件（需认证）。
+- `GET /api/documents/{task_id}/file/{doc_type}`: 获取原始文件（无需认证，用于 iframe 嵌入）。
+- `DELETE /api/documents/{task_id}`: 删除比对任务及关联数据。
 
 ### 📦 ECM 文件服务模块
 

@@ -63,14 +63,14 @@ const hasDiffContent = computed(() => filteredOps.value.length > 0);
   color: #1e293b;
 }
 .diff-del {
-  background: #fecaca;
+  background: #fca5a5;
   text-decoration: line-through;
-  text-decoration-color: #ef4444;
+  text-decoration-color: #dc2626;
   border-radius: 2px;
   padding: 0 1px;
 }
 .diff-ins {
-  background: #bbf7d0;
+  background: #86efac;
   border-radius: 2px;
   padding: 0 1px;
 }

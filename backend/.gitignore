@@ -1,3 +1,29 @@
+# System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python Backend
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/res/
+backend/*.log
+backend/uv.lock
+
+# General
+.env
+
+# Build artifacts
+*.tar.gz
+offline_deploy/
+
+
 # Python
 __pycache__/
 *.py[cod]
@@ -10,8 +36,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# lib/
+# lib64/
 parts/
 sdist/
 var/
@@ -47,4 +73,7 @@ download/
 .AppleDouble
 .LSOverride
 ._*
+*.tar
+
 uv.lock
+uv.toml

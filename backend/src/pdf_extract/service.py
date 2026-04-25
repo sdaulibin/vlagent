@@ -3,6 +3,7 @@
 
 处理流程：PDF → 拆分图片 → 构建 Schema + Prompt → 调用 AI → 修复 JSON → 保存结果
 """
+import asyncio
 import os
 import json
 import shutil
@@ -133,8 +134,9 @@ async def process_pdf_extract(db: AsyncSession, task: PdfExtractTask):
         # 解析字段定义
         fields = json.loads(task.fields_json)
 
-        # 调用 AI 提取
-        extracted_data = _extract_with_ai(image_paths, fields)
+        # 调用 AI 提取（在线程池中执行，避免同步 HTTP 调用阻塞事件循环）
+        loop = asyncio.get_event_loop()
+        extracted_data = await loop.run_in_executor(None, _extract_with_ai, image_paths, fields)
 
         # 保存结果
         result = PdfExtractResult(

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+	<root>
+		<prop name="cacheIp">10.238.145.107</prop>
+		<prop name="cachePort">8022</prop>
+		<prop name="tfsCacheIp">10.238.145.107</prop>
+		<prop name="tfsCachePort">8022</prop>
+		<prop name="uaIp">10.238.145.107</prop>
+		<prop name="uaPort">8022</prop>
+		<prop name="model_code">LOS_YW</prop>
+		<prop name="doc_part">RP_RB_PART</prop>
+		<prop name="serverName">SunECMDM</prop>
+		<prop name="groupName">group107</prop>
+		<prop name="userName">ibd</prop>
+		<prop name="password">Ibd#0923</prop>
+		<prop name="limitAmount">100</prop>
+
+</root>

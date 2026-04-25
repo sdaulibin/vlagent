@@ -110,9 +110,9 @@ server:
       scheme: HTTP
     initialDelaySeconds: 30
     periodSeconds: 30
-    timeoutSeconds: 5
+    timeoutSeconds: 15
     successThreshold: 1
-    failureThreshold: 3
+    failureThreshold: 5
 
   readinessProbe:
     httpGet:
@@ -121,9 +121,9 @@ server:
       scheme: HTTP
     initialDelaySeconds: 10
     periodSeconds: 10
-    timeoutSeconds: 5
+    timeoutSeconds: 15
     successThreshold: 1
-    failureThreshold: 3
+    failureThreshold: 5
 
   tolerations: []
   nodeSelector: {}

@@ -28,7 +28,7 @@ FULL_IMAGE_NAME = $(if $(REGISTRY),$(REGISTRY)/$(IMAGE_NAME):$(TAG),$(IMAGE_NAME
 
 # Python 基础镜像
 PYTHON_BUILDER_IMAGE ?= harbor.devops.qdb.com/star/python:3.13-bullseye-uv
-PYTHON_RUNTIME_IMAGE ?= harbor.devops.qdb.com/star/vlagent-backend-runtime:1.0
+PYTHON_RUNTIME_IMAGE ?= harbor.devops.qdb.com/star/vlagent-backend-runtime:1.1
 
 # 应用端口
 APP_PORT ?= 8000

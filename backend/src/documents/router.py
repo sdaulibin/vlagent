@@ -147,8 +147,12 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
     if ext in (".docx", ".doc"):
         pdf_path = os.path.splitext(file_path)[0] + ".pdf"
         if not os.path.exists(pdf_path):
+            import asyncio
             from src.documents.service import docx_to_pdf
-            docx_to_pdf(file_path, output_dir=os.path.dirname(file_path))
+            try:
+                await asyncio.to_thread(docx_to_pdf, file_path, os.path.dirname(file_path))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"文档转换PDF失败: {e}")
         file_path = pdf_path
         ext = ".pdf"
         filename = os.path.splitext(filename)[0] + ".pdf"

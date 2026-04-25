@@ -43,6 +43,12 @@ config: |
             try_files $uri $uri/ /index.html;
         }
 
+        location ~* \.mjs$ {
+            default_type application/javascript;
+            expires 30d;
+            add_header Cache-Control "public, max-age=2592000";
+        }
+
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
             expires 30d;
             add_header Cache-Control "public, max-age=2592000";
