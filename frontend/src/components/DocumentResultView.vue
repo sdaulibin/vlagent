@@ -1,20 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-vue-next';
+import { api } from '../api';
+import type { PageDiff } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-interface PageDiff {
-  id: number;
-  page_a: number | null;
-  page_b: number | null;
-  diff_type: string;
-  text_a: string | null;
-  text_b: string | null;
-  diff_ops_json: string | null;
-}
 
 interface Props {
   taskId: number;
@@ -47,8 +39,6 @@ const canvasB = ref<HTMLCanvasElement | null>(null);
 const highlightA = ref<HTMLDivElement | null>(null);
 const highlightB = ref<HTMLDivElement | null>(null);
 
-const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-
 const filteredPages = computed(() => {
   if (filter.value === 'all') return props.pages;
   return props.pages.filter(p => p.diff_type === filter.value);
@@ -67,6 +57,15 @@ const stats = computed(() => {
   return { all, modified, added, deleted, equal };
 });
 
+// 预解析所有页面的 diff_ops_json，避免模板中重复 JSON.parse
+const parsedDiffOpsMap = computed(() => {
+  const map = new Map<number, ReturnType<typeof parseDiffOps>>();
+  for (const page of props.pages) {
+    map.set(page.id, parseDiffOps(page.diff_ops_json));
+  }
+  return map;
+});
+
 const hasPrev = computed(() => currentPageIndex.value > 0);
 const hasNext = computed(() => currentPageIndex.value < filteredPages.value.length - 1);
 
@@ -79,27 +78,27 @@ const goToPage = (index: number) => {
 
 // ---- PDF loading ----
 
+async function loadPdf(docType: 'a' | 'b') {
+  const response = await api.post(
+    `/documents/${props.taskId}/file/${docType}`,
+    {},
+    { responseType: 'arraybuffer' }
+  );
+  const data = new Uint8Array(response.data);
+  return pdfjsLib.getDocument({ data }).promise;
+}
+
 async function loadPdfs() {
   pdfLoading.value = true;
 
-  const promises: Promise<void>[] = [];
+  try {
+    const [docA, docB] = await Promise.all([loadPdf('a'), loadPdf('b')]);
+    pdfDocA.value = docA;
+    pdfDocB.value = docB;
+  } catch (e) {
+    console.error('Failed to load PDFs:', e);
+  }
 
-  promises.push(
-    pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/a`).promise
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((doc: any) => { pdfDocA.value = doc; })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .catch((e: any) => console.error('Failed to load PDF A:', e))
-  );
-  promises.push(
-    pdfjsLib.getDocument(`${apiBase}/documents/${props.taskId}/file/b`).promise
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((doc: any) => { pdfDocB.value = doc; })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .catch((e: any) => console.error('Failed to load PDF B:', e))
-  );
-
-  await Promise.all(promises);
   pdfLoading.value = false;
 }
 
@@ -502,7 +501,7 @@ const typeBadgeClass: Record<string, string> = {
 
             <template v-if="page.diff_type === 'modified' && page.diff_ops_json">
               <div class="text-xs leading-relaxed mt-1.5 line-clamp-3">
-                <template v-for="(seg, si) in parseDiffOps(page.diff_ops_json)" :key="si">
+                <template v-for="(seg, si) in parsedDiffOpsMap.get(page.id) || []" :key="si">
                   <span v-if="seg.op === -1" class="diff-text-del">{{ seg.text }}</span>
                   <span v-else-if="seg.op === 1" class="diff-text-ins">{{ seg.text }}</span>
                   <span v-else class="text-slate-400">{{ seg.text }}</span>

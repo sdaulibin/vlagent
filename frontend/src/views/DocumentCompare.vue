@@ -9,6 +9,7 @@ import {
   getDocumentTaskStatus,
   deleteDocumentTask,
 } from '../api';
+import type { TaskItem, TaskDetail } from '../types';
 import DocumentUpload from '../components/DocumentUpload.vue';
 import DocumentHistory from '../components/DocumentHistory.vue';
 import DocumentResultView from '../components/DocumentResultView.vue';
@@ -20,40 +21,6 @@ const isProcessing = ref(false);
 const fileA = ref<File | null>(null);
 const fileB = ref<File | null>(null);
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
-
-interface PageDiff {
-  id: number;
-  page_a: number | null;
-  page_b: number | null;
-  diff_type: string;
-  text_a: string | null;
-  text_b: string | null;
-  diff_ops_json: string | null;
-}
-
-interface TaskDetail {
-  id: number;
-  file_a_name: string;
-  file_b_name: string;
-  file_a_page_count: number | null;
-  file_b_page_count: number | null;
-  status: string;
-  error_msg: string | null;
-  comparison_duration: number | null;
-  created_at: string;
-  pages: PageDiff[];
-}
-
-interface TaskItem {
-  id: number;
-  file_a_name: string;
-  file_b_name: string;
-  file_a_page_count: number | null;
-  file_b_page_count: number | null;
-  status: string;
-  comparison_duration: number | null;
-  created_at: string;
-}
 
 const historyList = ref<TaskItem[]>([]);
 const taskDetail = ref<TaskDetail | null>(null);

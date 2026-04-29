@@ -112,9 +112,6 @@ export const deleteDocumentTask = async (taskId: number) => {
   return response.data;
 };
 
-export const getDocumentFileUrl = (taskId: number, docType: "a" | "b") =>
-  fetchFileAsBlobUrl(`/documents/${taskId}/file/${docType}`);
-
 // ===== 询证函识别 API =====
 
 export const uploadConfirmationLetter = async (file: File) => {

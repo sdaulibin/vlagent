@@ -1,16 +1,6 @@
 <script setup lang="ts">
 import { Clock, Trash2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-vue-next';
-
-interface TaskItem {
-  id: number;
-  file_a_name: string;
-  file_b_name: string;
-  file_a_page_count: number | null;
-  file_b_page_count: number | null;
-  status: string;
-  comparison_duration: number | null;
-  created_at: string;
-}
+import type { TaskItem } from '../types';
 
 defineProps<{
   historyList: TaskItem[];

@@ -19,6 +19,7 @@ from difflib import SequenceMatcher
 from diff_match_patch import diff_match_patch
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.database import SessionLocal
 from src.documents.models import DocumentCompareTask, DocumentPageDiff
 
 logger = logging.getLogger(__name__)
@@ -742,69 +743,93 @@ def _diff_table_rows(row_a: list[str], row_b: list[str]) -> list[tuple[int, str]
 
     return ops
 
-async def process_document_comparison(db: AsyncSession, task: DocumentCompareTask):
-    """异步后台任务：提取 → 对齐 → diff → 写库"""
+async def process_document_comparison(task_id: int):
+    """异步后台任务：提取 → 对齐 → diff → 写库
+
+    自行创建数据库会话，避免使用请求作用域的 AsyncSession。
+    """
     start_time = time.time()
 
-    try:
-        task.status = "processing"
-        db.add(task)
-        await db.commit()
+    async with SessionLocal() as db:
+        task = await db.get(DocumentCompareTask, task_id)
+        if not task:
+            logger.error("文档比对任务不存在 task=%d", task_id)
+            return
 
-        # 1. 提取页面文本（在线程池中执行，避免阻塞事件循环）
-        loop = asyncio.get_event_loop()
-        text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path)
-        text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path)
+        try:
+            task.status = "processing"
+            db.add(task)
+            await db.commit()
 
-        task.file_a_page_count = len(text_a_pages)
-        task.file_b_page_count = len(text_b_pages)
+            # 1. 提取页面文本（用于页级对齐）+ 结构化块（用于表格感知 diff）
+            loop = asyncio.get_event_loop()
+            text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path)
+            text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path)
+            blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path)
+            blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path)
 
-        # 2. 页级对齐（基于纯文本）
-        aligned = align_pages(text_a_pages, text_b_pages)
+            task.file_a_page_count = len(text_a_pages)
+            task.file_b_page_count = len(text_b_pages)
 
-        # 3. 逐页计算 diff 并写入
-        for page_a_idx, page_b_idx, diff_type in aligned:
-            text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
-            text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
+            # 2. 页级对齐（基于纯文本）
+            aligned = align_pages(text_a_pages, text_b_pages)
 
-            diff_ops = None
-            if diff_type == "modified" and text_a is not None and text_b is not None:
-                # 先检查内容是否实际相同（排版差异导致的字符顺序不同）
-                if _is_content_identical(text_a, text_b):
-                    diff_type = "equal"
-                else:
-                    # 直接对整页文本做行级对齐，绕过 block 级别对齐
-                    # （两份 PDF 的 block 结构可能不同：一个有边框表格 TableBlock，一个无边框 TextBlock）
-                    ops = _diff_aligned_blocks(
-                        TextBlock(text=text_a),
-                        TextBlock(text=text_b),
-                        0, 0,
-                    )
-                    if all(op == 0 for op, *_ in ops):
+            # 3. 逐页计算 diff 并写入
+            for page_a_idx, page_b_idx, diff_type in aligned:
+                text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
+                text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
+
+                diff_ops = None
+                if diff_type == "modified" and text_a is not None and text_b is not None:
+                    # 先检查内容是否实际相同（排版差异导致的字符顺序不同）
+                    if _is_content_identical(text_a, text_b):
                         diff_type = "equal"
                     else:
-                        diff_ops = json.dumps(ops, ensure_ascii=False)
+                        # 尝试结构化 diff：当两页的 block 结构类型一致时，
+                        # 表格按行/单元格比对，非表格按行对齐+字符级 diff
+                        page_blocks_a = blocks_a[page_a_idx] if page_a_idx is not None and page_a_idx < len(blocks_a) else []
+                        page_blocks_b = blocks_b[page_b_idx] if page_b_idx is not None and page_b_idx < len(blocks_b) else []
+                        can_structured = (
+                            len(page_blocks_a) == len(page_blocks_b)
+                            and all(type(ba) == type(bb) for ba, bb in zip(page_blocks_a, page_blocks_b))
+                        )
 
-            page_diff = DocumentPageDiff(
-                task_id=task.id,
-                page_a=(page_a_idx + 1) if page_a_idx is not None else None,
-                page_b=(page_b_idx + 1) if page_b_idx is not None else None,
-                diff_type=diff_type,
-                text_a=text_a,
-                text_b=text_b,
-                diff_ops_json=diff_ops,
-            )
-            db.add(page_diff)
+                        if can_structured and page_blocks_a:
+                            ops = compute_structured_diff(page_blocks_a, page_blocks_b)
+                        else:
+                            # block 结构不同（如一个有边框表格 TableBlock，一个无边框 TextBlock），
+                            # 退化为整页纯文本行级对齐
+                            ops = _diff_aligned_blocks(
+                                TextBlock(text=text_a),
+                                TextBlock(text=text_b),
+                                0, 0,
+                            )
 
-        task.comparison_duration = round(time.time() - start_time, 2)
-        task.status = "done"
-        db.add(task)
-        await db.commit()
+                        if all(op == 0 for op, *_ in ops):
+                            diff_type = "equal"
+                        else:
+                            diff_ops = json.dumps(ops, ensure_ascii=False)
 
-    except Exception as e:
-        logger.exception("文档比对失败 task=%d", task.id)
-        task.status = "failed"
-        task.error_msg = str(e)
-        task.comparison_duration = round(time.time() - start_time, 2)
-        db.add(task)
-        await db.commit()
+                page_diff = DocumentPageDiff(
+                    task_id=task.id,
+                    page_a=(page_a_idx + 1) if page_a_idx is not None else None,
+                    page_b=(page_b_idx + 1) if page_b_idx is not None else None,
+                    diff_type=diff_type,
+                    text_a=text_a,
+                    text_b=text_b,
+                    diff_ops_json=diff_ops,
+                )
+                db.add(page_diff)
+
+            task.comparison_duration = round(time.time() - start_time, 2)
+            task.status = "done"
+            db.add(task)
+            await db.commit()
+
+        except Exception as e:
+            logger.exception("文档比对失败 task=%d", task.id)
+            task.status = "failed"
+            task.error_msg = str(e)
+            task.comparison_duration = round(time.time() - start_time, 2)
+            db.add(task)
+            await db.commit()

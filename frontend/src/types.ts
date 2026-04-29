@@ -159,3 +159,31 @@ export const BANK_TYPE_NAMES: Record<BankType, string> = {
   boc: "中国银行",
   bocom: "交通银行",
 };
+
+// ===== 文档比对 =====
+
+export interface PageDiff {
+  id: number;
+  page_a: number | null;
+  page_b: number | null;
+  diff_type: string;
+  text_a: string | null;
+  text_b: string | null;
+  diff_ops_json: string | null;
+}
+
+export interface TaskItem {
+  id: number;
+  file_a_name: string;
+  file_b_name: string;
+  file_a_page_count: number | null;
+  file_b_page_count: number | null;
+  status: string;
+  comparison_duration: number | null;
+  created_at: string;
+}
+
+export interface TaskDetail extends TaskItem {
+  error_msg: string | null;
+  pages: PageDiff[];
+}

@@ -5,7 +5,6 @@ from src.auth import verify_token, get_current_user_info
 from src.files.router import router as files_router
 from src.transactions.router import router as transactions_router
 from src.documents.router import router as documents_router
-from src.documents.router import public_router as documents_public_router
 from src.confirmation_letter.router import router as confirmation_router
 from src.confirmation_compare.router import router as format_compare_router
 from src.invoice_recognition.router import router as invoice_router
@@ -15,10 +14,6 @@ from src.file_provider.router import router as file_provider_router
 from src.pdf_extract.router import router as pdf_extract_router
 
 api_router = APIRouter(dependencies=[Depends(verify_token)])
-
-# 无需认证的公开路由（用于 iframe 嵌入文件访问）
-public_api_router = APIRouter()
-public_api_router.include_router(documents_public_router)
 
 # 文件管理
 api_router.include_router(files_router)

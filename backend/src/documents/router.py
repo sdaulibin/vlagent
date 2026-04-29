@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Backgro
 from fastapi.responses import FileResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc
-from sqlalchemy import delete as sql_delete
+from sqlalchemy import delete as sql_delete, and_
 from pathlib import Path
 from uuid import uuid4
 from urllib.parse import quote
 import os
-import shutil
 
 from src.database import get_session
 from src.documents.models import (
@@ -21,7 +20,8 @@ from src.documents.models import (
 from src.documents.service import process_document_comparison
 
 router = APIRouter(prefix="/documents", tags=["文档比对"])
-public_router = APIRouter(tags=["文档比对-文件访问"])
+
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 UPLOAD_DIR = os.getenv(
     "DOCUMENT_UPLOAD_DIR",
@@ -54,6 +54,19 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str, prefix: str
     return str(target_path)
 
 
+def _copyfileobj_limited(fsrc, fdst, max_size: int, chunk_size: int = 1024 * 1024):
+    """带大小限制的文件拷贝，超过 max_size 抛出 ValueError"""
+    total = 0
+    while True:
+        chunk = fsrc.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_size:
+            raise ValueError(f"文件大小超过限制 ({max_size // (1024 * 1024)}MB)")
+        fdst.write(chunk)
+
+
 @router.post("/compare")
 async def compare_documents(
     background_tasks: BackgroundTasks,
@@ -70,10 +83,38 @@ async def compare_documents(
     file_a_path = _build_safe_upload_path(UPLOAD_DIR, file_a.filename, prefix="a_")
     file_b_path = _build_safe_upload_path(UPLOAD_DIR, file_b.filename, prefix="b_")
 
-    with open(file_a_path, "wb") as buf:
-        shutil.copyfileobj(file_a.file, buf)
-    with open(file_b_path, "wb") as buf:
-        shutil.copyfileobj(file_b.file, buf)
+    try:
+        with open(file_a_path, "wb") as buf:
+            _copyfileobj_limited(file_a.file, buf, MAX_FILE_SIZE)
+    except ValueError:
+        if os.path.exists(file_a_path):
+            os.remove(file_a_path)
+        raise HTTPException(status_code=413, detail=f"文件 {file_a.filename} 超过 50MB 限制")
+
+    try:
+        with open(file_b_path, "wb") as buf:
+            _copyfileobj_limited(file_b.file, buf, MAX_FILE_SIZE)
+    except ValueError:
+        for p in (file_a_path, file_b_path):
+            if os.path.exists(p):
+                os.remove(p)
+        raise HTTPException(status_code=413, detail=f"文件 {file_b.filename} 超过 50MB 限制")
+
+    # 防重复提交：相同文件名如有 pending/processing 状态的任务，直接返回
+    existing_stmt = select(DocumentCompareTask).where(
+        and_(
+            DocumentCompareTask.file_a_name == file_a.filename,
+            DocumentCompareTask.file_b_name == file_b.filename,
+            DocumentCompareTask.status.in_(["pending", "processing"]),
+        )
+    ).order_by(desc(DocumentCompareTask.created_at)).limit(1)
+    existing = (await db.execute(existing_stmt)).scalars().first()
+    if existing:
+        # 清理刚上传的重复文件
+        for p in (file_a_path, file_b_path):
+            if os.path.exists(p):
+                os.remove(p)
+        return {"task_id": existing.id, "status": existing.status}
 
     task = DocumentCompareTask(
         file_a_name=file_a.filename,
@@ -86,7 +127,7 @@ async def compare_documents(
     await db.commit()
     await db.refresh(task)
 
-    background_tasks.add_task(process_document_comparison, db, task)
+    background_tasks.add_task(process_document_comparison, task.id)
 
     return {"task_id": task.id, "status": "pending"}
 
@@ -150,7 +191,12 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
             import asyncio
             from src.documents.service import docx_to_pdf
             try:
-                await asyncio.to_thread(docx_to_pdf, file_path, os.path.dirname(file_path))
+                await asyncio.wait_for(
+                    asyncio.to_thread(docx_to_pdf, file_path, os.path.dirname(file_path)),
+                    timeout=120,
+                )
+            except asyncio.TimeoutError:
+                raise HTTPException(status_code=504, detail="文档转换PDF超时，请稍后重试")
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"文档转换PDF失败: {e}")
         file_path = pdf_path
@@ -173,12 +219,6 @@ async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(
     return await _serve_task_file(task_id, doc_type, db)
 
 
-@public_router.get("/documents/{task_id}/file/{doc_type}")
-async def get_task_file_public(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session)):
-    """获取原始文件（GET，无需认证，用于 iframe 嵌入，支持 #page=N 页码跳转）"""
-    return await _serve_task_file(task_id, doc_type, db)
-
-
 @router.delete("/{task_id}")
 async def delete_task(task_id: int, db: AsyncSession = Depends(get_session)):
     """删除比对任务及关联数据"""
@@ -194,6 +234,14 @@ async def delete_task(task_id: int, db: AsyncSession = Depends(get_session)):
                 os.remove(path)
             except Exception:
                 pass
+        # 清理 DOCX 转换产生的 PDF 缓存
+        if path:
+            pdf_cache = os.path.splitext(path)[0] + ".pdf"
+            if os.path.exists(pdf_cache):
+                try:
+                    os.remove(pdf_cache)
+                except Exception:
+                    pass
 
     await db.delete(task)
     await db.commit()
