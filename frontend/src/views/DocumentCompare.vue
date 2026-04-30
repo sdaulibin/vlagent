@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, FileDiff } from 'lucide-vue-next';
 import {
@@ -17,13 +17,17 @@ import DocumentResultView from '../components/DocumentResultView.vue';
 const router = useRouter();
 
 const activeView = ref<'upload' | 'result'>('upload');
-const isProcessing = ref(false);
+const isSubmitting = ref(false);
 const fileA = ref<File | null>(null);
 const fileB = ref<File | null>(null);
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
+const pollingTimers = new Map<number, ReturnType<typeof setInterval>>();
 
 const historyList = ref<TaskItem[]>([]);
 const taskDetail = ref<TaskDetail | null>(null);
+
+const hasProcessingTasks = computed(() =>
+  historyList.value.some((t) => t.status === 'processing'),
+);
 
 const loadHistory = async () => {
   try {
@@ -34,32 +38,34 @@ const loadHistory = async () => {
 };
 
 const startPolling = (taskId: number) => {
-  stopPolling();
-  pollTimer.value = setInterval(async () => {
+  stopPolling(taskId);
+  const timer = setInterval(async () => {
     try {
       const status = await getDocumentTaskStatus(taskId);
       if (status.status === 'done') {
-        stopPolling();
-        taskDetail.value = await getDocumentTask(taskId);
-        isProcessing.value = false;
+        stopPolling(taskId);
         await loadHistory();
       } else if (status.status === 'failed') {
-        stopPolling();
-        isProcessing.value = false;
-        taskDetail.value = await getDocumentTask(taskId);
-        alert(`比对失败: ${status.error_msg || '未知错误'}`);
+        stopPolling(taskId);
         await loadHistory();
       }
     } catch (e) {
       console.error('Polling error:', e);
     }
   }, 3000);
+  pollingTimers.set(taskId, timer);
 };
 
-const stopPolling = () => {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-    pollTimer.value = null;
+const stopPolling = (taskId?: number) => {
+  if (taskId !== undefined) {
+    const timer = pollingTimers.get(taskId);
+    if (timer) {
+      clearInterval(timer);
+      pollingTimers.delete(taskId);
+    }
+  } else {
+    pollingTimers.forEach((timer) => clearInterval(timer));
+    pollingTimers.clear();
   }
 };
 
@@ -69,34 +75,47 @@ const startCompare = async () => {
     return;
   }
 
-  isProcessing.value = true;
+  isSubmitting.value = true;
 
   try {
     const result = await compareDocuments(fileA.value, fileB.value);
     const taskId = result.task_id;
 
-    // 立即构建一个初始 taskDetail 用于展示加载状态
-    taskDetail.value = {
+    // Add new task to top of history list
+    historyList.value.unshift({
       id: taskId,
       file_a_name: fileA.value.name,
       file_b_name: fileB.value.name,
       file_a_page_count: null,
       file_b_page_count: null,
       status: 'processing',
-      error_msg: null,
       comparison_duration: null,
       created_at: new Date().toISOString(),
-      pages: [],
-    };
-    activeView.value = 'result';
+    });
+
+    // Clear files for next upload
+    fileA.value = null;
+    fileB.value = null;
+
     startPolling(taskId);
   } catch (error: any) {
-    isProcessing.value = false;
     alert(error.response?.data?.detail || '比对失败，请重试');
+  } finally {
+    isSubmitting.value = false;
   }
 };
 
 const viewHistoryTask = async (task: TaskItem) => {
+  if (task.status === 'processing') return;
+  if (task.status === 'failed') {
+    try {
+      const detail = await getDocumentTask(task.id);
+      alert(`比对失败: ${detail.error_msg || '未知错误'}`);
+    } catch (e) {
+      console.error('Failed to load task:', e);
+    }
+    return;
+  }
   try {
     taskDetail.value = await getDocumentTask(task.id);
     activeView.value = 'result';
@@ -108,6 +127,7 @@ const viewHistoryTask = async (task: TaskItem) => {
 const handleDeleteTask = async (taskId: number) => {
   if (!confirm('确定要删除这个比对任务吗？')) return;
   try {
+    stopPolling(taskId);
     await deleteDocumentTask(taskId);
     await loadHistory();
   } catch (e) {
@@ -119,7 +139,6 @@ const goBack = () => {
   if (activeView.value === 'result') {
     activeView.value = 'upload';
     taskDetail.value = null;
-    stopPolling();
   } else {
     router.push('/');
   }
@@ -158,7 +177,7 @@ onUnmounted(() => {
         <DocumentUpload
           :fileA="fileA"
           :fileB="fileB"
-          :isProcessing="isProcessing"
+          :isProcessing="isSubmitting"
           @update:fileA="fileA = $event"
           @update:fileB="fileB = $event"
           @compare="startCompare"
@@ -166,6 +185,7 @@ onUnmounted(() => {
 
         <DocumentHistory
           :historyList="historyList"
+          :hasProcessing="hasProcessingTasks"
           @view="viewHistoryTask"
           @delete="handleDeleteTask"
         />
