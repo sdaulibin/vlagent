@@ -13,8 +13,9 @@ from typing import Optional, List
 class ConfirmationFile(SQLModel, table=True):
     """询证函文件记录"""
     __tablename__ = "confirmation_files"
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
     status: str = Field(default="pending")  # pending, processing, done, failed
@@ -29,8 +30,9 @@ class ConfirmationResult(SQLModel, table=True):
     __tablename__ = "confirmation_results"
     
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: int = Field(index=True, foreign_key="confirmation_files.id")
-    
+
     # 识别字段（13项）
     confirmation_no: Optional[str] = Field(default=None, description="函证编号")
     accounting_firm: Optional[str] = Field(default=None, description="事务所名称")

@@ -82,6 +82,13 @@ export const exportExcel = async (fileId: number, filename: string) => {
   window.URL.revokeObjectURL(url);
 };
 
+// ===== 权限 API =====
+
+export const getUserPermissions = async () => {
+  const response = await api.get("/permissions/me");
+  return response.data as string[];
+};
+
 // ===== 文档比对 API =====
 
 export const compareDocuments = async (fileA: File, fileB: File) => {

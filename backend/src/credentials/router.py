@@ -13,6 +13,9 @@ from sqlalchemy import select, delete
 from sqlmodel import Session
 from typing import Optional
 
+from sqlalchemy import or_
+
+from src.auth import get_current_user_id
 from src.database import get_session
 from src.credentials.service import process_credential
 from src.credentials.schemas import CredentialExtractionResponse
@@ -55,6 +58,7 @@ async def extract_credential(
     file: UploadFile = File(...),
     credential_type: str = Form(..., description=f"支持的类型: {', '.join(PROMPT_MAPPING.keys())}"),
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     提取凭证类文件(图片/PDF)的结构化信息，并保存记录。
@@ -62,8 +66,12 @@ async def extract_credential(
     if credential_type not in PROMPT_MAPPING:
         raise HTTPException(status_code=400, detail=f"不受支持的类型: {credential_type}")
 
+    # 创建用户目录
+    user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+    os.makedirs(user_upload_dir, exist_ok=True)
+
     # 保存文件到持久化目录
-    file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
+    file_path = _build_safe_upload_path(user_upload_dir, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
@@ -73,6 +81,7 @@ async def extract_credential(
         file_path=file_path,
         credential_type=credential_type,
         status="processing",
+        user_id=user_id,
     )
     session.add(record)
     await session.commit()
@@ -89,6 +98,7 @@ async def extract_credential(
             record_id=record.id,
             credential_type=result["credential_type"],
             extracted_data=json.dumps(result["extracted_data"], ensure_ascii=False),
+            user_id=user_id,
         )
         session.add(cred_result)
 
@@ -127,9 +137,10 @@ async def extract_credential(
 @router.post("/list", response_model=list[CredentialRecordListItem])
 async def list_records(
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取所有凭证提取记录"""
-    statement = select(CredentialRecord).order_by(CredentialRecord.created_at.desc())
+    statement = select(CredentialRecord).where(or_(CredentialRecord.user_id == user_id, CredentialRecord.user_id.is_(None))).order_by(CredentialRecord.created_at.desc())
     result = await session.execute(statement)
     records = result.scalars().all()
     return [
@@ -150,6 +161,7 @@ async def list_records(
 async def get_record(
     record_id: int,
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取单条凭证提取记录详情"""
     statement = select(CredentialRecord).where(CredentialRecord.id == record_id)
@@ -157,6 +169,8 @@ async def get_record(
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    if record.user_id is not None and record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     # 获取提取结果
     extracted_data = None
@@ -181,6 +195,7 @@ async def get_record(
 async def get_record_file(
     record_id: int,
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取原始文件预览"""
     statement = select(CredentialRecord).where(CredentialRecord.id == record_id)
@@ -188,6 +203,8 @@ async def get_record_file(
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    if record.user_id is not None and record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     if not os.path.exists(record.file_path):
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -215,6 +232,7 @@ async def get_record_file(
 async def delete_record(
     record_id: int,
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """删除凭证提取记录"""
     statement = select(CredentialRecord).where(CredentialRecord.id == record_id)
@@ -222,6 +240,8 @@ async def delete_record(
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="记录不存在")
+    if record.user_id is not None and record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     # 先删除提取结果（外键约束）
     await session.execute(

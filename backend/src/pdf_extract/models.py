@@ -23,6 +23,7 @@ class PdfExtractTask(SQLModel, table=True):
     __tablename__ = "pdf_extract_tasks"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
     status: str = Field(default="pending")  # pending, processing, done, failed
@@ -40,6 +41,7 @@ class PdfExtractResult(SQLModel, table=True):
     __tablename__ = "pdf_extract_results"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     task_id: int = Field(index=True, foreign_key="pdf_extract_tasks.id")
     extracted_data: str = Field(default="{}", description="提取结果 JSON 字符串")
     error_msg: Optional[str] = None

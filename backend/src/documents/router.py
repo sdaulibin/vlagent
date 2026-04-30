@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Backgro
 from fastapi.responses import FileResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc
-from sqlalchemy import delete as sql_delete, and_
+from sqlalchemy import delete as sql_delete, and_, or_
 from pathlib import Path
 from uuid import uuid4
 from urllib.parse import quote
 import os
 
 from src.database import get_session
+from src.auth import get_current_user_id
 from src.documents.models import (
     DocumentCompareTask,
     DocumentPageDiff,
@@ -73,6 +74,7 @@ async def compare_documents(
     file_a: UploadFile = File(...),
     file_b: UploadFile = File(...),
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """上传两份文档并启动异步比对"""
     allowed = (".pdf", ".docx", ".doc")
@@ -80,8 +82,11 @@ async def compare_documents(
         if not (f.filename or "").lower().endswith(allowed):
             raise HTTPException(status_code=400, detail=f"仅支持 PDF 和 Word 文档，不支持: {f.filename}")
 
-    file_a_path = _build_safe_upload_path(UPLOAD_DIR, file_a.filename, prefix="a_")
-    file_b_path = _build_safe_upload_path(UPLOAD_DIR, file_b.filename, prefix="b_")
+    user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+    os.makedirs(user_upload_dir, exist_ok=True)
+
+    file_a_path = _build_safe_upload_path(user_upload_dir, file_a.filename, prefix="a_")
+    file_b_path = _build_safe_upload_path(user_upload_dir, file_b.filename, prefix="b_")
 
     try:
         with open(file_a_path, "wb") as buf:
@@ -122,6 +127,7 @@ async def compare_documents(
         file_b_name=file_b.filename,
         file_b_path=file_b_path,
         status="pending",
+        user_id=user_id,
     )
     db.add(task)
     await db.commit()
@@ -133,20 +139,24 @@ async def compare_documents(
 
 
 @router.post("/list", response_model=list[DocumentTaskListItem])
-async def list_tasks(db: AsyncSession = Depends(get_session)):
+async def list_tasks(db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有比对任务列表"""
-    statement = select(DocumentCompareTask).order_by(desc(DocumentCompareTask.created_at))
+    statement = select(DocumentCompareTask).where(
+        or_(DocumentCompareTask.user_id == user_id, DocumentCompareTask.user_id.is_(None))
+    ).order_by(desc(DocumentCompareTask.created_at))
     result = await db.execute(statement)
     tasks = result.scalars().all()
     return [DocumentTaskListItem.model_validate(t) for t in tasks]
 
 
 @router.post("/list/{task_id}", response_model=DocumentCompareResponse)
-async def get_task(task_id: int, db: AsyncSession = Depends(get_session)):
+async def get_task(task_id: int, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取任务详情（含页级 diff）"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该任务")
 
     pages_stmt = select(DocumentPageDiff).where(DocumentPageDiff.task_id == task_id).order_by(DocumentPageDiff.id)
     pages_result = await db.execute(pages_stmt)
@@ -158,19 +168,23 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_session)):
 
 
 @router.post("/{task_id}/status", response_model=DocumentTaskStatusResponse)
-async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session)):
+async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """轮询任务状态"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该任务")
     return DocumentTaskStatusResponse.model_validate(task)
 
 
-async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
+async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_id: str):
     """文件服务内部方法。DOCX/DOC 自动转 PDF 后返回，转换结果缓存到同目录"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该任务")
 
     if doc_type == "a":
         file_path, filename = task.file_a_path, task.file_a_name
@@ -214,17 +228,19 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession):
 
 
 @router.post("/{task_id}/file/{doc_type}")
-async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session)):
+async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取原始文件（POST，需认证）"""
-    return await _serve_task_file(task_id, doc_type, db)
+    return await _serve_task_file(task_id, doc_type, db, user_id)
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, db: AsyncSession = Depends(get_session)):
+async def delete_task(task_id: int, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """删除比对任务及关联数据"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该任务")
 
     await db.execute(sql_delete(DocumentPageDiff).where(DocumentPageDiff.task_id == task_id))
 

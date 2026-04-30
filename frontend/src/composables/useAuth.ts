@@ -29,7 +29,7 @@ let authReady = false;
 })();
 
 /** 将 JWT payload 部分解码（不做签名验证，仅读取字段） */
-function decodePayload(token: string): Record<string, unknown> | null {
+export function decodePayload(token: string): Record<string, unknown> | null {
   try {
     const base64 = token.split(".")[1];
     const json = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));

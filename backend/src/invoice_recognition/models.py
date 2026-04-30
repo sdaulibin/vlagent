@@ -13,8 +13,9 @@ from typing import Optional, List
 class InvoiceFile(SQLModel, table=True):
     """发票上传记录"""
     __tablename__ = "invoice_files"
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
     status: str = Field(default="pending")  # pending, processing, done, failed
@@ -30,6 +31,7 @@ class InvoiceResult(SQLModel, table=True):
     __tablename__ = "invoice_results"
     
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: int = Field(index=True, foreign_key="invoice_files.id")
     page_number: int = Field(description="PDF页码(1-indexed)")
     

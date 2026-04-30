@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class BocomSummary(SQLModel, table=True):
     """交通银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     bank_branch: Optional[str] = None         # 开户机构
@@ -25,6 +26,7 @@ class BocomSummary(SQLModel, table=True):
 class BocomTransaction(SQLModel, table=True):
     """交通银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     sequence: Optional[str] = None               # 序号

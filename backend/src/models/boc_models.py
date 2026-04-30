@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class BocSummary(SQLModel, table=True):
     """中国银行流水汇总信息（中英双语表头）"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     # 首页顶部账户信息
@@ -27,6 +28,7 @@ class BocSummary(SQLModel, table=True):
 class BocTransaction(SQLModel, table=True):
     """中国银行交易明细（中英双语表头）"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     sequence: Optional[str] = None               # 序号 No.

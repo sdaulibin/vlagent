@@ -7,6 +7,9 @@ import os
 from datetime import datetime
 from typing import List
 
+from sqlalchemy import or_
+
+from src.auth import get_current_user_id
 from src.database import get_session
 from src.invoice_recognition.models import (
     InvoiceFile, 
@@ -28,7 +31,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_invoice_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_session)
+    db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     上传新的发票 PDF 进行识别。返回数据库中新建任务的文件信息。
@@ -37,10 +41,14 @@ async def upload_invoice_pdf(
     if not file.filename.lower().endswith(allowed_extensions):
         raise HTTPException(status_code=400, detail="仅支持 PDF、JPG、PNG 文件。")
 
+    # 创建用户目录
+    user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+    os.makedirs(user_upload_dir, exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
     unique_filename = f"{timestamp}_{safe_filename}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    file_path = os.path.join(user_upload_dir, unique_filename)
 
     # 1. 保存文件
     content = await file.read()
@@ -51,7 +59,8 @@ async def upload_invoice_pdf(
     db_file = InvoiceFile(
         filename=file.filename,
         file_path=file_path,
-        status="pending"
+        status="pending",
+        user_id=user_id,
     )
     db.add(db_file)
     await db.commit()
@@ -70,12 +79,13 @@ async def upload_invoice_pdf(
 
 @router.post("/list", response_model=List[InvoiceFileListItem])
 async def list_invoice_files(
-    db: AsyncSession = Depends(get_session)
+    db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     获取所有发票文件列表（按创建时间倒序）。
     """
-    statement = select(InvoiceFile).order_by(desc(InvoiceFile.created_at))
+    statement = select(InvoiceFile).where(or_(InvoiceFile.user_id == user_id, InvoiceFile.user_id.is_(None))).order_by(desc(InvoiceFile.created_at))
     results = (await db.execute(statement)).scalars().all()
     return [
         InvoiceFileListItem(
@@ -94,7 +104,8 @@ async def list_invoice_files(
 @router.post("/list/{file_id}", response_model=InvoiceRecognitionResponse)
 async def get_invoice_result(
     file_id: int,
-    db: AsyncSession = Depends(get_session)
+    db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     获取单个发票 PDF 的识别结果和状态。
@@ -102,6 +113,8 @@ async def get_invoice_result(
     db_file = await db.get(InvoiceFile, file_id)
     if not db_file:
         raise HTTPException(status_code=404, detail="File not found")
+    if db_file.user_id is not None and db_file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     statement = select(InvoiceResult).where(InvoiceResult.file_id == file_id).order_by(InvoiceResult.page_number)
     results = (await db.execute(statement)).scalars().all()
@@ -136,12 +149,15 @@ async def get_invoice_result(
 @router.post("/{file_id}/file")
 async def get_invoice_file(
     file_id: int,
-    db: AsyncSession = Depends(get_session)
+    db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取发票原始文件"""
     db_file = await db.get(InvoiceFile, file_id)
     if not db_file:
         raise HTTPException(status_code=404, detail="File not found")
+    if db_file.user_id is not None and db_file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     if not db_file.file_path or not os.path.exists(db_file.file_path):
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -157,7 +173,8 @@ async def get_invoice_file(
 @router.delete("/{file_id}")
 async def delete_invoice_file(
     file_id: int,
-    db: AsyncSession = Depends(get_session)
+    db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     删除发票文件及其所有识别结果。
@@ -165,6 +182,8 @@ async def delete_invoice_file(
     db_file = await db.get(InvoiceFile, file_id)
     if not db_file:
         raise HTTPException(status_code=404, detail="File not found")
+    if db_file.user_id is not None and db_file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     # 先删除关联的识别结果（外键约束）
     await db.execute(

@@ -15,6 +15,7 @@ class CredentialRecord(SQLModel, table=True):
     __tablename__ = "credential_records"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
     credential_type: str = Field(description="凭证类型: id_card, bank_card, etc.")
@@ -29,6 +30,7 @@ class CredentialResult(SQLModel, table=True):
     __tablename__ = "credential_results"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     record_id: int = Field(index=True, foreign_key="credential_records.id")
     credential_type: str
     extracted_data: str = Field(default="{}", description="提取结果 JSON 字符串")

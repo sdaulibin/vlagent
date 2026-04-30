@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class IcbcSummary(SQLModel, table=True):
     """工商银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     account_number: Optional[str] = None      # 账号
@@ -24,6 +25,7 @@ class IcbcSummary(SQLModel, table=True):
 class IcbcTransaction(SQLModel, table=True):
     """工商银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     transaction_time: Optional[str] = None       # 交易时间

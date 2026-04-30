@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class CmbSummary(SQLModel, table=True):
     """招商银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     account_number: Optional[str] = None     # 账号
@@ -29,6 +30,7 @@ class CmbSummary(SQLModel, table=True):
 class CmbTransaction(SQLModel, table=True):
     """招商银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     serial_no: Optional[str] = None          # 交易流水号

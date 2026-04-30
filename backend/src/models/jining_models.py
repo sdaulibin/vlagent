@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class JiningSummary(SQLModel, table=True):
     """济宁银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     account_number: Optional[str] = None     # 账号
@@ -26,6 +27,7 @@ class JiningSummary(SQLModel, table=True):
 class JiningTransaction(SQLModel, table=True):
     """济宁银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     sequence: Optional[str] = None           # 序号

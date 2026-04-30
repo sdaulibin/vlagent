@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc
 
+from sqlalchemy import or_
+
+from src.auth import get_current_user_id
 from src.database import get_session
 from src.pdf_extract.models import (
     PdfExtractTask,
@@ -37,6 +40,7 @@ async def upload_pdf_extract(
     fields: str = Form(..., description="提取字段 JSON 数组"),
     output_format: str = Form("json", description="输出格式: json/csv/xlsx"),
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     上传 PDF 文件和字段定义，启动提取任务。
@@ -54,11 +58,17 @@ async def upload_pdf_extract(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"字段解析失败: {e}")
 
+    # 创建用户目录
+    user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+    os.makedirs(user_upload_dir, exist_ok=True)
+    user_download_dir = os.path.join(DOWNLOAD_DIR, user_id)
+    os.makedirs(user_download_dir, exist_ok=True)
+
     # 保存文件
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
     unique_filename = f"{timestamp}_{safe_filename}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    file_path = os.path.join(user_upload_dir, unique_filename)
 
     content = await file.read()
     with open(file_path, 'wb') as out_file:
@@ -70,7 +80,8 @@ async def upload_pdf_extract(
         file_path=file_path,
         fields_json=fields,
         output_format=output_format,
-        status="pending"
+        status="pending",
+        user_id=user_id,
     )
     db.add(task)
     await db.commit()
@@ -91,9 +102,10 @@ async def upload_pdf_extract(
 @router.post("/list", response_model=List[PdfExtractTaskListItem])
 async def list_pdf_extract_tasks(
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取所有提取任务列表"""
-    statement = select(PdfExtractTask).order_by(desc(PdfExtractTask.created_at))
+    statement = select(PdfExtractTask).where(or_(PdfExtractTask.user_id == user_id, PdfExtractTask.user_id.is_(None))).order_by(desc(PdfExtractTask.created_at))
     results = (await db.execute(statement)).scalars().all()
     return [
         PdfExtractTaskListItem(
@@ -114,11 +126,14 @@ async def list_pdf_extract_tasks(
 async def get_pdf_extract_task(
     task_id: int,
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """获取单个任务的提取结果"""
     task = await db.get(PdfExtractTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     fields_data = json.loads(task.fields_json)
     result_data = None
@@ -145,11 +160,14 @@ async def get_pdf_extract_task(
 async def download_pdf_extract(
     task_id: int,
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """下载导出文件（CSV/XLSX）"""
     task = await db.get(PdfExtractTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     if task.status != "done":
         raise HTTPException(status_code=400, detail="任务尚未完成")
 
@@ -184,11 +202,14 @@ async def download_pdf_extract(
 async def delete_pdf_extract_task(
     task_id: int,
     db: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """删除提取任务及其结果"""
     task = await db.get(PdfExtractTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     # 删除关联结果
     statement = select(PdfExtractResult).where(PdfExtractResult.task_id == task_id)

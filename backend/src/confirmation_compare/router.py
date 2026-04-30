@@ -13,6 +13,9 @@ from fastapi.responses import FileResponse
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from sqlalchemy import or_
+
+from src.auth import get_current_user_id
 from src.database import get_session
 from .models import FormatCompareTask, FormatCompareTaskDTO, FormatMismatchItem, TemplateInfo
 from .service import compare_with_template, get_template_list, get_template_pdf_path, _load_template
@@ -92,14 +95,19 @@ async def preview_template(format_key: str):
 async def upload_file(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """上传询证函（仅保存文件，不立即比对）"""
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "仅支持 PDF 文件")
 
+    # 创建用户目录
+    user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+    os.makedirs(user_upload_dir, exist_ok=True)
+
     # 保存文件
     safe_name = f"{uuid4().hex[:8]}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
+    file_path = os.path.join(user_upload_dir, safe_name)
     with open(file_path, "wb") as f:
         content = await file.read()
         f.write(content)
@@ -109,6 +117,7 @@ async def upload_file(
         filename=file.filename,
         file_path=file_path,
         status="pending",
+        user_id=user_id,
     )
     session.add(task)
     await session.commit()
@@ -121,11 +130,14 @@ async def upload_file(
 async def run_compare(
     task_id: int,
     session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """对已上传的文件执行格式比对"""
     task = await session.get(FormatCompareTask, task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     if task.status == "processing":
         raise HTTPException(400, "比对正在进行中")
 
@@ -156,40 +168,61 @@ async def run_compare(
 
 
 @router.post("", response_model=list[FormatCompareTaskDTO])
-async def list_tasks(session: AsyncSession = Depends(get_session)):
+async def list_tasks(
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
+):
     """获取所有比对任务"""
-    stmt = select(FormatCompareTask).order_by(FormatCompareTask.created_at.desc())
+    stmt = select(FormatCompareTask).where(or_(FormatCompareTask.user_id == user_id, FormatCompareTask.user_id.is_(None))).order_by(FormatCompareTask.created_at.desc())
     result = await session.execute(stmt)
     tasks = result.scalars().all()
     return [_to_dto(t) for t in tasks]
 
 
 @router.post("/{task_id}", response_model=FormatCompareTaskDTO)
-async def get_task(task_id: int, session: AsyncSession = Depends(get_session)):
+async def get_task(
+    task_id: int,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
+):
     """获取单个比对任务详情"""
     task = await session.get(FormatCompareTask, task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     return _to_dto(task)
 
 
 @router.post("/{task_id}/file")
-async def preview_uploaded_file(task_id: int, session: AsyncSession = Depends(get_session)):
+async def preview_uploaded_file(
+    task_id: int,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
+):
     """预览上传的询证函 PDF"""
     task = await session.get(FormatCompareTask, task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
     if not os.path.exists(task.file_path):
         raise HTTPException(404, "文件不存在")
     return FileResponse(task.file_path, media_type="application/pdf")
 
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, session: AsyncSession = Depends(get_session)):
+async def delete_task(
+    task_id: int,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
+):
     """删除比对任务"""
     task = await session.get(FormatCompareTask, task_id)
     if not task:
         raise HTTPException(404, "任务不存在")
+    if task.user_id is not None and task.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问")
 
     # 删除文件
     if os.path.exists(task.file_path):

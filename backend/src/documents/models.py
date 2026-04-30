@@ -15,6 +15,7 @@ class DocumentCompareTask(SQLModel, table=True):
     __tablename__ = "document_compare_tasks"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_a_name: str
     file_a_path: str
     file_b_name: str
@@ -32,6 +33,7 @@ class DocumentPageDiff(SQLModel, table=True):
     __tablename__ = "document_page_diffs"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     task_id: int = Field(index=True, foreign_key="document_compare_tasks.id")
     page_a: Optional[int] = Field(default=None, description="文档A页码(1-based)，整页新增时为null")
     page_b: Optional[int] = Field(default=None, description="文档B页码(1-based)，整页删除时为null")

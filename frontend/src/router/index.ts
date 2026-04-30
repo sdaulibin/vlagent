@@ -9,6 +9,7 @@ import CredentialRecognition from '../views/CredentialRecognition.vue'
 import PdfExtract from '../views/PdfExtract.vue'
 import AuthError from '../views/AuthError.vue'
 import { isAuthenticated } from '../composables/useAuth'
+import { useUser } from '../composables/useUser'
 
 const routes = [
     {
@@ -68,14 +69,20 @@ const router = createRouter({
     routes
 })
 
-// 路由守卫：未认证时重定向到错误页面
+// 路由守卫：未认证时重定向到错误页面，无权限时重定向到首页
 router.beforeEach((to, _from, next) => {
     if (to.meta.public) {
         next()
     } else if (!isAuthenticated()) {
         next({ name: 'AuthError' })
     } else {
-        next()
+        const { hasPermission, permissionsLoaded } = useUser()
+        const moduleKey = to.path.slice(1)
+        if (permissionsLoaded.value && moduleKey && moduleKey !== '' && !hasPermission(moduleKey)) {
+            next({ name: 'Home' })
+        } else {
+            next()
+        }
     }
 })
 

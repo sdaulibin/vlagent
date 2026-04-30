@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class CgbSummary(SQLModel, table=True):
     """广发银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     account_name: Optional[str] = None       # 户名
@@ -33,6 +34,7 @@ class CgbSummary(SQLModel, table=True):
 class CgbTransaction(SQLModel, table=True):
     """广发银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     summary_id: Optional[int] = Field(default=None, foreign_key="cgbsummary.id")  # 关联汇总
     

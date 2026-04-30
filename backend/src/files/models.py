@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 class FileRecord(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str
     file_path: str
     status: str = "pending"

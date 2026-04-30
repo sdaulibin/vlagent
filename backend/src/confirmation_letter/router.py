@@ -17,8 +17,10 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
+from sqlalchemy import or_
 
 from src.database import get_session
+from src.auth import get_current_user_id
 from src.confirmation_letter.models import (
     ConfirmationFile,
     ConfirmationResult,
@@ -107,11 +109,12 @@ def _to_file_dto(file_obj: ConfirmationFile, rec_obj: ConfirmationResult | None)
 
 
 @router.post("", response_model=List[ConfirmationFileDTO])
-async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
+async def get_confirmation_files(session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有询证函文件记录"""
     statement = (
         select(ConfirmationFile, ConfirmationResult)
         .outerjoin(ConfirmationResult, ConfirmationResult.file_id == ConfirmationFile.id)
+        .where(or_(ConfirmationFile.user_id == user_id, ConfirmationFile.user_id.is_(None)))
         .order_by(desc(ConfirmationFile.created_at))
     )
     result = await session.execute(statement)
@@ -130,7 +133,8 @@ async def get_confirmation_files(session: AsyncSession = Depends(get_session)):
 @router.post("/upload")
 async def upload_confirmation_file(
     file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """上传询证函文件"""
     try:
@@ -138,14 +142,17 @@ async def upload_confirmation_file(
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
 
-        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
+        user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+        os.makedirs(user_upload_dir, exist_ok=True)
+
+        file_path = _build_safe_upload_path(user_upload_dir, file.filename)
 
         # 保存文件
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         # 创建文件记录
-        conf_file = ConfirmationFile(filename=file.filename, file_path=file_path)
+        conf_file = ConfirmationFile(filename=file.filename, file_path=file_path, user_id=user_id)
         session.add(conf_file)
         await session.commit()
         await session.refresh(conf_file)
@@ -166,13 +173,15 @@ async def upload_confirmation_file(
 
 
 @router.post("/{file_id}", response_model=ConfirmationFileDTO)
-async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
+async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取单个询证函详情（文件 + 识别结果）"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     result = await session.execute(statement)
     file = result.scalar_one_or_none()
     if not file:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
+    if file.user_id is not None and file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该文件")
     
     # 查询关联的识别结果
     res_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
@@ -182,13 +191,15 @@ async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(ge
 
 
 @router.post("/{file_id}/file")
-async def preview_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session)):
+async def preview_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """预览询证函原始文件"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     result = await session.execute(statement)
     file_obj = result.scalar_one_or_none()
     if not file_obj:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
+    if file_obj.user_id is not None and file_obj.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该文件")
     if not os.path.exists(file_obj.file_path):
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -203,8 +214,9 @@ async def preview_confirmation_file(file_id: int, session: AsyncSession = Depend
 
 @router.post("/{file_id}/recognize")
 async def recognize_confirmation_file(
-    file_id: int, 
-    session: AsyncSession = Depends(get_session)
+    file_id: int,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """识别询证函字段"""
     try:
@@ -213,9 +225,11 @@ async def recognize_confirmation_file(
             select(ConfirmationFile).where(ConfirmationFile.id == file_id)
         )
         conf_file = result.scalar_one_or_none()
-        
+
         if not conf_file:
             raise HTTPException(status_code=404, detail="询证函记录不存在")
+        if conf_file.user_id is not None and conf_file.user_id != user_id:
+            raise HTTPException(status_code=403, detail="无权访问该文件")
         
         if conf_file.status == "done":
             return {"status": "already_done", "message": "已识别完成"}
@@ -266,6 +280,7 @@ async def recognize_confirmation_file(
             # 创建新的识别结果记录
             conf_result = ConfirmationResult(
                 file_id=file_id,
+                user_id=user_id,
                 confirmation_no=recognition_result.get("confirmation_no", ""),
                 recipient_bank=recognition_result.get("recipient_bank", ""),
                 accounting_firm=recognition_result.get("accounting_firm", ""),
@@ -318,17 +333,21 @@ async def recognize_confirmation_file(
 
 @router.put("/{file_id}/result")
 async def update_confirmation_result(
-    file_id: int, 
+    file_id: int,
     data: ConfirmationResultUpdate,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """人工修改识别结果"""
     # 检查文件是否存在
     file_result = await session.execute(
         select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     )
-    if not file_result.scalar_one_or_none():
+    file_obj = file_result.scalar_one_or_none()
+    if not file_obj:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
+    if file_obj.user_id is not None and file_obj.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该文件")
     
     # 查询识别结果
     result = await session.execute(
@@ -356,17 +375,20 @@ async def update_confirmation_result(
 
 @router.delete("/{file_id}")
 async def delete_confirmation_file(
-    file_id: int, 
-    session: AsyncSession = Depends(get_session)
+    file_id: int,
+    session: AsyncSession = Depends(get_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """删除询证函文件及关联的识别结果"""
     result = await session.execute(
         select(ConfirmationFile).where(ConfirmationFile.id == file_id)
     )
     conf_file = result.scalar_one_or_none()
-    
+
     if not conf_file:
         raise HTTPException(status_code=404, detail="询证函记录不存在")
+    if conf_file.user_id is not None and conf_file.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问该文件")
     
     cleaned = []
     

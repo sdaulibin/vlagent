@@ -14,9 +14,11 @@ import shutil
 import os
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_
 from sqlmodel import select, desc
 from openpyxl import Workbook
 
+from src.auth import get_current_user_id
 from src.database import get_session
 from src.files.models import FileRecord
 from src.banks import get_bank_handler, get_all_handlers
@@ -51,15 +53,15 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
 
 
 @router.post("", response_model=List[FileRecord])
-async def get_files(session: AsyncSession = Depends(get_session)):
+async def get_files(session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有文件列表"""
-    statement = select(FileRecord).order_by(desc(FileRecord.created_at))
+    statement = select(FileRecord).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None))).order_by(desc(FileRecord.created_at))
     result = await session.execute(statement)
     return result.scalars().all()
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session)):
+async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """上传文件（仅保存，不处理）"""
     try:
         # 1. 验证文件格式（仅支持 PDF）
@@ -73,14 +75,16 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         if not is_valid:
             raise HTTPException(status_code=400, detail=error_msg)
 
-        file_path = _build_safe_upload_path(UPLOAD_DIR, file.filename)
+        user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
+        os.makedirs(user_upload_dir, exist_ok=True)
+        file_path = _build_safe_upload_path(user_upload_dir, file.filename)
 
         # 保存文件
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         # 创建文件记录 - 状态为 pending（待处理）
-        db_file = FileRecord(filename=file.filename, file_path=file_path, status="pending")
+        db_file = FileRecord(filename=file.filename, file_path=file_path, status="pending", user_id=user_id)
         session.add(db_file)
         await session.commit()
         await session.refresh(db_file)
@@ -101,9 +105,9 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
 
 
 @router.post("/{file_id}", response_model=FileRecord)
-async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
+async def get_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取单个文件详情"""
-    statement = select(FileRecord).where(FileRecord.id == file_id)
+    statement = select(FileRecord).where(FileRecord.id == file_id).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None)))
     result = await session.execute(statement)
     file = result.scalar_one_or_none()
     if not file:
@@ -112,11 +116,11 @@ async def get_file(file_id: int, session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/{file_id}/recognize")
-async def start_recognition(file_id: int, session: AsyncSession = Depends(get_session)):
+async def start_recognition(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """开始识别文件内容"""
     try:
         # 获取文件记录
-        result = await session.execute(select(FileRecord).where(FileRecord.id == file_id))
+        result = await session.execute(select(FileRecord).where(FileRecord.id == file_id).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None))))
         db_file = result.scalar_one_or_none()
         
         if not db_file:
@@ -294,10 +298,10 @@ async def _process_cgb_multi_summary(session, file_id, raw_transactions, summary
 
 
 @router.delete("/{file_id}")
-async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)):
+async def delete_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """删除文件及其关联的所有数据"""
     try:
-        statement = select(FileRecord).where(FileRecord.id == file_id)
+        statement = select(FileRecord).where(FileRecord.id == file_id).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None)))
         result = await session.execute(statement)
         file_record = result.scalar_one_or_none()
         
@@ -334,10 +338,10 @@ async def delete_file(file_id: int, session: AsyncSession = Depends(get_session)
 
 
 @router.post("/{file_id}/export")
-async def export_file(file_id: int, session: AsyncSession = Depends(get_session)):
+async def export_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """导出文件交易数据为 Excel（包含汇总信息）"""
     # 获取文件信息
-    file_stmt = select(FileRecord).where(FileRecord.id == file_id)
+    file_stmt = select(FileRecord).where(FileRecord.id == file_id).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None)))
     file_result = await session.execute(file_stmt)
     file_record = file_result.scalar_one_or_none()
     

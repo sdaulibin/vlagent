@@ -32,13 +32,20 @@ async def init_db():
         JiningSummary, JiningTransaction,
         CgbSummary, CgbTransaction,
         PsbcSummary, PsbcTransaction,
+        IcbcSummary, IcbcTransaction,
+        CcbSummary, CcbTransaction,
+        AbcSummary, AbcTransaction,
+        BocSummary, BocTransaction,
+        BocomSummary, BocomTransaction,
     )
     from src.documents.models import DocumentCompareTask, DocumentPageDiff
     from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult
     from src.confirmation_compare.models import FormatCompareTask
     from src.invoice_recognition.models import InvoiceFile, InvoiceResult
     from src.credentials.models import CredentialRecord, CredentialResult
-    
+    from src.pdf_extract.models import PdfExtractTask, PdfExtractResult
+    from src.permissions.models import UserPermission
+
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -83,6 +90,35 @@ async def init_db():
             await conn.execute(text(
                 f"ALTER TABLE invoice_results "
                 f"ADD COLUMN IF NOT EXISTS {col[0]} {col[1]}"
+            ))
+
+        # 用户权限系统：为所有表添加 user_id 字段（幂等）
+        _ALL_TABLES = [
+            "filerecord",
+            "shandonglocalsummary", "shandonglocaltransaction",
+            "everbrightsummary", "everbrighttransaction",
+            "cmbsummary", "cmbtransaction",
+            "jiningsummary", "jiningtransaction",
+            "cgbsummary", "cgbtransaction",
+            "psbcsummary", "psbctransaction",
+            "icbcsummary", "icbctransaction",
+            "ccbsummary", "ccbtransaction",
+            "abcsummary", "abctransaction",
+            "bocsummary", "boctransaction",
+            "bocomsummary", "bocomtransaction",
+            "document_compare_tasks", "document_page_diffs",
+            "confirmation_files", "confirmation_results",
+            "format_compare_tasks",
+            "invoice_files", "invoice_results",
+            "credential_records", "credential_results",
+            "pdf_extract_tasks", "pdf_extract_results",
+        ]
+        for tbl in _ALL_TABLES:
+            await conn.execute(text(
+                f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS user_id VARCHAR"
+            ))
+            await conn.execute(text(
+                f"CREATE INDEX IF NOT EXISTS ix_{tbl}_user_id ON {tbl} (user_id)"
             ))
 
 

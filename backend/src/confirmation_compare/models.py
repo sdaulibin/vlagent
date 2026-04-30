@@ -11,6 +11,7 @@ class FormatCompareTask(SQLModel, table=True):
     __tablename__ = "format_compare_tasks"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
     format_type: Optional[str] = Field(default=None, description="识别的格式类型: format_1/format_2/capital_verification")

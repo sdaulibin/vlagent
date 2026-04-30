@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 class AbcSummary(SQLModel, table=True):
     """农业银行流水汇总信息"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     # 首页顶部信息
@@ -30,6 +31,7 @@ class AbcSummary(SQLModel, table=True):
 class AbcTransaction(SQLModel, table=True):
     """农业银行交易明细"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
     file_id: Optional[int] = Field(default=None, foreign_key="filerecord.id")
     
     transaction_time: Optional[str] = None       # 交易时间

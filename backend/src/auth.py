@@ -79,3 +79,16 @@ async def get_current_user_info(
 ) -> dict:
     """验证 token 并返回用户信息，用于 /auth/me 接口。"""
     return payload
+
+
+async def get_current_user_id(
+    payload: dict = Depends(verify_token),
+) -> str:
+    """从已验证的 JWT payload 中提取 user_id。"""
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 缺少 user_id",
+        )
+    return user_id

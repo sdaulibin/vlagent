@@ -6,32 +6,35 @@
         </div>
     </div>
     <router-view v-else />
+    <UserAvatar v-if="!loading" />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { initAuth } from './composables/useAuth'
+import { useUser } from './composables/useUser'
 import { api } from './api/index'
+import UserAvatar from './components/UserAvatar.vue'
 
 const router = useRouter()
 const loading = ref(true)
+
+const { loadPermissions } = useUser()
 
 onMounted(async () => {
     const token = await initAuth()
 
     if (token) {
-        // 主动调用后端验证 token，触发后端日志打印
         try {
             await api.post('/auth/me')
+            await loadPermissions()
         } catch {
-            // 验证失败（401）由 axios 拦截器处理
             loading.value = false
             router.replace('/auth-error')
             return
         }
         loading.value = false
-        // 认证成功但路由守卫可能已跳转到 auth-error，修正回首页
         if (router.currentRoute.value.name === 'AuthError') {
             router.replace('/')
         }
