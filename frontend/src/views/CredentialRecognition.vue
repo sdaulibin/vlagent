@@ -384,18 +384,16 @@ onMounted(() => {
           <div v-if="previewUrl" class="border-b border-slate-100 bg-slate-50">
             <div class="p-3">
               <p class="text-xs font-medium text-slate-500 mb-2">原文预览</p>
-              <div class="rounded-lg overflow-hidden border border-slate-200 bg-white" style="max-height: 400px;">
+              <div class="file-preview-container">
                 <img
                   v-if="isImageFile(previewUrl)"
                   :src="previewUrl"
-                  class="w-full h-auto object-contain"
-                  style="max-height: 400px;"
+                  class="file-preview-img"
                 />
                 <iframe
                   v-else
                   :src="previewUrl"
-                  class="w-full border-0"
-                  style="height: 400px;"
+                  class="file-preview-iframe"
                 />
               </div>
             </div>

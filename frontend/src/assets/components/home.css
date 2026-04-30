@@ -1,48 +1,36 @@
 @layer components {
-  /* ===== Home Page - Dark Theme ===== */
+  /* ===== Home Page ===== */
   .home-container {
-    @apply min-h-screen;
-    background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
+    @apply min-h-screen bg-slate-50;
   }
 
   .home-header {
-    @apply pt-12 pb-8 text-center;
+    @apply pt-16 pb-10 text-center;
   }
 
   .home-title {
-    @apply text-4xl font-bold bg-clip-text text-transparent;
-    background-image: linear-gradient(to right, #60a5fa, #a78bfa);
+    @apply text-3xl font-bold text-slate-900;
   }
 
   .home-subtitle {
-    @apply text-gray-400 text-lg;
+    @apply text-slate-500 text-base mt-2;
   }
 
   .home-logo {
-    @apply p-3 rounded-2xl shadow-lg;
-    background: linear-gradient(to right, #3b82f6, #9333ea);
-    box-shadow: 0 10px 25px rgba(147, 51, 234, 0.3);
+    @apply w-12 h-12 rounded-xl flex items-center justify-center bg-blue-600 shadow-sm;
   }
 
   .home-footer {
-    @apply text-center py-8 text-gray-500 text-sm;
+    @apply text-center py-8 text-slate-400 text-sm;
   }
 
   /* ===== Scenario Cards ===== */
   .scenario-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 24px;
-    transition: all 0.3s ease;
+    @apply bg-white rounded-xl border border-slate-200 p-6 transition-all;
   }
 
-  .scenario-card:hover:not(.scenario-card--disabled) {
-    transform: translateY(-4px);
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  .scenario-card:hover {
+    @apply shadow-md border-slate-300 -translate-y-0.5;
   }
 
   .scenario-card--disabled {
@@ -50,43 +38,51 @@
   }
 
   .scenario-card-icon {
-    @apply w-14 h-14 rounded-2xl flex items-center justify-center mb-4;
+    @apply w-11 h-11 rounded-lg flex items-center justify-center mb-4;
   }
 
   .scenario-card-title {
-    @apply text-xl font-semibold text-white mb-2;
+    @apply text-base font-semibold text-slate-900 mb-1.5;
   }
 
   .scenario-card-desc {
-    @apply text-gray-400 text-sm mb-4;
+    @apply text-sm text-slate-500 leading-relaxed mb-4;
   }
 
   .scenario-card-link {
-    @apply flex items-center text-blue-400 text-sm font-medium;
+    @apply flex items-center text-sm font-medium text-blue-600;
   }
 
   .scenario-card-link:hover {
-    @apply text-blue-300;
+    @apply text-blue-700;
   }
 
   /* ===== Icon Gradients ===== */
   .icon-gradient-blue {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    @apply bg-blue-600;
   }
 
   .icon-gradient-green {
-    background: linear-gradient(135deg, #22c55e, #16a34a);
+    @apply bg-emerald-600;
   }
 
   .icon-gradient-orange {
-    background: linear-gradient(135deg, #f97316, #ea580c);
+    @apply bg-orange-500;
   }
 
   .icon-gradient-purple {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    @apply bg-violet-600;
   }
 
   .icon-gradient-red {
-    background: linear-gradient(135deg, #f43f5e, #e11d48);
+    @apply bg-rose-500;
+  }
+
+  .icon-gradient-indigo {
+    @apply bg-indigo-600;
+  }
+
+  .icon-gradient-cyan {
+    @apply bg-cyan-600;
   }
 }

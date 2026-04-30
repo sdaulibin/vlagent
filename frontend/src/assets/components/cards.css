@@ -32,19 +32,17 @@
 
   /* File Preview */
   .file-preview-container {
-    @apply rounded-lg overflow-hidden border border-slate-200 bg-slate-50;
+    @apply rounded-lg overflow-hidden border border-slate-200 bg-white;
     max-height: 400px;
-    overflow-y: auto;
   }
 
   .file-preview-iframe {
     @apply w-full border-0;
-    height: 380px;
+    height: 400px;
   }
 
   .file-preview-img {
-    @apply max-w-full mx-auto block;
-    max-height: 380px;
-    object-fit: contain;
+    @apply w-full h-auto object-contain;
+    max-height: 400px;
   }
 }
