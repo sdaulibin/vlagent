@@ -812,6 +812,7 @@ async def process_document_comparison(task_id: int):
 
                 page_diff = DocumentPageDiff(
                     task_id=task.id,
+                    user_id=task.user_id,
                     page_a=(page_a_idx + 1) if page_a_idx is not None else None,
                     page_b=(page_b_idx + 1) if page_b_idx is not None else None,
                     diff_type=diff_type,

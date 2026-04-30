@@ -159,6 +159,7 @@ async def process_invoice_recognitions(db: AsyncSession, file_record: InvoiceFil
             
             result_record = InvoiceResult(
                 file_id=file_record.id,
+                user_id=file_record.user_id,
                 page_number=i + 1,
                 invoice_type=page_data.get("invoice_type"),
                 invoice_no=page_data.get("invoice_no"),

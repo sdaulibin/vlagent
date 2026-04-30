@@ -141,6 +141,7 @@ async def process_pdf_extract(db: AsyncSession, task: PdfExtractTask):
         # 保存结果
         result = PdfExtractResult(
             task_id=task.id,
+            user_id=task.user_id,
             extracted_data=json.dumps(extracted_data, ensure_ascii=False)
         )
         db.add(result)
