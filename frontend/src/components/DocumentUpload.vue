@@ -31,8 +31,8 @@ const handleFileBSelect = (event: Event) => {
 </script>
 
 <template>
-  <div class="w-96 flex flex-col gap-6">
-    <label class="document-upload-area document-upload-original h-40">
+  <div class="w-[360px] flex flex-col gap-4">
+    <label class="document-upload-area document-upload-original h-32">
       <div class="document-upload-badge document-badge-original">原文档</div>
       <input type="file" class="hidden" accept=".pdf,.docx,.doc" @change="handleFileASelect" />
       <div class="document-upload-icon document-icon-original">
@@ -44,7 +44,7 @@ const handleFileBSelect = (event: Event) => {
       <p class="text-xs text-slate-400">PDF, Word (最大 50MB)</p>
     </label>
 
-    <label class="document-upload-area document-upload-compare h-40">
+    <label class="document-upload-area document-upload-compare h-32">
       <div class="document-upload-badge document-badge-compare">比对文档</div>
       <input type="file" class="hidden" accept=".pdf,.docx,.doc" @change="handleFileBSelect" />
       <div class="document-upload-icon document-icon-compare">

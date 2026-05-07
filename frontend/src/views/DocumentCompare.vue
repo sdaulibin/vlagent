@@ -173,15 +173,17 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="flex-1 flex gap-8">
-        <DocumentUpload
-          :fileA="fileA"
-          :fileB="fileB"
-          :isProcessing="isSubmitting"
-          @update:fileA="fileA = $event"
-          @update:fileB="fileB = $event"
-          @compare="startCompare"
-        />
+      <div class="flex-1 flex gap-8 max-w-7xl mx-auto w-full">
+        <div class="shrink-0">
+          <DocumentUpload
+            :fileA="fileA"
+            :fileB="fileB"
+            :isProcessing="isSubmitting"
+            @update:fileA="fileA = $event"
+            @update:fileB="fileB = $event"
+            @compare="startCompare"
+          />
+        </div>
 
         <DocumentHistory
           :historyList="historyList"
