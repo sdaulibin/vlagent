@@ -89,6 +89,25 @@ export const getUserPermissions = async () => {
   return response.data as string[];
 };
 
+// ===== 模块 API =====
+
+export interface ModuleInfo {
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  route: string;
+  gradient: string;
+  hover_class: string;
+  sort_order: number;
+  status: boolean;
+}
+
+export const getModules = async () => {
+  const response = await api.get("/modules");
+  return response.data as ModuleInfo[];
+};
+
 // ===== 文档比对 API =====
 
 export const compareDocuments = async (fileA: File, fileB: File) => {

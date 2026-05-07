@@ -4,19 +4,10 @@ from sqlmodel import select
 
 from src.auth import get_current_user_id
 from src.database import get_session
+from src.modules.models import Module
 from src.permissions.models import UserPermission
 
 router = APIRouter(prefix="/permissions", tags=["权限管理"])
-
-ALL_MODULES = [
-    "bank-statement",
-    "confirmation-letter",
-    "document-compare",
-    "format-compare",
-    "invoice-recognition",
-    "credential-recognition",
-    "pdf-extract",
-]
 
 
 @router.get("/me")
@@ -32,6 +23,8 @@ async def get_my_permissions(
     modules = [row[0] for row in result.all()]
 
     if not modules:
-        return ALL_MODULES
+        all_stmt = select(Module.key).where(Module.status == True)
+        all_result = await session.execute(all_stmt)
+        return [row[0] for row in all_result.all()]
 
     return modules

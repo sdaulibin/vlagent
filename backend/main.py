@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import time
 
 import jwt
@@ -73,11 +74,17 @@ async def health_check():
 
 @app.post("/api/dev-token")
 async def dev_token():
-    """开发模式：生成测试用 JWT token（无需认证）"""
+    """开发模式：生成测试用 JWT token（无需认证），随机分配测试用户"""
+    _DEV_USERS = [
+        {"user_id": "QD24000010", "name": "李彬"},
+        {"user_id": "QD24000099", "name": "张三"},
+        {"user_id": "QD24000088", "name": "王二"},
+    ]
     now = time.time()
+    user = random.choice(_DEV_USERS)
     payload = {
-        "user_id": "QD24000010",
-        "name": "李彬",
+        "user_id": user["user_id"],
+        "name": user["name"],
         "org_id": "",
         "user_type": "",
         "iat": int(now),

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getUserPermissions } from '../api'
+import { getUserPermissions, getModules, type ModuleInfo } from '../api'
 import { decodePayload, getToken } from './useAuth'
 
 export interface UserInfo {
@@ -9,18 +9,9 @@ export interface UserInfo {
   userType: string
 }
 
-const ALL_MODULES = [
-  'bank-statement',
-  'confirmation-letter',
-  'document-compare',
-  'format-compare',
-  'invoice-recognition',
-  'credential-recognition',
-  'pdf-extract',
-]
-
 const userInfo = ref<UserInfo | null>(null)
 const permittedModules = ref<string[]>([])
+const modules = ref<ModuleInfo[]>([])
 const permissionsLoaded = ref(false)
 
 function extractUserInfo(): UserInfo | null {
@@ -39,10 +30,14 @@ function extractUserInfo(): UserInfo | null {
 async function loadPermissions() {
   userInfo.value = extractUserInfo()
   try {
-    const modules = await getUserPermissions()
-    permittedModules.value = modules
+    const [keys, mods] = await Promise.all([
+      getUserPermissions(),
+      getModules(),
+    ])
+    permittedModules.value = keys
+    modules.value = mods
   } catch {
-    permittedModules.value = ALL_MODULES
+    permittedModules.value = modules.value.map(m => m.key)
   }
   permissionsLoaded.value = true
 }
@@ -56,6 +51,7 @@ export function useUser() {
   return {
     userInfo,
     permittedModules,
+    modules,
     permissionsLoaded,
     loadPermissions,
     hasPermission,

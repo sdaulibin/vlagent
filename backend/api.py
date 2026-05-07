@@ -13,6 +13,7 @@ from src.credentials.router import router as credentials_router
 from src.file_provider.router import router as file_provider_router
 from src.pdf_extract.router import router as pdf_extract_router
 from src.permissions.router import router as permissions_router
+from src.modules.router import router as modules_router
 
 api_router = APIRouter(dependencies=[Depends(verify_token)])
 
@@ -48,6 +49,9 @@ api_router.include_router(pdf_extract_router)
 
 # 权限管理
 api_router.include_router(permissions_router)
+
+# 模块管理
+api_router.include_router(modules_router)
 
 
 # Token 验证接口
