@@ -1,0 +1,82 @@
+{
+  "topic": "VLAgent 智能文档识别平台业务需求规格说明书",
+  "audience": {
+    "level": "intermediate",
+    "role": "产品经理、技术负责人、审计行业从业者",
+    "prior_knowledge": "了解 Web 应用基本架构，熟悉审计/金融文档处理场景",
+    "target_outcome": "全面理解 VLAgent 平台的业务定位、功能需求、技术架构和系统约束"
+  },
+  "language": "zh-CN",
+  "user_materials": {
+    "notes": [
+      "docs/项目简介.md",
+      "docs/需求规格说明书.md"
+    ],
+    "urls": [],
+    "files": [
+      "vlagent-backend/main.py",
+      "vlagent-backend/api.py",
+      "vlagent-backend/src/banks/base.py",
+      "vlagent-backend/src/config.py",
+      "vlagent-frontend/src/views/Home.vue",
+      "vlagent-frontend/src/router/index.ts",
+      "vlagent-frontend/src/api/index.ts"
+    ],
+    "named_references": [
+      "项目前后端源码完整分析"
+    ],
+    "must_use": [
+      "docs/项目简介.md",
+      "docs/需求规格说明书.md"
+    ],
+    "nice_to_use": [],
+    "do_not_use": [],
+    "style_references": [],
+    "sufficiency_tier": "rich"
+  },
+  "scope": {
+    "desired_length": "complete tutorial",
+    "chapter_count": "auto",
+    "time_budget": "",
+    "must_include": [
+      "项目背景与业务定位",
+      "用户角色与使用场景",
+      "七大功能模块详细需求",
+      "技术架构与数据模型",
+      "非功能需求与约束",
+      "接口规格与外部依赖"
+    ],
+    "avoid": [
+      "具体代码实现细节",
+      "部署运维操作手册"
+    ]
+  },
+  "research": {
+    "priority_rule": "use user-provided material as the tutorial spine when it is strong enough; add external sources for verification, gaps, freshness, and counterexamples",
+    "source_layers": [
+      "official",
+      "papers",
+      "github"
+    ],
+    "required_domains": [],
+    "forbidden_domains": [],
+    "freshness_requirement": "verify current facts before writing",
+    "external_research_level": "gap-check"
+  },
+  "visuals": {
+    "one_visual_per_chapter": true,
+    "preferred_types": [
+      "layer",
+      "flow",
+      "comparison",
+      "matrix",
+      "mindmap"
+    ],
+    "style_notes": "clear, instructional, audit-industry professional"
+  },
+  "outputs": [
+    "markdown",
+    "html"
+  ],
+  "citation_style": "human-readable references section"
+}

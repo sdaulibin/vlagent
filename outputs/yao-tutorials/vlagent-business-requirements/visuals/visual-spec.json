@@ -1,0 +1,167 @@
+{
+  "title": "VLAgent 业务需求规格说明书 — 章节视觉规格",
+  "theme": {
+    "accent": "#1f4e79",
+    "accent2": "#1f4e79",
+    "ink": "#111827",
+    "muted": "#5f6673",
+    "surface": "#f8f6f1",
+    "border": "#d9d6cc",
+    "paper": "#ffffff"
+  },
+  "board_style": {
+    "layout": "sticky-rail-canvas",
+    "aspect_ratio": "16:9",
+    "visual_system": "frontend-slides-first canvas board"
+  },
+  "chapters": [
+    {
+      "id": "chapter-01",
+      "title": "项目背景与业务定位",
+      "diagram_type": "layer",
+      "layout_note": "三层价值架构：底层 AI 能力、中层功能模块、顶层业务价值",
+      "summary": "展示 VLAgent 从 AI 能力到业务价值的三层架构",
+      "nodes": [
+        { "label": "AI 能力层", "detail": "Qwen-VL 视觉语言模型" },
+        { "label": "功能模块层", "detail": "7 大功能模块" },
+        { "label": "业务价值层", "detail": "效率提升、错误降低、流程标准化" }
+      ],
+      "caption": "图 1.1：VLAgent 平台核心价值架构 — 从 AI 能力到业务价值的三层映射"
+    },
+    {
+      "id": "chapter-02",
+      "title": "用户角色与认证体系",
+      "diagram_type": "flow",
+      "layout_note": "认证流程时序图，展示四种令牌获取路径",
+      "summary": "四种认证通道的流程和适用场景",
+      "nodes": [
+        { "label": "URL Token", "detail": "iframe 嵌入场景" },
+        { "label": "postMessage", "detail": "动态注入令牌" },
+        { "label": "Dev Token API", "detail": "开发环境" },
+        { "label": "Authorization Header", "detail": "标准 API 调用" }
+      ],
+      "caption": "图 2.1：四种认证通道的流程与适用场景"
+    },
+    {
+      "id": "chapter-03",
+      "title": "银行流水识别",
+      "diagram_type": "flow",
+      "layout_note": "策略模式类图，BankHandler 基类与 11 个具体处理器",
+      "summary": "策略模式的银行处理器注册与分发机制",
+      "nodes": [
+        { "label": "BankHandler", "detail": "抽象基类" },
+        { "label": "@register_bank", "detail": "装饰器注册" },
+        { "label": "Registry", "detail": "全局映射表" },
+        { "label": "Router", "detail": "动态分发" }
+      ],
+      "caption": "图 3.1：银行识别策略模式 — 注册式处理器架构"
+    },
+    {
+      "id": "chapter-04",
+      "title": "询证函识别与格式比对",
+      "diagram_type": "flow",
+      "layout_note": "询证函处理双路径：识别路径和比对路径",
+      "summary": "询证函识别和格式比对两条处理主线",
+      "nodes": [
+        { "label": "上传 PDF", "detail": "入口" },
+        { "label": "AI 格式识别", "detail": "格式一/二/验资" },
+        { "label": "结构化提取", "detail": "13 字段" },
+        { "label": "幻觉修正", "detail": "正则+交叉验证" },
+        { "label": "模板匹配", "detail": "3 套标准模板" },
+        { "label": "差异检测", "detail": "三级严重度" }
+      ],
+      "caption": "图 4.1：询证函识别与格式比对处理流程"
+    },
+    {
+      "id": "chapter-05",
+      "title": "文档比对",
+      "diagram_type": "flow",
+      "layout_note": "双链比对流程：两条文档处理链汇总至比对引擎",
+      "summary": "四阶段比对流水线：预处理→页级对齐→字符级差异→结果渲染",
+      "nodes": [
+        { "label": "预处理", "detail": "格式转换+去图+繁简转换" },
+        { "label": "页级对齐", "detail": "动态规划" },
+        { "label": "字符级差异", "detail": "diff-match-patch" },
+        { "label": "结果渲染", "detail": "高亮层叠加" }
+      ],
+      "caption": "图 5.1：文档比对四阶段流水线"
+    },
+    {
+      "id": "chapter-06",
+      "title": "发票与凭证识别",
+      "diagram_type": "matrix",
+      "layout_note": "8×3 凭证类型矩阵，展示类型-字段-能力三维映射",
+      "summary": "8 类凭证的输入格式、提取字段和特殊检测能力矩阵",
+      "nodes": [
+        { "label": "身份证", "detail": "6 字段 + 正反面识别" },
+        { "label": "电子印章", "detail": "编码 + 多枚识别" },
+        { "label": "银行卡", "detail": "卡号 + 切角检测" },
+        { "label": "电子凭证", "detail": "收付方 + 签名检测" },
+        { "label": "网银申请书", "detail": "操作员 + 签章检测" },
+        { "label": "违法告知函", "detail": "信息 + 指纹检测" },
+        { "label": "开户申请书", "detail": "申请表 + 复选框检测" },
+        { "label": "授权书", "detail": "15 项授权 + 勾选检测" }
+      ],
+      "caption": "图 6.1：8 类凭证的识别能力矩阵"
+    },
+    {
+      "id": "chapter-07",
+      "title": "通用 PDF 提取",
+      "diagram_type": "flow",
+      "layout_note": "配置→上传→提取→展示的完整流程",
+      "summary": "自定义字段配置到双视图结果展示的端到端流程",
+      "nodes": [
+        { "label": "字段配置", "detail": "最多 10 字段，4 种类型" },
+        { "label": "PDF 上传", "detail": "多文件批量" },
+        { "label": "AI 提取", "detail": "异步处理" },
+        { "label": "双视图展示", "detail": "表格 + JSON" }
+      ],
+      "caption": "图 7.1：通用 PDF 提取配置与结果展示流程"
+    },
+    {
+      "id": "chapter-08",
+      "title": "技术架构与部署方案",
+      "diagram_type": "layer",
+      "layout_note": "四层技术架构分层图",
+      "summary": "前端展示→后端服务→AI能力→数据存储的四层架构",
+      "nodes": [
+        { "label": "前端展示层", "detail": "Vue 3 + Vite + Tailwind" },
+        { "label": "后端服务层", "detail": "FastAPI + SQLModel" },
+        { "label": "AI 能力层", "detail": "Qwen-VL" },
+        { "label": "数据存储层", "detail": "PostgreSQL + SunECM" }
+      ],
+      "caption": "图 8.1：VLAgent 四层技术架构"
+    },
+    {
+      "id": "chapter-09",
+      "title": "非功能需求与系统约束",
+      "diagram_type": "matrix",
+      "layout_note": "五维度需求矩阵：性能、可靠性、安全、兼容性、可维护性",
+      "summary": "22 条非功能需求的五维度分布与优先级",
+      "nodes": [
+        { "label": "性能", "detail": "NFR-001 ~ 005" },
+        { "label": "可靠性", "detail": "NFR-006 ~ 009" },
+        { "label": "安全", "detail": "NFR-010 ~ 013" },
+        { "label": "兼容性", "detail": "NFR-014 ~ 018" },
+        { "label": "可维护性", "detail": "NFR-019 ~ 022" }
+      ],
+      "caption": "图 9.1：非功能需求五维度矩阵"
+    },
+    {
+      "id": "chapter-10",
+      "title": "数据模型与接口总览",
+      "diagram_type": "flow",
+      "layout_note": "核心实体关系概览，展示模块间的数据流向",
+      "summary": "7 个业务模块的实体关系和 34 张表的结构",
+      "nodes": [
+        { "label": "FileRecord", "detail": "银行流水中心实体" },
+        { "label": "DocumentCompare", "detail": "文档比对模块" },
+        { "label": "Confirmation", "detail": "询证函模块" },
+        { "label": "Invoice", "detail": "发票模块" },
+        { "label": "Credential", "detail": "凭证模块" },
+        { "label": "PdfExtract", "detail": "通用提取模块" }
+      ],
+      "caption": "图 10.1：VLAgent 核心实体关系概览"
+    }
+  ]
+}

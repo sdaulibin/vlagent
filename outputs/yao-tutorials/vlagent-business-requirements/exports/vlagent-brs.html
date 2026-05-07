@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>VLAgent 智能文档识别平台 — 业务需求规格说明书</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+  <style type="text/css">:root {
+color-scheme: light;
+--bg: #f5f4ed;
+--surface: #faf9f5;
+--ink: #111827;
+--muted: #5e5d59;
+--accent: #1b365d;
+--line: #e8e5da;
+--line-strong: #d1cfc5;
+--code-bg: #f2eee6;
+--toc-width: clamp(196px, 19vw, 252px);
+--reading-width: 820px;
+--page-gap: clamp(28px, 4vw, 56px);
+--shell-pad-x: clamp(18px, 3vw, 44px);
+--layout-width: calc(var(--toc-width) + var(--page-gap) + var(--reading-width));
+--body-size: clamp(16px, 1.05vw, 18px);
+--small-size: clamp(12px, 0.85vw, 14px);
+--h1-size: clamp(2rem, 4.2vw, 3.55rem);
+--h2-size: clamp(1.55rem, 2.7vw, 2.25rem);
+--h3-size: clamp(1.1rem, 1.7vw, 1.35rem);
+}
+@page {
+size: A4;
+margin: 20mm 22mm 22mm;
+background: #f5f4ed;
+}
+html {
+background: var(--bg);
+scroll-behavior: smooth;
+}
+body {
+margin: 0;
+padding: 0;
+color: var(--ink);
+font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+font-size: var(--body-size);
+line-height: 1.54;
+letter-spacing: 0;
+}
+.report-shell {
+display: grid;
+grid-template-columns: var(--toc-width) minmax(0, var(--reading-width));
+column-gap: var(--page-gap);
+align-items: start;
+width: min(calc(100% - (var(--shell-pad-x) * 2)), var(--layout-width));
+margin: 0 auto;
+padding: clamp(32px, 5vw, 72px) 0 80px;
+}
+.report-shell--no-toc {
+display: block;
+max-width: var(--reading-width);
+}
+.article-body {
+min-width: 0;
+max-width: var(--reading-width);
+}
+nav#TOC {
+position: sticky;
+top: clamp(32px, 5vw, 72px);
+width: auto;
+max-height: calc(100vh - 48px);
+overflow: auto;
+padding: 2px 0 2px 14px;
+border-left: 2px solid var(--line-strong);
+background: transparent;
+}
+nav#TOC ul {
+margin: 0;
+padding: 0;
+list-style: none;
+}
+nav#TOC li {
+margin: 0;
+padding: 0;
+font-size: var(--small-size);
+line-height: 1.34;
+}
+nav#TOC li li {
+margin-left: 12px;
+font-size: calc(var(--small-size) * 0.92);
+}
+nav#TOC a {
+display: block;
+padding: 5px 0;
+color: var(--muted);
+text-decoration: none;
+}
+nav#TOC a:hover {
+color: var(--accent);
+}
+h1,
+h2,
+h3,
+h4 {
+color: var(--ink);
+font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, serif;
+font-weight: 700;
+letter-spacing: 0;
+line-height: 1.16;
+scroll-margin-top: 36px;
+}
+h1 {
+margin: 0 0 10px;
+font-size: var(--h1-size);
+}
+.doc-date {
+margin: 0 0 24px;
+padding-bottom: 18px;
+border-bottom: 2px solid var(--accent);
+color: var(--muted);
+font-size: var(--small-size);
+line-height: 1.4;
+}
+h1 + p,
+.doc-date + p {
+margin-top: 0;
+color: var(--muted);
+font-size: clamp(1.02rem, 1.25vw, 1.18rem);
+line-height: 1.58;
+}
+h2 {
+margin-top: 56px;
+padding-top: 22px;
+border-top: 1px solid var(--line);
+font-size: var(--h2-size);
+}
+h3 {
+margin-top: 30px;
+font-size: var(--h3-size);
+}
+h4 {
+margin-top: 24px;
+font-size: 1rem;
+}
+p,
+li {
+font-size: 1rem;
+}
+p {
+margin: 0 0 1em;
+}
+ul,
+ol {
+padding-left: 1.24em;
+}
+li + li {
+margin-top: 0.28em;
+}
+a {
+color: var(--accent);
+text-decoration-thickness: 1px;
+text-underline-offset: 0.18em;
+}
+blockquote {
+margin: 24px 0;
+padding: 12px 18px;
+border-left: 3px solid var(--accent);
+background: var(--surface);
+color: var(--ink);
+}
+figure {
+margin: 28px 0 10px;
+}
+figure > img,
+p > img,
+img {
+display: block;
+}
+figure > img,
+p > img {
+width: 100%;
+max-width: 100%;
+height: auto;
+margin: 0 auto;
+border: 0;
+border-radius: 8px;
+background: transparent;
+}
+figure > figcaption[aria-hidden="true"] {
+display: none;
+}
+figcaption,
+.caption,
+figure + p,
+p:has(> img) + p {
+max-width: 720px;
+margin: 10px auto 30px;
+color: var(--muted);
+font-size: var(--small-size);
+text-align: center;
+}
+.table-wrap {
+max-width: 100%;
+margin: 26px 0 30px;
+overflow-x: auto;
+border: 1px solid var(--line);
+border-radius: 8px;
+background: transparent;
+}
+table {
+width: 100%;
+min-width: 680px;
+margin: 0;
+border-collapse: separate;
+border-spacing: 0;
+border: 0;
+background: var(--surface);
+font-size: 0.92rem;
+}
+col[style] {
+width: auto !important;
+}
+th,
+td {
+padding: 11px 13px;
+border: 0;
+border-right: 1px solid var(--line);
+border-bottom: 1px solid var(--line);
+line-height: 1.48;
+vertical-align: top;
+overflow-wrap: anywhere;
+}
+th {
+background: #eef2f7;
+color: var(--ink);
+font-size: 0.88rem;
+font-weight: 700;
+text-align: left;
+}
+td {
+background: var(--surface);
+}
+th:last-child,
+td:last-child {
+border-right: 0;
+}
+tbody tr:last-child td {
+border-bottom: 0;
+}
+tbody tr:nth-child(even) td {
+background: #f7f5ee;
+}
+tbody td:first-child {
+color: var(--ink);
+font-weight: 700;
+}
+code {
+padding: 0.08em 0.28em;
+border-radius: 4px;
+background: var(--code-bg);
+color: #7c2d12;
+font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+font-size: 0.9em;
+}
+pre {
+overflow-x: auto;
+margin: 24px 0;
+padding: 16px;
+border: 1px solid #20283b;
+border-radius: 6px;
+background: #111827;
+color: #f9fafb;
+}
+pre code {
+padding: 0;
+background: transparent;
+color: inherit;
+}
+hr {
+margin: 40px 0;
+border: 0;
+border-top: 1px solid var(--line);
+}
+@media (max-width: 980px) {
+.report-shell,
+.report-shell--no-toc {
+display: block;
+max-width: var(--reading-width);
+width: auto;
+margin: 0 auto;
+padding: clamp(24px, 5vw, 48px) clamp(18px, 4vw, 44px) 72px;
+}
+.article-body {
+max-width: none;
+}
+nav#TOC {
+position: sticky;
+top: 0;
+z-index: 10;
+width: auto;
+max-height: 38vh;
+margin: 0 0 24px;
+padding: 10px 0;
+border-left: 0;
+border-bottom: 1px solid var(--line-strong);
+background: var(--bg);
+}
+}
+@media (max-width: 640px) {
+.report-shell,
+.report-shell--no-toc {
+padding: 22px 16px 56px;
+}
+h1 {
+font-size: clamp(1.75rem, 10vw, 2.6rem);
+}
+.doc-date {
+margin-bottom: 20px;
+}
+}
+@media (prefers-reduced-motion: reduce) {
+*,
+*::before,
+*::after {
+transition-duration: 0.01ms !important;
+animation-duration: 0.01ms !important;
+}
+html {
+scroll-behavior: auto;
+}
+}
+@media print {
+html,
+body {
+background: #f5f4ed;
+}
+body {
+display: block;
+max-width: none;
+padding: 0;
+font-size: 10pt;
+line-height: 1.52;
+}
+.report-shell,
+.report-shell--no-toc,
+.article-body {
+display: block;
+width: auto;
+max-width: none;
+margin: 0;
+padding: 0;
+}
+nav#TOC {
+display: none;
+}
+h1,
+h2,
+h3 {
+break-after: avoid;
+}
+h1 {
+font-size: 34pt;
+line-height: 1.12;
+}
+.doc-date {
+margin: 0 0 16pt;
+padding-bottom: 10pt;
+font-size: 8.5pt;
+}
+h2 {
+font-size: 18pt;
+line-height: 1.22;
+}
+h3 {
+font-size: 12.5pt;
+line-height: 1.3;
+}
+figure {
+margin: 18pt 0 8pt;
+}
+figure + p,
+p:has(> img) + p {
+margin: 6pt auto 18pt;
+font-size: 8.5pt;
+}
+.table-wrap {
+overflow: visible;
+margin: 16pt 0 18pt;
+border-radius: 6pt;
+}
+table {
+min-width: 0;
+font-size: 8.8pt;
+}
+th,
+td {
+padding: 6pt 7pt;
+line-height: 1.38;
+}
+img,
+.table-wrap,
+blockquote,
+pre {
+break-inside: avoid;
+}
+a {
+color: var(--ink);
+text-decoration: none;
+}
+}
+</style>
+</head>
+<body>
+<div class="report-shell">
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#vlagent-智能文档识别平台-业务需求规格说明书" id="toc-vlagent-智能文档识别平台-业务需求规格说明书">VLAgent
+智能文档识别平台 — 业务需求规格说明书</a>
+<ul>
+<li><a href="#第1章-项目背景与业务定位" id="toc-第1章-项目背景与业务定位">第1章 项目背景与业务定位</a>
+<ul>
+<li><a href="#行业痛点金融文档处理的人工困境" id="toc-行业痛点金融文档处理的人工困境">1.1
+行业痛点：金融文档处理的人工困境</a></li>
+<li><a href="#产品定位" id="toc-产品定位">1.2 产品定位</a></li>
+<li><a href="#核心价值主张" id="toc-核心价值主张">1.3
+核心价值主张</a></li>
+</ul></li>
+<li><a href="#第2章-用户角色与认证体系" id="toc-第2章-用户角色与认证体系">第2章 用户角色与认证体系</a>
+<ul>
+<li><a href="#目标用户画像" id="toc-目标用户画像">2.1
+目标用户画像</a></li>
+<li><a href="#认证方案" id="toc-认证方案">2.2 认证方案</a></li>
+<li><a href="#权限控制" id="toc-权限控制">2.3 权限控制</a></li>
+</ul></li>
+<li><a href="#第3章-银行流水识别" id="toc-第3章-银行流水识别">第3章
+银行流水识别</a>
+<ul>
+<li><a href="#业务场景" id="toc-业务场景">3.1 业务场景</a></li>
+<li><a href="#功能需求" id="toc-功能需求">3.2 功能需求</a></li>
+<li><a href="#策略模式架构" id="toc-策略模式架构">3.3
+策略模式架构</a></li>
+</ul></li>
+<li><a href="#第4章-询证函识别与格式比对" id="toc-第4章-询证函识别与格式比对">第4章 询证函识别与格式比对</a>
+<ul>
+<li><a href="#询证函识别" id="toc-询证函识别">4.1 询证函识别</a></li>
+<li><a href="#询证函格式比对" id="toc-询证函格式比对">4.2
+询证函格式比对</a></li>
+</ul></li>
+<li><a href="#第5章-文档比对" id="toc-第5章-文档比对">第5章 文档比对</a>
+<ul>
+<li><a href="#业务场景-1" id="toc-业务场景-1">5.1 业务场景</a></li>
+<li><a href="#核心能力" id="toc-核心能力">5.2 核心能力</a></li>
+<li><a href="#比对算法流程" id="toc-比对算法流程">5.3
+比对算法流程</a></li>
+</ul></li>
+<li><a href="#第6章-发票与凭证识别" id="toc-第6章-发票与凭证识别">第6章
+发票与凭证识别</a>
+<ul>
+<li><a href="#发票识别" id="toc-发票识别">6.1 发票识别</a></li>
+<li><a href="#凭证识别" id="toc-凭证识别">6.2 凭证识别</a></li>
+</ul></li>
+<li><a href="#第7章-通用-pdf-提取" id="toc-第7章-通用-pdf-提取">第7章
+通用 PDF 提取</a>
+<ul>
+<li><a href="#自定义字段配置" id="toc-自定义字段配置">7.1
+自定义字段配置</a></li>
+<li><a href="#输出格式与结果展示" id="toc-输出格式与结果展示">7.2
+输出格式与结果展示</a></li>
+</ul></li>
+<li><a href="#第8章-技术架构与部署方案" id="toc-第8章-技术架构与部署方案">第8章 技术架构与部署方案</a>
+<ul>
+<li><a href="#前后端技术栈" id="toc-前后端技术栈">8.1
+前后端技术栈</a></li>
+<li><a href="#系统架构分层" id="toc-系统架构分层">8.2
+系统架构分层</a></li>
+<li><a href="#部署架构" id="toc-部署架构">8.3 部署架构</a></li>
+</ul></li>
+<li><a href="#第9章-非功能需求与系统约束" id="toc-第9章-非功能需求与系统约束">第9章 非功能需求与系统约束</a>
+<ul>
+<li><a href="#性能需求" id="toc-性能需求">9.1 性能需求</a></li>
+<li><a href="#可靠性需求" id="toc-可靠性需求">9.2 可靠性需求</a></li>
+<li><a href="#安全需求" id="toc-安全需求">9.3 安全需求</a></li>
+<li><a href="#兼容性与可维护性" id="toc-兼容性与可维护性">9.4
+兼容性与可维护性</a></li>
+</ul></li>
+<li><a href="#第10章-数据模型与接口总览" id="toc-第10章-数据模型与接口总览">第10章 数据模型与接口总览</a>
+<ul>
+<li><a href="#核心实体关系" id="toc-核心实体关系">10.1
+核心实体关系</a></li>
+<li><a href="#数据库表统计" id="toc-数据库表统计">10.2
+数据库表统计</a></li>
+<li><a href="#api-接口总览" id="toc-api-接口总览">10.3 API
+接口总览</a></li>
+</ul></li>
+<li><a href="#附录-a-外部依赖" id="toc-附录-a-外部依赖">附录 A
+外部依赖</a></li>
+<li><a href="#附录-b-术语表" id="toc-附录-b-术语表">附录 B
+术语表</a></li>
+<li><a href="#附录-c-约束与假设" id="toc-附录-c-约束与假设">附录 C
+约束与假设</a></li>
+</ul></li>
+</ul>
+</nav>
+<main class="article-body">
+<h1 id="vlagent-智能文档识别平台-业务需求规格说明书">VLAgent
+智能文档识别平台 — 业务需求规格说明书</h1>
+<p class="doc-date">更新日期：2026年4月30日</p>
+<p>2026 年 4 月 30 日</p>
+<hr />
+<p>审计年忙季，一名审计师面前的桌上堆着三家客户的银行流水
+PDF、数十封银行询证函、两份待比对的合同版本。她需要逐笔核对流水金额、手工录入询证函上的
+13
+个字段、用肉眼逐字扫描两份合同的每一处修改。这是审计行业持续了数十年的日常——重复、耗时、极易出错。</p>
+<p>VLAgent 正是为解决这一痛点而设计的 AI
+智能文档识别平台。它面向审计、会计等金融行业场景，将文档上传、AI
+识别、结构化提取与差异比对串成一条端到端的自动化链路。平台当前覆盖 7
+大功能模块、支持 11 家银行的流水识别、8
+类凭证的智能提取，以及字符级的文档差异比对。</p>
+<p>本文档将完整呈现 VLAgent
+的业务定位、功能需求、技术架构、数据模型与系统约束，为产品决策和技术实施提供统一的需求基线。</p>
+<hr />
+<h2 id="第1章-项目背景与业务定位">第1章 项目背景与业务定位</h2>
+<h3 id="行业痛点金融文档处理的人工困境">1.1
+行业痛点：金融文档处理的人工困境</h3>
+<p>审计、会计等金融行业中，文档处理占据大量人力。核心痛点集中在三个环节：</p>
+<p><strong>信息录入低效。</strong>
+银行流水、询证函、发票等文档中的结构化信息（金额、日期、账号等）需要人工逐项阅读和录入，一份
+50 页的银行流水可能包含数百笔交易，逐笔录入耗时且容易发生抄写错误。</p>
+<p><strong>版本比对困难。</strong>
+合同、协议等文档在修订过程中产生多个版本，审计人员需要逐字比对差异。当文档超过
+10 页、且涉及繁体中文版本时，人工比对的准确率和效率急剧下降。</p>
+<p><strong>凭证核验繁琐。</strong>
+身份证、银行卡、授权书等凭证的核验需要逐一检查各字段信息，而不同格式的凭证缺乏统一的信息提取标准。</p>
+<h3 id="产品定位">1.2 产品定位</h3>
+<p>VLAgent 定位为<strong>AI
+驱动的金融文档智能处理平台</strong>，核心能力覆盖三个层面：</p>
+<ul>
+<li><strong>识别</strong>：通过 Qwen-VL 视觉语言模型，对 PDF
+和图片文档进行 OCR 级别的信息识别</li>
+<li><strong>提取</strong>：将非结构化文档信息转化为结构化数据（JSON/Excel），支持用户自定义字段</li>
+<li><strong>比对</strong>：对两份文档进行字符级差异标注，自动处理繁简转换和图片干扰</li>
+</ul>
+<h3 id="核心价值主张">1.3 核心价值主张</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>能力维度</th>
+<th>传统人工方式</th>
+<th>VLAgent 方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>银行流水录入</td>
+<td>逐笔手动抄写</td>
+<td>AI 自动识别 + Excel 导出</td>
+</tr>
+<tr>
+<td>询证函处理</td>
+<td>逐字阅读提取 13 个字段</td>
+<td>AI 一次提取 + 幻觉校验修正</td>
+</tr>
+<tr>
+<td>文档比对</td>
+<td>逐页逐字肉眼扫描</td>
+<td>字符级自动 diff + 可视化高亮</td>
+</tr>
+<tr>
+<td>凭证核验</td>
+<td>逐项人工检查</td>
+<td>AI 结构化提取 + 格式校验</td>
+</tr>
+</tbody>
+</table></div>
+<figure>
+<img role="img" aria-label="图 1.1：VLAgent 平台核心价值架构" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IumhueebruiDjOaZr+S4juS4muWKoeWumuS9jSIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDHnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7pobnnm67og4zmma/kuI7kuJrliqHlrprkvY08L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuWxleekuiBWTEFnZW50IOS7jiBBSSDog73lipvliLDkuJrliqHku7flgLznmoTkuInlsYLmnrbmnoQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNjgiIHk9IjIyMiIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjcwMCI+6LaK5b6A5LiL6LaK5o6l6L+R5bqV5bGC5py65Yi277yM6LaK5b6A5LiK6LaK5o6l6L+R55So5oi35Y+v6KeB57uT5p6cPC90ZXh0PgogIDxyZWN0IHg9IjE2OC4wIiB5PSIyMzYuMCIgd2lkdGg9Ijg2NC4wIiBoZWlnaHQ9IjU0LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iMTY4LjAiIHk9IjIzNi4wIiB3aWR0aD0iNyIgaGVpZ2h0PSI1NC4wIiByeD0iMy41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMTk4LjAiIHk9IjI3MC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTkiIGZvbnQtd2VpZ2h0PSI3ODAiPjx0c3BhbiB4PSIxOTguMCIgZHk9IjAiPkFJIOiDveWKm+WxgjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjEwMDguMCIgeT0iMjY4LjAiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTMiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIxMDA4LjAiIGR5PSIwIj5Rd2VuLVZMIOinhuinieivreiogOaooeWeizwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9IjE5Ni4wIiB5PSIzMDIuMCIgd2lkdGg9IjgwOC4wIiBoZWlnaHQ9IjU0LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iMTk2LjAiIHk9IjMwMi4wIiB3aWR0aD0iNyIgaGVpZ2h0PSI1NC4wIiByeD0iMy41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMjI2LjAiIHk9IjMzNi4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTkiIGZvbnQtd2VpZ2h0PSI3ODAiPjx0c3BhbiB4PSIyMjYuMCIgZHk9IjAiPuWKn+iDveaooeWdl+WxgjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk4MC4wIiB5PSIzMzQuMCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMyIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9Ijk4MC4wIiBkeT0iMCI+NyDlpKflip/og73mqKHlnZc8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSIyMjQuMCIgeT0iMzY4LjAiIHdpZHRoPSI3NTIuMCIgaGVpZ2h0PSI1NC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9IjIyNC4wIiB5PSIzNjguMCIgd2lkdGg9IjciIGhlaWdodD0iNTQuMCIgcng9IjMuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjI1NC4wIiB5PSI0MDIuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE5IiBmb250LXdlaWdodD0iNzgwIj48dHNwYW4geD0iMjU0LjAiIGR5PSIwIj7kuJrliqHku7flgLzlsYI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5NTIuMCIgeT0iNDAwLjAiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTMiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI5NTIuMCIgZHk9IjAiPuaViOeOh+aPkOWNh+OAgemUmeivr+mZjeS9juOAgea1geeoi+agh+WHhuWMljwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 1.1：VLAgent 平台核心价值架构" />
+<figcaption aria-hidden="true">图 1.1：VLAgent
+平台核心价值架构</figcaption>
+</figure>
+<hr />
+<h2 id="第2章-用户角色与认证体系">第2章 用户角色与认证体系</h2>
+<h3 id="目标用户画像">2.1 目标用户画像</h3>
+<p>VLAgent 的用户群体分为两个核心角色：</p>
+<p><strong>审计人员（主要用户）。</strong>
+负责上传银行流水、询证函、合同等文档，查看识别和比对结果，导出结构化数据。他们的核心诉求是减少重复劳动、提高核验准确性。</p>
+<p><strong>系统集成方（技术对接方）。</strong> 通过 iframe 将 VLAgent
+嵌入到现有审计管理系统中，使用外部认证体系对接用户身份。他们的核心诉求是无缝集成、安全对接、功能模块按需启用。</p>
+<h3 id="认证方案">2.2 认证方案</h3>
+<p>系统采用 JWT（HS256）令牌认证，根据部署场景提供四种认证通道：</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>认证方式</th>
+<th>适用场景</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AUTH-001</td>
+<td>Authorization Header</td>
+<td>标准前端调用</td>
+<td>所有 API 请求携带 <code>Bearer &lt;token&gt;</code></td>
+</tr>
+<tr>
+<td>AUTH-002</td>
+<td>URL 参数 <code>?token=</code></td>
+<td>iframe 嵌入</td>
+<td>父系统在 URL 中注入令牌</td>
+</tr>
+<tr>
+<td>AUTH-003</td>
+<td>postMessage</td>
+<td>iframe 动态注入</td>
+<td>父窗口通过 postMessage 传递令牌，10 秒超时</td>
+</tr>
+<tr>
+<td>AUTH-004</td>
+<td>开发令牌 <code>/api/dev-token</code></td>
+<td>本地开发</td>
+<td>生成 24 小时有效测试令牌</td>
+</tr>
+</tbody>
+</table></div>
+<p>令牌载荷包含
+<code>user_id</code>、<code>name</code>、<code>org_id</code>、<code>user_type</code>
+字段，认证失败时自动跳转错误页面。</p>
+<h3 id="权限控制">2.3 权限控制</h3>
+<p>系统实现了模块级权限控制（<code>permissions</code>
+模块），支持按用户和模块维度配置访问权限。前端路由守卫在页面加载时检查用户对当前模块的访问权限，无权限时拒绝进入。</p>
+<figure>
+<img role="img" aria-label="图 2.1：认证流程时序图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueUqOaIt+inkuiJsuS4juiupOivgeS9k+ezuyIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDLnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7nlKjmiLfop5LoibLkuI7orqTor4HkvZPns7s8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuWbm+enjeiupOivgemAmumBk+eahOa1geeoi+WSjOmAgueUqOWcuuaZrzwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk0IiB5PSIyNTIiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI3MDAiPuS7jui+k+WFpeWIsOe7k+aenOeahOacgOefreWtpuS5oOi3r+W+hDwvdGV4dD4KICA8bGluZSB4MT0iOTQiIHkxPSIyNzQiIHgyPSIxMTA2IiB5Mj0iMjc0IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40Ii8+CiAgPGxpbmUgeDE9IjM0MS41IiB5MT0iNDA4LjAiIHgyPSIzNDMuNSIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iOTQuMCIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iMTIwLjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMjAuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMjAuMCIgZHk9IjAiPjE8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNDYuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE0Ni4wIiBkeT0iMCI+VVJMIFRva2VuPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTE2LjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIxMTYuMCIgZHk9IjAiPmlmcmFtZSDltYzlhaXlnLrmma88L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iNTk5LjAiIHkxPSI0MDguMCIgeDI9IjYwMS4wIiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iMzUxLjUiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iMzc3LjUiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIzNzcuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIzNzcuNSIgZHk9IjAiPjI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI0MDMuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjQwMy41IiBkeT0iMCI+cG9zdE1lc3NhZ2U8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIzNzMuNSIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjM3My41IiBkeT0iMCI+5Yqo5oCB5rOo5YWl5Luk54mMPC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9Ijg1Ni41IiB5MT0iNDA4LjAiIHgyPSI4NTguNSIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9IjYwOS4wIiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjYzNS4wIiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iNjM1LjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iNjM1LjAiIGR5PSIwIj4zPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjYxLjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI2NjEuMCIgZHk9IjAiPkRldiBUb2tlbiBBUEk8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2MzEuMCIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjYzMS4wIiBkeT0iMCI+5byA5Y+R546v5aKDPC90c3Bhbj48L3RleHQ+CiAgPHJlY3QgeD0iODY2LjUiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iODY2LjUiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iNSIgcng9IjIuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDxjaXJjbGUgY3g9Ijg5Mi41IiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODkyLjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iODkyLjUiIGR5PSIwIj40PC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iOTE4LjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI5MTguNSIgZHk9IjAiPkF1dGhvcml6YXRpb248L3RzcGFuPjx0c3BhbiB4PSI5MTguNSIgZHk9IjIxIj5IZWFkZXI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4ODguNSIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9Ijg4OC41IiBkeT0iMCI+5qCH5YeGIEFQSSDosIPnlKg8L3RzcGFuPjwvdGV4dD4KPC9zdmc+Cg==" alt="图 2.1：认证流程时序图" />
+<figcaption aria-hidden="true">图 2.1：认证流程时序图</figcaption>
+</figure>
+<hr />
+<h2 id="第3章-银行流水识别">第3章 银行流水识别</h2>
+<h3 id="业务场景">3.1 业务场景</h3>
+<p>银行流水核对是审计工作中最高频的文档处理任务。审计人员需要从客户提供的银行流水
+PDF
+中提取账户汇总信息（户名、账号、日期范围、收支统计）和逐笔交易明细（日期、金额、余额、对方信息、摘要），用于后续的账目核对和分析。</p>
+<h3 id="功能需求">3.2 功能需求</h3>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BS-001</td>
+<td>支持上传 PDF 格式银行流水文件（单个或批量）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-002</td>
+<td>自动检测银行类型（文件名关键词 + AI 图像分析）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-003</td>
+<td>支持 11
+家银行：工商、农业、中国、建设、交通、招商、光大、广发、邮储、济宁、山东地方银行</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-004</td>
+<td>提取账户汇总信息：户名、账号、日期范围、收支笔数与金额</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-005</td>
+<td>逐笔提取交易明细：交易时间、收支金额、余额、对方信息、摘要</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-006</td>
+<td>根据银行类型展示定制化汇总组件</td>
+<td>中</td>
+</tr>
+<tr>
+<td>BS-007</td>
+<td>交易明细分页展示（每页 10 条）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>BS-008</td>
+<td>广发银行多汇总页场景：标签页切换 + 按汇总 ID 筛选明细</td>
+<td>中</td>
+</tr>
+<tr>
+<td>BS-009</td>
+<td>一键导出识别结果为 Excel（.xlsx）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>BS-010</td>
+<td>支持重新识别和删除文件</td>
+<td>中</td>
+</tr>
+<tr>
+<td>BS-011</td>
+<td>文件格式校验（magic bytes，非扩展名判断）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>BS-012</td>
+<td>AI 分类验证：识别前校验文件是否为银行流水</td>
+<td>中</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="策略模式架构">3.3 策略模式架构</h3>
+<p>系统采用<strong>策略模式</strong>处理多银行差异。核心设计如下：</p>
+<ul>
+<li><strong>抽象基类
+<code>BankHandler</code></strong>：定义统一接口（获取汇总、获取明细、创建记录、删除记录、导出
+Excel、获取 Schema）</li>
+<li><strong>装饰器注册
+<code>@register_bank</code></strong>：每个银行处理器通过装饰器自动注册到全局映射表</li>
+<li><strong>运行时分发
+<code>get_bank_handler(bank_type)</code></strong>：根据 AI
+识别的银行类型，动态选择对应处理器</li>
+</ul>
+<p>这种设计使得新增银行支持时，只需实现一个新的 Handler
+类并通过装饰器注册，无需修改核心路由和服务逻辑。</p>
+<p>当前已注册的 11
+家银行处理器：icbc（工商）、abc（农业）、boc（中国）、ccb（建设）、bocom（交通）、cmb（招商）、everbright（光大）、cgb（广发）、psbc（邮储）、jining（济宁）、shandong（山东地方）。</p>
+<figure>
+<img role="img" aria-label="图 3.1：银行识别策略模式类图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IumTtuihjOa1geawtOivhuWIqyIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDPnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7pk7booYzmtYHmsLTor4bliKs8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuetlueVpeaooeW8j+eahOmTtuihjOWkhOeQhuWZqOazqOWGjOS4juWIhuWPkeacuuWItjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk0IiB5PSIyNTIiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI3MDAiPuS7jui+k+WFpeWIsOe7k+aenOeahOacgOefreWtpuS5oOi3r+W+hDwvdGV4dD4KICA8bGluZSB4MT0iOTQiIHkxPSIyNzQiIHgyPSIxMTA2IiB5Mj0iMjc0IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40Ii8+CiAgPGxpbmUgeDE9IjM0MS41IiB5MT0iNDA4LjAiIHgyPSIzNDMuNSIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iOTQuMCIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iMTIwLjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMjAuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMjAuMCIgZHk9IjAiPjE8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNDYuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE0Ni4wIiBkeT0iMCI+QmFua0hhbmRsZXI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxMTYuMCIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjExNi4wIiBkeT0iMCI+5oq96LGh5Z+657G7PC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9IjU5OS4wIiB5MT0iNDA4LjAiIHgyPSI2MDEuMCIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9IjM1MS41IiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjM3Ny41IiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMzc3LjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMzc3LjUiIGR5PSIwIj4yPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNDAzLjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI0MDMuNSIgZHk9IjAiPkByZWdpc3Rlcl9iYW5rPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMzczLjUiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIzNzMuNSIgZHk9IjAiPuijhemlsOWZqOazqOWGjDwvdHNwYW4+PC90ZXh0PgogIDxsaW5lIHgxPSI4NTYuNSIgeTE9IjQwOC4wIiB4Mj0iODU4LjUiIHkyPSI0MDguMCIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KICA8cmVjdCB4PSI2MDkuMCIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSIxNDguMCIgcng9IjgiIGZpbGw9IiNmYWY5ZjUiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8Y2lyY2xlIGN4PSI2MzUuMCIgY3k9IjM2Mi4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjYzNS4wIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjYzNS4wIiBkeT0iMCI+MzwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjY2MS4wIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iNjYxLjAiIGR5PSIwIj5SZWdpc3RyeTwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjYzMS4wIiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iNjMxLjAiIGR5PSIwIj7lhajlsYDmmKDlsITooag8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSI4NjYuNSIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSIxNDguMCIgcng9IjgiIGZpbGw9IiNmN2Y1ZWUiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8cmVjdCB4PSI4NjYuNSIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iODkyLjUiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI4OTIuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI4OTIuNSIgZHk9IjAiPjQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5MTguNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjkxOC41IiBkeT0iMCI+Um91dGVyPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODg4LjUiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI4ODguNSIgZHk9IjAiPuWKqOaAgeWIhuWPkTwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 3.1：银行识别策略模式类图" />
+<figcaption aria-hidden="true">图 3.1：银行识别策略模式类图</figcaption>
+</figure>
+<hr />
+<h2 id="第4章-询证函识别与格式比对">第4章 询证函识别与格式比对</h2>
+<h3 id="询证函识别">4.1 询证函识别</h3>
+<p>银行询证函是审计过程中的核心确认文件，用于向银行核实被审计单位的账户信息。</p>
+<p><strong>功能需求：</strong></p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CL-001</td>
+<td>支持上传 PDF 格式询证函</td>
+<td>高</td>
+</tr>
+<tr>
+<td>CL-002</td>
+<td>AI 提取 13
+个关键字段：编号、事务所名称、回函地址、联系人、联系电话、邮编、借款账户、截止日期、起止日期、印章日期、印章名称、签名人姓名、收函银行</td>
+<td>高</td>
+</tr>
+<tr>
+<td>CL-003</td>
+<td>提取结果支持手动修正（PUT 接口更新）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>CL-004</td>
+<td>自动识别格式类型（格式一 / 格式二 / 验资询证函）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>CL-005</td>
+<td>将提取结果与标准模板校验，报告不符项</td>
+<td>高</td>
+</tr>
+<tr>
+<td>CL-006</td>
+<td>AI 幻觉检测与修正：基于 13 条正则规则修正常见错误</td>
+<td>高</td>
+</tr>
+<tr>
+<td>CL-007</td>
+<td>日期字段交叉验证：词频分析纠正误识别日期</td>
+<td>中</td>
+</tr>
+<tr>
+<td>CL-008</td>
+<td>电话号码标准化：统一格式，去除中文括号注释</td>
+<td>中</td>
+</tr>
+<tr>
+<td>CL-009</td>
+<td>银行名称多级正则匹配（XX 银行 XX 分行 XX 支行 XX 营业部）</td>
+<td>高</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>AI 幻觉修正机制</strong>是询证函识别的关键质量保障。系统在 AI
+返回结果后，自动执行三重校验：正则规则匹配修正明显错误、日期字段交叉验证确保时间逻辑一致、词频分析纠正
+AI 对高频词汇的误识别。</p>
+<h3 id="询证函格式比对">4.2 询证函格式比对</h3>
+<p>格式比对功能允许用户上传询证函
+PDF，系统自动识别其格式类型，与内置标准模板逐项比对，报告格式差异。</p>
+<p><strong>功能需求：</strong></p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FC-001</td>
+<td>支持上传 PDF 格式询证函</td>
+<td>高</td>
+</tr>
+<tr>
+<td>FC-002</td>
+<td>内置 3 套标准模板：格式一、格式二、验资询证函</td>
+<td>高</td>
+</tr>
+<tr>
+<td>FC-003</td>
+<td>AI 自动识别格式类型（基于内容结构判断）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>FC-004</td>
+<td>AI 提取文档结构：节次名称、表格列标题、补充描述、子节</td>
+<td>高</td>
+</tr>
+<tr>
+<td>FC-005</td>
+<td>逐项比对：节次数量、名称、表格表头</td>
+<td>高</td>
+</tr>
+<tr>
+<td>FC-006</td>
+<td>差异严重度分级：高（结构缺失）、中（数量不符）、低（多余字段）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>FC-007</td>
+<td>并排展示模板 PDF 和上传文件 PDF</td>
+<td>中</td>
+</tr>
+<tr>
+<td>FC-008</td>
+<td>并排展示模板结构与 AI 提取结构，不符项红色高亮</td>
+<td>高</td>
+</tr>
+</tbody>
+</table></div>
+<figure>
+<img role="img" aria-label="图 4.1：询证函处理流程图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IuivouivgeWHveivhuWIq+S4juagvOW8j+avlOWvuSIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDTnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7or6Lor4Hlh73or4bliKvkuI7moLzlvI/mr5Tlr7k8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuivouivgeWHveivhuWIq+WSjOagvOW8j+avlOWvueS4pOadoeWkhOeQhuS4u+e6vzwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk0IiB5PSIyNTIiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI3MDAiPuS7jui+k+WFpeWIsOe7k+aenOeahOacgOefreWtpuS5oOi3r+W+hDwvdGV4dD4KICA8bGluZSB4MT0iOTQiIHkxPSIyNzQiIHgyPSIxMTA2IiB5Mj0iMjc0IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40Ii8+CiAgPGxpbmUgeDE9IjI1NS43IiB5MT0iNDA4LjAiIHgyPSIyNTcuNyIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iOTQuMCIgeT0iMzM0LjAiIHdpZHRoPSIxNTMuNyIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iMTIwLjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMjAuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMjAuMCIgZHk9IjAiPjE8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNDYuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE0Ni4wIiBkeT0iMCI+5LiK5LygIFBERjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjExNi4wIiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMTE2LjAiIGR5PSIwIj7lhaXlj6M8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iNDI3LjMiIHkxPSI0MDguMCIgeDI9IjQyOS4zIiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iMjY1LjciIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iMjkxLjciIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIyOTEuNyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIyOTEuNyIgZHk9IjAiPjI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIzMTcuNyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjMxNy43IiBkeT0iMCI+QUkg5qC85byP6K+G5YirPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMjg3LjciIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIyODcuNyIgZHk9IjAiPuagvOW8j+S4gC/kuowv6aqM6LWEPC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9IjU5OS4wIiB5MT0iNDA4LjAiIHgyPSI2MDEuMCIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9IjQzNy4zIiB5PSIzMzQuMCIgd2lkdGg9IjE1My43IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjQ2My4zIiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iNDYzLjMiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iNDYzLjMiIGR5PSIwIj4zPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNDg5LjMiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI0ODkuMyIgZHk9IjAiPue7k+aehOWMluaPkOWPljwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjQ1OS4zIiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iNDU5LjMiIGR5PSIwIj4xMyDlrZfmrrU8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iNzcwLjciIHkxPSI0MDguMCIgeDI9Ijc3Mi43IiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iNjA5LjAiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iNjM1LjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI2MzUuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI2MzUuMCIgZHk9IjAiPjQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NjEuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjY2MS4wIiBkeT0iMCI+5bm76KeJ5L+u5q2jPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjMxLjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI2MzEuMCIgZHk9IjAiPuato+WImSvkuqTlj4npqozor4E8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iOTQyLjMiIHkxPSI0MDguMCIgeDI9Ijk0NC4zIiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iNzgwLjciIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iODA2LjciIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI4MDYuNyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI4MDYuNyIgZHk9IjAiPjU8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4MzIuNyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjgzMi43IiBkeT0iMCI+5qih5p2/5Yy56YWNPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODAyLjciIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI4MDIuNyIgZHk9IjAiPjMg5aWX5qCH5YeG5qih5p2/PC90c3Bhbj48L3RleHQ+CiAgPHJlY3QgeD0iOTUyLjMiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iOTUyLjMiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iNSIgcng9IjIuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDxjaXJjbGUgY3g9Ijk3OC4zIiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iOTc4LjMiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iOTc4LjMiIGR5PSIwIj42PC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTAwNC4zIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iMTAwNC4zIiBkeT0iMCI+5beu5byC5qOA5rWLPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iOTc0LjMiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI5NzQuMyIgZHk9IjAiPuS4iee6p+S4pemHjeW6pjwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 4.1：询证函处理流程图" />
+<figcaption aria-hidden="true">图 4.1：询证函处理流程图</figcaption>
+</figure>
+<hr />
+<h2 id="第5章-文档比对">第5章 文档比对</h2>
+<h3 id="业务场景-1">5.1 业务场景</h3>
+<p>合同、协议、招股书等文档在审计过程中经历多次修订，审计人员需要精确标注每个版本的文本差异。当文档超过数十页、涉及繁简体中文混排、包含大量图片时，人工比对几乎不可能做到精确。</p>
+<h3 id="核心能力">5.2 核心能力</h3>
+<p>文档比对模块提供<strong>页级自动对齐 +
+字符级差异标注</strong>的双重比对能力。</p>
+<p><strong>功能需求：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DC-001</td>
+<td>支持 PDF、DOCX、DOC 格式（单文件最大 50MB）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-002</td>
+<td>DOCX/DOC 自动通过 LibreOffice 转 PDF</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-003</td>
+<td>自动检测并拒绝伪装为 Word 的 MHTML 文件</td>
+<td>中</td>
+</tr>
+<tr>
+<td>DC-004</td>
+<td>比对前自动去除 PDF 图片，仅保留文本</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-005</td>
+<td>去图 PDF 同步用于前端展示，确保高亮位置对齐</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-006</td>
+<td>繁体中文自动转简体后比对</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-007</td>
+<td>页级自动对齐：动态规划算法处理不等页数</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-008</td>
+<td>字符级差异计算：diff-match-patch 算法</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-009</td>
+<td>差异分类：equal / modified / added / deleted</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-010</td>
+<td>内容一致性检测：字符频率分析判断排版不同但内容相同</td>
+<td>中</td>
+</tr>
+<tr>
+<td>DC-011</td>
+<td>并排展示 PDF + 字符级高亮层（红色删除、绿色新增）</td>
+<td>高</td>
+</tr>
+<tr>
+<td>DC-012</td>
+<td>侧边栏展示页面对比对状态，支持按类型筛选</td>
+<td>中</td>
+</tr>
+<tr>
+<td>DC-013</td>
+<td>侧边栏差异文本预览（删除线 + 绿色背景）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>DC-014</td>
+<td>比对任务历史记录查看和删除</td>
+<td>中</td>
+</tr>
+<tr>
+<td>DC-015</td>
+<td>异步处理 + 3 秒轮询</td>
+<td>高</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="比对算法流程">5.3 比对算法流程</h3>
+<p>文档比对采用<strong>四阶段流水线</strong>：</p>
+<ol type="1">
+<li><strong>预处理</strong>：DOCX → PDF 转换 → 去除图片 → 繁简转换 →
+纯文本提取</li>
+<li><strong>页级对齐</strong>：使用动态规划算法将两份文档的页面进行最优匹配，处理页数不一致的情况</li>
+<li><strong>字符级差异</strong>：对每对匹配页面使用 diff-match-patch
+算法计算字符级差异，输出差异操作数组</li>
+<li><strong>结果渲染</strong>：前端在 PDF
+页面上叠加高亮层，精确标注每个字符的增加和删除</li>
+</ol>
+<p>差异操作数据格式为
+<code>[[op, text, offset_a, offset_b], ...]</code>，其中 <code>op</code>
+取值 -1（删除）、0（相同）、1（新增），支持精确到字符的位置定位。</p>
+<figure>
+<img role="img" aria-label="图 5.1：文档比对算法流程图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IuaWh+aho+avlOWvuSIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDXnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7mlofmoaPmr5Tlr7k8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuWbm+mYtuauteavlOWvuea1geawtOe6v++8mumihOWkhOeQhuKGkumhtee6p+Wvuem9kOKGkuWtl+espue6p+W3ruW8guKGkue7k+aenOa4suafkzwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk0IiB5PSIyNTIiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI3MDAiPuS7jui+k+WFpeWIsOe7k+aenOeahOacgOefreWtpuS5oOi3r+W+hDwvdGV4dD4KICA8bGluZSB4MT0iOTQiIHkxPSIyNzQiIHgyPSIxMTA2IiB5Mj0iMjc0IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40Ii8+CiAgPGxpbmUgeDE9IjM0MS41IiB5MT0iNDA4LjAiIHgyPSIzNDMuNSIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iOTQuMCIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iMTIwLjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMjAuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMjAuMCIgZHk9IjAiPjE8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNDYuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE0Ni4wIiBkeT0iMCI+6aKE5aSE55CGPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTE2LjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIxMTYuMCIgZHk9IjAiPuagvOW8j+i9rOaNoivljrvlm74r57mB566A6L2s5o2iPC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9IjU5OS4wIiB5MT0iNDA4LjAiIHgyPSI2MDEuMCIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9IjM1MS41IiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjM3Ny41IiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMzc3LjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMzc3LjUiIGR5PSIwIj4yPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNDAzLjUiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI0MDMuNSIgZHk9IjAiPumhtee6p+Wvuem9kDwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjM3My41IiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMzczLjUiIGR5PSIwIj7liqjmgIHop4TliJI8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iODU2LjUiIHkxPSI0MDguMCIgeDI9Ijg1OC41IiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iNjA5LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iNjM1LjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI2MzUuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI2MzUuMCIgZHk9IjAiPjM8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NjEuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjY2MS4wIiBkeT0iMCI+5a2X56ym57qn5beu5byCPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjMxLjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI2MzEuMCIgZHk9IjAiPmRpZmYtbWF0Y2gtcGF0Y2g8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSI4NjYuNSIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSIxNDguMCIgcng9IjgiIGZpbGw9IiNmN2Y1ZWUiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8cmVjdCB4PSI4NjYuNSIgeT0iMzM0LjAiIHdpZHRoPSIyMzkuNSIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iODkyLjUiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI4OTIuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI4OTIuNSIgZHk9IjAiPjQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5MTguNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjkxOC41IiBkeT0iMCI+57uT5p6c5riy5p+TPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODg4LjUiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI4ODguNSIgZHk9IjAiPumrmOS6ruWxguWPoOWKoDwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 5.1：文档比对算法流程图" />
+<figcaption aria-hidden="true">图 5.1：文档比对算法流程图</figcaption>
+</figure>
+<hr />
+<h2 id="第6章-发票与凭证识别">第6章 发票与凭证识别</h2>
+<h3 id="发票识别">6.1 发票识别</h3>
+<p>发票识别支持 PDF 和图片格式（JPG/PNG），批量上传后异步处理。</p>
+<p><strong>功能需求：</strong></p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IR-001</td>
+<td>支持 PDF、JPG、PNG 格式，支持多文件批量上传</td>
+<td>高</td>
+</tr>
+<tr>
+<td>IR-002</td>
+<td>PDF 自动按页拆分为图片，逐页识别</td>
+<td>高</td>
+</tr>
+<tr>
+<td>IR-003</td>
+<td>AI 提取 8
+个字段：发票类型、发票号码、开票日期、发票金额、购买方名称、购买方税号、销售方名称、销售方税号</td>
+<td>高</td>
+</tr>
+<tr>
+<td>IR-004</td>
+<td>按页展示识别结果卡片</td>
+<td>中</td>
+</tr>
+<tr>
+<td>IR-005</td>
+<td>原始文件预览（PDF iframe / 图片 img）</td>
+<td>中</td>
+</tr>
+<tr>
+<td>IR-006</td>
+<td>异步批量处理 + 前端轮询</td>
+<td>高</td>
+</tr>
+<tr>
+<td>IR-007</td>
+<td>支持识别结果删除</td>
+<td>低</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="凭证识别">6.2 凭证识别</h3>
+<p>凭证识别覆盖审计场景中常见的 8
+类凭证文件，每类凭证有独立的字段提取规则和结果展示组件。</p>
+<p><strong>支持的凭证类型与提取字段：</strong></p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>凭证类型</th>
+<th>提取字段</th>
+<th>特殊能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>身份证</td>
+<td>姓名、性别、民族、出生日期、住址、身份证号</td>
+<td>自动识别正面/背面</td>
+</tr>
+<tr>
+<td>电子印章</td>
+<td>印章编码</td>
+<td>多枚印章识别 + 防幻觉校验</td>
+</tr>
+<tr>
+<td>银行卡</td>
+<td>卡号</td>
+<td>切角检测（作废标记）</td>
+</tr>
+<tr>
+<td>电子凭证</td>
+<td>付款方/收款方信息、金额</td>
+<td>手写签名检测</td>
+</tr>
+<tr>
+<td>网银申请书</td>
+<td>操作员信息、权限列表</td>
+<td>签章检测</td>
+</tr>
+<tr>
+<td>违法告知函</td>
+<td>相关信息</td>
+<td>指纹检测</td>
+</tr>
+<tr>
+<td>开户申请书</td>
+<td>完整申请表信息</td>
+<td>复选框勾选状态检测（链式推理）</td>
+</tr>
+<tr>
+<td>授权书</td>
+<td>15 项分类授权项目（开户/变更/注销/其他）</td>
+<td>勾选状态检测</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>图像预处理能力：</strong></p>
+<ul>
+<li>密集表单图片自动网格切割，分区域识别后合并结果</li>
+<li>多表单并排图片自动水平切割</li>
+<li>布尔字段后处理：修正 AI 对勾选标记的误判</li>
+</ul>
+<figure>
+<img role="img" aria-label="图 6.1：凭证类型识别矩阵" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IuWPkeelqOS4juWHreivgeivhuWIqyIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDbnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7lj5HnpajkuI7lh63or4Hor4bliKs8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPjgg57G75Yet6K+B55qE6L6T5YWl5qC85byP44CB5o+Q5Y+W5a2X5q615ZKM54m55q6K5qOA5rWL6IO95Yqb55+p6Zi1PC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9IjYwMCIgeTE9IjIyMCIgeDI9IjYwMCIgeTI9IjU4OCIgc3Ryb2tlPSIjYzljNGI4IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8bGluZSB4MT0iODYiIHkxPSI0MDYiIHgyPSIxMTE0IiB5Mj0iNDA2IiBzdHJva2U9IiNjOWM0YjgiIHN0cm9rZS13aWR0aD0iMiIvPgogIDxyZWN0IHg9IjEwNC4wIiB5PSIyMzYuMCIgd2lkdGg9IjQ3Mi4wIiBoZWlnaHQ9IjE0Mi4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9IjEwNC4wIiB5PSIyMzYuMCIgd2lkdGg9IjQ3Mi4wIiBoZWlnaHQ9IjUiIHJ4PSIyLjUiIGZpbGw9IiMxZjRlNzkiLz4KICA8Y2lyY2xlIGN4PSIxMzAuMCIgY3k9IjI2NC4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjEzMC4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjEzMC4wIiBkeT0iMCI+MTwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjE1Ni4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iMTU2LjAiIGR5PSIwIj7ouqvku73or4E8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxMjYuMCIgeT0iMzUwLjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjEyNi4wIiBkeT0iMCI+NiDlrZfmrrUgKyDmraPlj43pnaLor4bliKs8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSI2MjQuMCIgeT0iMjM2LjAiIHdpZHRoPSI0NzIuMCIgaGVpZ2h0PSIxNDIuMCIgcng9IjgiIGZpbGw9IiNmYWY5ZjUiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8Y2lyY2xlIGN4PSI2NTAuMCIgY3k9IjI2NC4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjY1MC4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjY1MC4wIiBkeT0iMCI+MjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjY3Ni4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iNjc2LjAiIGR5PSIwIj7nlLXlrZDljbDnq6A8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NDYuMCIgeT0iMzUwLjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjY0Ni4wIiBkeT0iMCI+57yW56CBICsg5aSa5p6a6K+G5YirPC90c3Bhbj48L3RleHQ+CiAgPHJlY3QgeD0iMTA0LjAiIHk9IjQyNC4wIiB3aWR0aD0iNDcyLjAiIGhlaWdodD0iMTQyLjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iMTMwLjAiIGN5PSI0NTIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMzAuMCIgeT0iNDU3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMzAuMCIgZHk9IjAiPjM8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNTYuMCIgeT0iNDU3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE1Ni4wIiBkeT0iMCI+6ZO26KGM5Y2hPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTI2LjAiIHk9IjUzOC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIxMjYuMCIgZHk9IjAiPuWNoeWPtyArIOWIh+inkuajgOa1izwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9IjYyNC4wIiB5PSI0MjQuMCIgd2lkdGg9IjQ3Mi4wIiBoZWlnaHQ9IjE0Mi4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjY1MC4wIiBjeT0iNDUyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iNjUwLjAiIHk9IjQ1Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iNjUwLjAiIGR5PSIwIj40PC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjc2LjAiIHk9IjQ1Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSI2NzYuMCIgZHk9IjAiPueUteWtkOWHreivgTwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjY0Ni4wIiB5PSI1MzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iNjQ2LjAiIGR5PSIwIj7mlLbku5jmlrkgKyDnrb7lkI3mo4DmtYs8L3RzcGFuPjwvdGV4dD4KPC9zdmc+Cg==" alt="图 6.1：凭证类型识别矩阵" />
+<figcaption aria-hidden="true">图 6.1：凭证类型识别矩阵</figcaption>
+</figure>
+<hr />
+<h2 id="第7章-通用-pdf-提取">第7章 通用 PDF 提取</h2>
+<h3 id="自定义字段配置">7.1 自定义字段配置</h3>
+<p>通用 PDF 提取模块允许用户定义提取字段 schema，AI 从任意 PDF
+中按定义提取结构化信息。</p>
+<p><strong>字段类型系统：</strong></p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>类型</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>string</td>
+<td>单行文本</td>
+<td>公司名称、合同编号</td>
+</tr>
+<tr>
+<td>number</td>
+<td>数值</td>
+<td>金额、数量</td>
+</tr>
+<tr>
+<td>array</td>
+<td>字符串数组</td>
+<td>股东名单、经营范围</td>
+</tr>
+<tr>
+<td>object_array</td>
+<td>对象数组（支持子字段定义）</td>
+<td>董事信息（姓名+职务+任期）</td>
+</tr>
+</tbody>
+</table></div>
+<p>配置规则：最多 10 个提取字段；object_array
+类型支持定义子字段（名称、类型、描述）。</p>
+<h3 id="输出格式与结果展示">7.2 输出格式与结果展示</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PE-001</td>
+<td>用户可配置最多 10 个提取字段</td>
+<td>高</td>
+</tr>
+<tr>
+<td>PE-002</td>
+<td>每字段支持配置名称、类型、描述</td>
+<td>高</td>
+</tr>
+<tr>
+<td>PE-003</td>
+<td>object_array 类型支持子字段定义</td>
+<td>中</td>
+</tr>
+<tr>
+<td>PE-004</td>
+<td>支持输出格式：JSON、CSV、XLSX</td>
+<td>高</td>
+</tr>
+<tr>
+<td>PE-005</td>
+<td>多文件批量上传 + 异步处理</td>
+<td>高</td>
+</tr>
+<tr>
+<td>PE-006</td>
+<td>双模式展示：表格视图 + JSON 原始视图</td>
+<td>中</td>
+</tr>
+<tr>
+<td>PE-007</td>
+<td>支持复制 JSON 到剪贴板、下载 JSON 文件</td>
+<td>低</td>
+</tr>
+<tr>
+<td>PE-008</td>
+<td>支持后端生成的 CSV/XLSX 下载</td>
+<td>中</td>
+</tr>
+</tbody>
+</table></div>
+<figure>
+<img role="img" aria-label="图 7.1：通用 PDF 提取配置与结果展示流程" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IumAmueUqCBQREYg5o+Q5Y+WIiBmb250LWZhbWlseT0iTm90byBTYW5zIFNDLCBTb3VyY2UgSGFuIFNhbnMgU0MsIFBpbmdGYW5nIFNDLCBzeXN0ZW0tdWksIHNhbnMtc2VyaWYiPgogIDxkZWZzPgogICAgPGZpbHRlciBpZD0ic29mdC1zaGFkb3ciIHg9Ii04JSIgeT0iLTEyJSIgd2lkdGg9IjExNiUiIGhlaWdodD0iMTI4JSI+CiAgICAgIDxmZURyb3BTaGFkb3cgZHg9IjAiIGR5PSI1IiBzdGREZXZpYXRpb249IjciIGZsb29kLWNvbG9yPSIjMTExODI3IiBmbG9vZC1vcGFjaXR5PSIwLjA4Ii8+CiAgICA8L2ZpbHRlcj4KICAgIDxwYXR0ZXJuIGlkPSJkb3QtZ3JpZCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjI4IiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPGNpcmNsZSBjeD0iMS41IiBjeT0iMS41IiByPSIxLjIiIGZpbGw9IiNlOGU0ZGEiIG9wYWNpdHk9IjAuODUiLz4KICAgIDwvcGF0dGVybj4KICAgIDxtYXJrZXIgaWQ9ImFycm93IiBtYXJrZXJXaWR0aD0iMTIiIG1hcmtlckhlaWdodD0iMTIiIHJlZlg9IjEwIiByZWZZPSI2IiBvcmllbnQ9ImF1dG8iIG1hcmtlclVuaXRzPSJzdHJva2VXaWR0aCI+CiAgICAgIDxwYXRoIGQ9Ik0yLDIgTDEwLDYgTDIsMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIC8+CiAgICA8L21hcmtlcj4KICA8L2RlZnM+CiAgPHJlY3Qgd2lkdGg9IjEyMDAiIGhlaWdodD0iNjc1IiBmaWxsPSIjZjhmNmYxIi8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjYiLz4KICA8cmVjdCB4PSIxIiB5PSIxIiB3aWR0aD0iMTE5OCIgaGVpZ2h0PSI2NzMiIHJ4PSIxOCIgZmlsbD0idXJsKCNkb3QtZ3JpZCkiIG9wYWNpdHk9IjAuMzQiLz4KICA8cmVjdCB4PSI3MiIgeT0iMjA2IiB3aWR0aD0iMTA1NiIgaGVpZ2h0PSIzOTAiIHJ4PSIxNiIgZmlsbD0iI2Y4ZjZmMSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuMSIgb3BhY2l0eT0iMC44MiIvPgogIDx0ZXh0IHg9Ijg0IiB5PSI4MiIgZmlsbD0iIzFmNGU3OSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCIgbGV0dGVyLXNwYWNpbmc9IjEuMiI+56ysN+eroDwvdGV4dD4KICA8dGV4dCB4PSIxMTE2IiB5PSI4MiIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9IjEiPuaVmeWtpuWbvuekujwvdGV4dD4KICA8cmVjdCB4PSI4NCIgeT0iMTAwIiB3aWR0aD0iNTQiIGhlaWdodD0iNCIgcng9IjIiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI4NC4wIiB5PSIxMzYuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjMxIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPumAmueUqCBQREYg5o+Q5Y+WPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODQuMCIgeT0iMTc4LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjUwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7oh6rlrprkuYnlrZfmrrXphY3nva7liLDlj4zop4blm77nu5PmnpzlsZXnpLrnmoTnq6/liLDnq6/mtYHnqIs8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5NCIgeT0iMjUyIiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNzAwIj7ku47ovpPlhaXliLDnu5PmnpznmoTmnIDnn63lrabkuaDot6/lvoQ8L3RleHQ+CiAgPGxpbmUgeDE9Ijk0IiB5MT0iMjc0IiB4Mj0iMTEwNiIgeTI9IjI3NCIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIvPgogIDxsaW5lIHgxPSIzNDEuNSIgeTE9IjQwOC4wIiB4Mj0iMzQzLjUiIHkyPSI0MDguMCIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KICA8cmVjdCB4PSI5NC4wIiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iNSIgcng9IjIuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDxjaXJjbGUgY3g9IjEyMC4wIiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMTIwLjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMTIwLjAiIGR5PSIwIj4xPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTQ2LjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSIxNDYuMCIgZHk9IjAiPuWtl+autemFjee9rjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjExNi4wIiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMTE2LjAiIGR5PSIwIj7mnIDlpJogMTAg5a2X5q6177yMNCDnp43nsbvlnos8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iNTk5LjAiIHkxPSI0MDguMCIgeDI9IjYwMS4wIiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iMzUxLjUiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iMzc3LjUiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIzNzcuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIzNzcuNSIgZHk9IjAiPjI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI0MDMuNSIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjQwMy41IiBkeT0iMCI+UERGIOS4iuS8oDwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjM3My41IiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMzczLjUiIGR5PSIwIj7lpJrmlofku7bmibnph488L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iODU2LjUiIHkxPSI0MDguMCIgeDI9Ijg1OC41IiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iNjA5LjAiIHk9IjMzNC4wIiB3aWR0aD0iMjM5LjUiIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iNjM1LjAiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI2MzUuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI2MzUuMCIgZHk9IjAiPjM8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NjEuMCIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjY2MS4wIiBkeT0iMCI+QUkg5o+Q5Y+WPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjMxLjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI2MzEuMCIgZHk9IjAiPuW8guatpeWkhOeQhjwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9Ijg2Ni41IiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9Ijg2Ni41IiB5PSIzMzQuMCIgd2lkdGg9IjIzOS41IiBoZWlnaHQ9IjUiIHJ4PSIyLjUiIGZpbGw9IiMxZjRlNzkiLz4KICA8Y2lyY2xlIGN4PSI4OTIuNSIgY3k9IjM2Mi4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9Ijg5Mi41IiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg5Mi41IiBkeT0iMCI+NDwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjkxOC41IiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iOTE4LjUiIGR5PSIwIj7lj4zop4blm77lsZXnpLo8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4ODguNSIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9Ijg4OC41IiBkeT0iMCI+6KGo5qC8ICsgSlNPTjwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 7.1：通用 PDF 提取配置与结果展示流程" />
+<figcaption aria-hidden="true">图 7.1：通用 PDF
+提取配置与结果展示流程</figcaption>
+</figure>
+<hr />
+<h2 id="第8章-技术架构与部署方案">第8章 技术架构与部署方案</h2>
+<h3 id="前后端技术栈">8.1 前后端技术栈</h3>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>层级</th>
+<th>后端技术</th>
+<th>前端技术</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>语言</td>
+<td>Python &gt;= 3.11</td>
+<td>TypeScript 5.9</td>
+</tr>
+<tr>
+<td>框架</td>
+<td>FastAPI + Uvicorn（异步）</td>
+<td>Vue 3.5（Composition API）</td>
+</tr>
+<tr>
+<td>构建</td>
+<td>uv（pyproject.toml）</td>
+<td>Vite 7</td>
+</tr>
+<tr>
+<td>ORM/数据</td>
+<td>SQLModel + asyncpg + PostgreSQL</td>
+<td>Axios（HTTP）</td>
+</tr>
+<tr>
+<td>AI 接入</td>
+<td>OpenAI 兼容 SDK → Qwen-VL</td>
+<td>—</td>
+</tr>
+<tr>
+<td>PDF 处理</td>
+<td>pdfplumber、PyMuPDF、pdf2image、camelot</td>
+<td>pdfjs-dist（PDF.js 渲染）</td>
+</tr>
+<tr>
+<td>文档转换</td>
+<td>LibreOffice headless（DOCX → PDF）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>比对引擎</td>
+<td>diff-match-patch、difflib</td>
+<td>TipTap（diff 可视化）</td>
+</tr>
+<tr>
+<td>简繁转换</td>
+<td>OpenCC</td>
+<td>—</td>
+</tr>
+<tr>
+<td>认证</td>
+<td>PyJWT（HS256）</td>
+<td>sessionStorage + postMessage</td>
+</tr>
+<tr>
+<td>样式</td>
+<td>—</td>
+<td>Tailwind CSS 4</td>
+</tr>
+<tr>
+<td>导出</td>
+<td>pandas + openpyxl（Excel）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>外部集成</td>
+<td>JPype1（SunECM Java SDK 桥接）</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="系统架构分层">8.2 系统架构分层</h3>
+<p>系统采用经典的三层架构，前后端完全分离：</p>
+<pre><code>┌─────────────────────────────────────────────┐
+│          前端展示层（Vue 3 + Vite）           │
+│  9 个页面视图 · 11 个银行汇总组件 · 认证守卫  │
+├─────────────────────────────────────────────┤
+│          后端服务层（FastAPI + SQLModel）      │
+│  11 个业务模块 · 57 个 API 端点 · 异步任务    │
+├─────────────────────────────────────────────┤
+│          AI 能力层（Qwen-VL）                 │
+│     视觉语言模型 · 多模态文档理解              │
+├─────────────────────────────────────────────┤
+│          数据与存储层                          │
+│  PostgreSQL（34 张表）· SunECM（可选集成）     │
+└─────────────────────────────────────────────┘</code></pre>
+<h3 id="部署架构">8.3 部署架构</h3>
+<ul>
+<li><strong>容器化部署</strong>：后端和前端各自提供 Dockerfile，通过
+Kubernetes Helm Charts 编排</li>
+<li><strong>前端部署</strong>：多阶段构建（Node.js 编译 →
+OpenResty/Nginx 托管），端口 8001，Nginx 反代 <code>/api</code>
+至后端</li>
+<li><strong>后端部署</strong>：自定义运行时镜像，非 root
+用户（appuser），tini 作为 init 进程，<code>/health</code> 健康检查</li>
+<li><strong>CI/CD</strong>：Jenkins 流水线（ci-prepare → ci-build →
+ci-push），nerdctl 构建推送至私有 Harbor 镜像仓库</li>
+<li><strong>嵌入部署</strong>：支持 iframe 嵌入模式，通过 postMessage
+从父系统获取认证令牌</li>
+</ul>
+<figure>
+<img role="img" aria-label="图 8.1：技术架构分层图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IuaKgOacr+aetuaehOS4jumDqOe9suaWueahiCIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDjnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7mioDmnK/mnrbmnoTkuI7pg6jnvbLmlrnmoYg8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPuWJjeerr+WxleekuuKGkuWQjuerr+acjeWKoeKGkkFJ6IO95Yqb4oaS5pWw5o2u5a2Y5YKo55qE5Zub5bGC5p625p6EPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTY4IiB5PSIyMjIiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI3MDAiPui2iuW+gOS4i+i2iuaOpei/keW6leWxguacuuWItu+8jOi2iuW+gOS4iui2iuaOpei/keeUqOaIt+WPr+ingee7k+aenDwvdGV4dD4KICA8cmVjdCB4PSIxNjguMCIgeT0iMjM2LjAiIHdpZHRoPSI4NjQuMCIgaGVpZ2h0PSI1NC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9IjE2OC4wIiB5PSIyMzYuMCIgd2lkdGg9IjciIGhlaWdodD0iNTQuMCIgcng9IjMuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjE5OC4wIiB5PSIyNzAuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE5IiBmb250LXdlaWdodD0iNzgwIj48dHNwYW4geD0iMTk4LjAiIGR5PSIwIj7liY3nq6/lsZXnpLrlsYI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxMDA4LjAiIHk9IjI2OC4wIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMTAwOC4wIiBkeT0iMCI+VnVlIDMgKyBWaXRlICs8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSIxOTYuMCIgeT0iMzAyLjAiIHdpZHRoPSI4MDguMCIgaGVpZ2h0PSI1NC4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9IjE5Ni4wIiB5PSIzMDIuMCIgd2lkdGg9IjciIGhlaWdodD0iNTQuMCIgcng9IjMuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjIyNi4wIiB5PSIzMzYuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE5IiBmb250LXdlaWdodD0iNzgwIj48dHNwYW4geD0iMjI2LjAiIGR5PSIwIj7lkI7nq6/mnI3liqHlsYI8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5ODAuMCIgeT0iMzM0LjAiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTMiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI5ODAuMCIgZHk9IjAiPkZhc3RBUEkgKyBTUUxNb2RlbDwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9IjIyNC4wIiB5PSIzNjguMCIgd2lkdGg9Ijc1Mi4wIiBoZWlnaHQ9IjU0LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iMjI0LjAiIHk9IjM2OC4wIiB3aWR0aD0iNyIgaGVpZ2h0PSI1NC4wIiByeD0iMy41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMjU0LjAiIHk9IjQwMi4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTkiIGZvbnQtd2VpZ2h0PSI3ODAiPjx0c3BhbiB4PSIyNTQuMCIgZHk9IjAiPkFJIOiDveWKm+WxgjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9Ijk1Mi4wIiB5PSI0MDAuMCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMyIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9Ijk1Mi4wIiBkeT0iMCI+UXdlbi1WTDwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9IjI1Mi4wIiB5PSI0MzQuMCIgd2lkdGg9IjY5Ni4wIiBoZWlnaHQ9IjU0LjAiIHJ4PSI4IiBmaWxsPSIjZjdmNWVlIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPHJlY3QgeD0iMjUyLjAiIHk9IjQzNC4wIiB3aWR0aD0iNyIgaGVpZ2h0PSI1NC4wIiByeD0iMy41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMjgyLjAiIHk9IjQ2OC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTkiIGZvbnQtd2VpZ2h0PSI3ODAiPjx0c3BhbiB4PSIyODIuMCIgZHk9IjAiPuaVsOaNruWtmOWCqOWxgjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjkyNC4wIiB5PSI0NjYuMCIgdGV4dC1hbmNob3I9ImVuZCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMyIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjkyNC4wIiBkeT0iMCI+UG9zdGdyZVNRTCArIFN1bkVDTTwvdHNwYW4+PC90ZXh0Pgo8L3N2Zz4K" alt="图 8.1：技术架构分层图" />
+<figcaption aria-hidden="true">图 8.1：技术架构分层图</figcaption>
+</figure>
+<hr />
+<h2 id="第9章-非功能需求与系统约束">第9章 非功能需求与系统约束</h2>
+<h3 id="性能需求">9.1 性能需求</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-001</td>
+<td>PDF 文本提取响应时间 ≤ 5 秒/页（不含 AI 调用）</td>
+</tr>
+<tr>
+<td>NFR-002</td>
+<td>文档比对异步处理，不阻塞其他 API 请求</td>
+</tr>
+<tr>
+<td>NFR-003</td>
+<td>数据库连接池：最小 5 连接，最大 10 溢出，300 秒回收</td>
+</tr>
+<tr>
+<td>NFR-004</td>
+<td>AI 识别超时保护：单文件最长 1800 秒</td>
+</tr>
+<tr>
+<td>NFR-005</td>
+<td>大图片自动压缩（尺寸 + 质量）后发送 AI，降低推理延迟</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="可靠性需求">9.2 可靠性需求</h3>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-006</td>
+<td>AI 返回 JSON 自动修复（括号补全、Markdown
+围栏清除、控制字符转义）</td>
+</tr>
+<tr>
+<td>NFR-007</td>
+<td>DOCX 转 PDF 失败时返回明确错误信息，不中断服务</td>
+</tr>
+<tr>
+<td>NFR-008</td>
+<td>异步任务失败时记录错误信息，状态标记为 failed</td>
+</tr>
+<tr>
+<td>NFR-009</td>
+<td>数据库表结构自动迁移（启动时 ALTER TABLE 补列）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="安全需求">9.3 安全需求</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-010</td>
+<td>所有 API 接口（除公开端点外）需 JWT 认证</td>
+</tr>
+<tr>
+<td>NFR-011</td>
+<td>文件上传路径安全校验，防止目录穿越攻击</td>
+</tr>
+<tr>
+<td>NFR-012</td>
+<td>上传文件格式校验（magic bytes 检测）</td>
+</tr>
+<tr>
+<td>NFR-013</td>
+<td>JWT 令牌包含过期时间，过期后拒绝访问</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="兼容性与可维护性">9.4 兼容性与可维护性</h3>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>编号</th>
+<th>需求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-014</td>
+<td>支持 PDF、DOCX、DOC、JPG、JPEG、PNG 格式输入</td>
+</tr>
+<tr>
+<td>NFR-015</td>
+<td>支持简体中文和繁体中文文档的识别与比对</td>
+</tr>
+<tr>
+<td>NFR-016</td>
+<td>HiDPI/Retina 屏幕适配（PDF canvas 按 devicePixelRatio 缩放）</td>
+</tr>
+<tr>
+<td>NFR-017</td>
+<td>支持主流浏览器：Chrome、Edge、Firefox、Safari</td>
+</tr>
+<tr>
+<td>NFR-018</td>
+<td>支持 iframe 嵌入部署</td>
+</tr>
+<tr>
+<td>NFR-019</td>
+<td>银行识别策略采用注册式策略模式，新增银行无需修改核心逻辑</td>
+</tr>
+<tr>
+<td>NFR-020</td>
+<td>提示词和字段 Schema 通过配置文件管理</td>
+</tr>
+<tr>
+<td>NFR-021</td>
+<td>容器化部署，提供 Dockerfile 和 Kubernetes Helm Charts</td>
+</tr>
+<tr>
+<td>NFR-022</td>
+<td>前后端完全分离，独立构建和部署</td>
+</tr>
+</tbody>
+</table></div>
+<figure>
+<img role="img" aria-label="图 9.1：非功能需求矩阵" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IumdnuWKn+iDvemcgOaxguS4juezu+e7n+e6puadnyIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDnnq6A8L3RleHQ+CiAgPHRleHQgeD0iMTExNiIgeT0iODIiIHRleHQtYW5jaG9yPSJlbmQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI3MDAiIGxldHRlci1zcGFjaW5nPSIxIj7mlZnlrablm77npLo8L3RleHQ+CiAgPHJlY3QgeD0iODQiIHk9IjEwMCIgd2lkdGg9IjU0IiBoZWlnaHQ9IjQiIHJ4PSIyIiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iODQuMCIgeT0iMTM2LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIzMSIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj7pnZ7lip/og73pnIDmsYLkuI7ns7vnu5/nuqbmnZ88L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI4NC4wIiB5PSIxNzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjE1IiBmb250LXdlaWdodD0iNTAwIj48dHNwYW4geD0iODQuMCIgZHk9IjAiPjIyIOadoemdnuWKn+iDvemcgOaxgueahOS6lOe7tOW6puWIhuW4g+S4juS8mOWFiOe6pzwvdHNwYW4+PC90ZXh0PgogIDxsaW5lIHgxPSI2MDAiIHkxPSIyMjAiIHgyPSI2MDAiIHkyPSI1ODgiIHN0cm9rZT0iI2M5YzRiOCIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgPGxpbmUgeDE9Ijg2IiB5MT0iNDA2IiB4Mj0iMTExNCIgeTI9IjQwNiIgc3Ryb2tlPSIjYzljNGI4IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cmVjdCB4PSIxMDQuMCIgeT0iMjM2LjAiIHdpZHRoPSI0NzIuMCIgaGVpZ2h0PSIxNDIuMCIgcng9IjgiIGZpbGw9IiNmN2Y1ZWUiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8cmVjdCB4PSIxMDQuMCIgeT0iMjM2LjAiIHdpZHRoPSI0NzIuMCIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPGNpcmNsZSBjeD0iMTMwLjAiIGN5PSIyNjQuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSIxMzAuMCIgeT0iMjY5LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSIxMzAuMCIgZHk9IjAiPjE8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxNTYuMCIgeT0iMjY5LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjE1Ni4wIiBkeT0iMCI+5oCn6IO9PC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTI2LjAiIHk9IjM1MC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSIxMjYuMCIgZHk9IjAiPk5GUi0wMDEgfiAwMDU8L3RzcGFuPjwvdGV4dD4KICA8cmVjdCB4PSI2MjQuMCIgeT0iMjM2LjAiIHdpZHRoPSI0NzIuMCIgaGVpZ2h0PSIxNDIuMCIgcng9IjgiIGZpbGw9IiNmYWY5ZjUiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8Y2lyY2xlIGN4PSI2NTAuMCIgY3k9IjI2NC4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjY1MC4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjY1MC4wIiBkeT0iMCI+MjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjY3Ni4wIiB5PSIyNjkuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iNjc2LjAiIGR5PSIwIj7lj6/pnaDmgKc8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NDYuMCIgeT0iMzUwLjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjY0Ni4wIiBkeT0iMCI+TkZSLTAwNiB+IDAwOTwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9IjEwNC4wIiB5PSI0MjQuMCIgd2lkdGg9IjQ3Mi4wIiBoZWlnaHQ9IjE0Mi4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjEzMC4wIiBjeT0iNDUyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMTMwLjAiIHk9IjQ1Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMTMwLjAiIGR5PSIwIj4zPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTU2LjAiIHk9IjQ1Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSIxNTYuMCIgZHk9IjAiPuWuieWFqDwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjEyNi4wIiB5PSI1MzguMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMTI2LjAiIGR5PSIwIj5ORlItMDEwIH4gMDEzPC90c3Bhbj48L3RleHQ+CiAgPHJlY3QgeD0iNjI0LjAiIHk9IjQyNC4wIiB3aWR0aD0iNDcyLjAiIGhlaWdodD0iMTQyLjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iNjUwLjAiIGN5PSI0NTIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI2NTAuMCIgeT0iNDU3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI2NTAuMCIgZHk9IjAiPjQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI2NzYuMCIgeT0iNDU3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjY3Ni4wIiBkeT0iMCI+5YW85a655oCnPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjQ2LjAiIHk9IjUzOC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI2NDYuMCIgZHk9IjAiPk5GUi0wMTQgfiAwMTg8L3RzcGFuPjwvdGV4dD4KPC9zdmc+Cg==" alt="图 9.1：非功能需求矩阵" />
+<figcaption aria-hidden="true">图 9.1：非功能需求矩阵</figcaption>
+</figure>
+<hr />
+<h2 id="第10章-数据模型与接口总览">第10章 数据模型与接口总览</h2>
+<h3 id="核心实体关系">10.1 核心实体关系</h3>
+<pre><code>FileRecord（银行流水文件）
+├── {Bank}Summary（账户汇总，11 家银行各一张表）
+└── {Bank}Transaction（交易明细，11 家银行各一张表）
+
+DocumentCompareTask（文档比对任务）
+└── DocumentPageDiff（页级差异，1:N）
+
+ConfirmationFile（询证函文件）
+└── ConfirmationResult（识别结果，1:1）
+
+FormatCompareTask（格式比对任务）
+
+InvoiceFile（发票文件）
+└── InvoiceResult（识别结果，1:N 按页）
+
+CredentialRecord（凭证记录）
+└── CredentialResult（提取结果，1:1）
+
+PdfExtractTask（PDF 提取任务）
+└── PdfExtractResult（提取结果，1:1）
+
+UserPermission（用户权限）</code></pre>
+<p>所有业务表均包含 <code>user_id</code> 字段，实现多租户数据隔离。</p>
+<h3 id="数据库表统计">10.2 数据库表统计</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>类别</th>
+<th>表数量</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>银行流水相关</td>
+<td>23</td>
+<td>files + 11 张 summary + 11 张 transaction</td>
+</tr>
+<tr>
+<td>文档比对</td>
+<td>2</td>
+<td>compare_tasks + page_diffs</td>
+</tr>
+<tr>
+<td>询证函识别</td>
+<td>2</td>
+<td>confirmation_files + confirmation_results</td>
+</tr>
+<tr>
+<td>格式比对</td>
+<td>1</td>
+<td>format_compare_tasks</td>
+</tr>
+<tr>
+<td>发票识别</td>
+<td>2</td>
+<td>invoice_files + invoice_results</td>
+</tr>
+<tr>
+<td>凭证识别</td>
+<td>2</td>
+<td>credential_records + credential_results</td>
+</tr>
+<tr>
+<td>PDF 提取</td>
+<td>2</td>
+<td>pdf_extract_tasks + pdf_extract_results</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td><strong>34</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="api-接口总览">10.3 API 接口总览</h3>
+<p>所有 API 以 <code>/api</code> 为前缀，除文件获取和公开端点外均使用
+POST 方法，请求和响应均为 JSON 格式。</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>模块</th>
+<th>路由前缀</th>
+<th>端点数</th>
+<th>核心功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>认证</td>
+<td><code>/api/auth</code></td>
+<td>1</td>
+<td>开发令牌获取</td>
+</tr>
+<tr>
+<td>银行流水</td>
+<td><code>/api/files</code></td>
+<td>6</td>
+<td>上传、识别、删除、导出</td>
+</tr>
+<tr>
+<td>交易记录</td>
+<td><code>/api/transactions</code></td>
+<td>2</td>
+<td>汇总查询、明细查询</td>
+</tr>
+<tr>
+<td>文档比对</td>
+<td><code>/api/documents</code></td>
+<td>6</td>
+<td>创建任务、查询状态、获取差异、历史管理</td>
+</tr>
+<tr>
+<td>询证函</td>
+<td><code>/api/confirmation</code></td>
+<td>7</td>
+<td>上传、识别、更新、删除</td>
+</tr>
+<tr>
+<td>格式比对</td>
+<td><code>/api/format-compare</code></td>
+<td>8</td>
+<td>上传、识别、比对、结果查询</td>
+</tr>
+<tr>
+<td>发票识别</td>
+<td><code>/api/invoice_recognition</code></td>
+<td>5</td>
+<td>上传、识别、结果查询、删除</td>
+</tr>
+<tr>
+<td>凭证识别</td>
+<td><code>/api/credentials</code></td>
+<td>5</td>
+<td>上传、识别、结果查询、删除</td>
+</tr>
+<tr>
+<td>PDF 提取</td>
+<td><code>/api/pdf_extract</code></td>
+<td>5</td>
+<td>上传、识别、结果查询、删除</td>
+</tr>
+<tr>
+<td>文档管理</td>
+<td><code>/api/file-provider</code></td>
+<td>4</td>
+<td>SunECM 平台文档存取</td>
+</tr>
+<tr>
+<td>原生流水</td>
+<td><code>/api/native-statement</code></td>
+<td>3</td>
+<td>原生 PDF 解析</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td></td>
+<td><strong>57</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>异步任务状态流转：<code>pending → processing → done / failed</code>。前端采用
+3 秒间隔轮询获取任务状态更新。</p>
+<figure>
+<img role="img" aria-label="图 10.1：实体关系概览图" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgdmlld0JveD0iMCAwIDEyMDAgNjc1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IuaVsOaNruaooeWei+S4juaOpeWPo+aAu+iniCIgZm9udC1mYW1pbHk9Ik5vdG8gU2FucyBTQywgU291cmNlIEhhbiBTYW5zIFNDLCBQaW5nRmFuZyBTQywgc3lzdGVtLXVpLCBzYW5zLXNlcmlmIj4KICA8ZGVmcz4KICAgIDxmaWx0ZXIgaWQ9InNvZnQtc2hhZG93IiB4PSItOCUiIHk9Ii0xMiUiIHdpZHRoPSIxMTYlIiBoZWlnaHQ9IjEyOCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNSIgc3RkRGV2aWF0aW9uPSI3IiBmbG9vZC1jb2xvcj0iIzExMTgyNyIgZmxvb2Qtb3BhY2l0eT0iMC4wOCIvPgogICAgPC9maWx0ZXI+CiAgICA8cGF0dGVybiBpZD0iZG90LWdyaWQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyOCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxjaXJjbGUgY3g9IjEuNSIgY3k9IjEuNSIgcj0iMS4yIiBmaWxsPSIjZThlNGRhIiBvcGFjaXR5PSIwLjg1Ii8+CiAgICA8L3BhdHRlcm4+CiAgICA8bWFya2VyIGlkPSJhcnJvdyIgbWFya2VyV2lkdGg9IjEyIiBtYXJrZXJIZWlnaHQ9IjEyIiByZWZYPSIxMCIgcmVmWT0iNiIgb3JpZW50PSJhdXRvIiBtYXJrZXJVbml0cz0ic3Ryb2tlV2lkdGgiPgogICAgICA8cGF0aCBkPSJNMiwyIEwxMCw2IEwyLDEwIiBmaWxsPSJub25lIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiAvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSIgZmlsbD0iI2Y4ZjZmMSIvPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIxMTk4IiBoZWlnaHQ9IjY3MyIgcng9IjE4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS42Ii8+CiAgPHJlY3QgeD0iMSIgeT0iMSIgd2lkdGg9IjExOTgiIGhlaWdodD0iNjczIiByeD0iMTgiIGZpbGw9InVybCgjZG90LWdyaWQpIiBvcGFjaXR5PSIwLjM0Ii8+CiAgPHJlY3QgeD0iNzIiIHk9IjIwNiIgd2lkdGg9IjEwNTYiIGhlaWdodD0iMzkwIiByeD0iMTYiIGZpbGw9IiNmOGY2ZjEiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjEiIG9wYWNpdHk9IjAuODIiLz4KICA8dGV4dCB4PSI4NCIgeT0iODIiIGZpbGw9IiMxZjRlNzkiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiIGxldHRlci1zcGFjaW5nPSIxLjIiPuesrDEw56ugPC90ZXh0PgogIDx0ZXh0IHg9IjExMTYiIHk9IjgyIiB0ZXh0LWFuY2hvcj0iZW5kIiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNzAwIiBsZXR0ZXItc3BhY2luZz0iMSI+5pWZ5a2m5Zu+56S6PC90ZXh0PgogIDxyZWN0IHg9Ijg0IiB5PSIxMDAiIHdpZHRoPSI1NCIgaGVpZ2h0PSI0IiByeD0iMiIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9Ijg0LjAiIHk9IjEzNi4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMzEiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI4NC4wIiBkeT0iMCI+5pWw5o2u5qih5Z6L5LiO5o6l5Y+j5oC76KeIPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODQuMCIgeT0iMTc4LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxNSIgZm9udC13ZWlnaHQ9IjUwMCI+PHRzcGFuIHg9Ijg0LjAiIGR5PSIwIj43IOS4quS4muWKoeaooeWdl+eahOWunuS9k+WFs+ezu+WSjCAzNCDlvKDooajnmoTnu5PmnoQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5NCIgeT0iMjUyIiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNzAwIj7ku47ovpPlhaXliLDnu5PmnpznmoTmnIDnn63lrabkuaDot6/lvoQ8L3RleHQ+CiAgPGxpbmUgeDE9Ijk0IiB5MT0iMjc0IiB4Mj0iMTEwNiIgeTI9IjI3NCIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIvPgogIDxsaW5lIHgxPSIyNTUuNyIgeTE9IjQwOC4wIiB4Mj0iMjU3LjciIHkyPSI0MDguMCIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KICA8cmVjdCB4PSI5NC4wIiB5PSIzMzQuMCIgd2lkdGg9IjE1My43IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9Ijk0LjAiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iNSIgcng9IjIuNSIgZmlsbD0iIzFmNGU3OSIvPgogIDxjaXJjbGUgY3g9IjEyMC4wIiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMTIwLjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMTIwLjAiIGR5PSIwIj4xPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMTQ2LjAiIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSIxNDYuMCIgZHk9IjAiPkZpbGVSZWNvcmQ8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSIxMTYuMCIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9IjExNi4wIiBkeT0iMCI+6ZO26KGM5rWB5rC05Lit5b+D5a6e5L2TPC90c3Bhbj48L3RleHQ+CiAgPGxpbmUgeDE9IjQyNy4zIiB5MT0iNDA4LjAiIHgyPSI0MjkuMyIgeTI9IjQwOC4wIiBzdHJva2U9IiMxZjRlNzkiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBtYXJrZXItZW5kPSJ1cmwoI2Fycm93KSIvPgogIDxyZWN0IHg9IjI2NS43IiB5PSIzMzQuMCIgd2lkdGg9IjE1My43IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2ZhZjlmNSIgc3Ryb2tlPSIjZDlkNmNjIiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxjaXJjbGUgY3g9IjI5MS43IiBjeT0iMzYyLjAiIHI9IjE1IiBmaWxsPSIjMWY0ZTc5Ii8+CiAgPHRleHQgeD0iMjkxLjciIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmZmZmIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iODAwIj48dHNwYW4geD0iMjkxLjciIGR5PSIwIj4yPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iMzE3LjciIHk9IjM2Ny4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiMxMTE4MjciIGZvbnQtc2l6ZT0iMTciIGZvbnQtd2VpZ2h0PSI3NjAiPjx0c3BhbiB4PSIzMTcuNyIgZHk9IjAiPkRvY3VtZW50Q29tcGFyZTwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjI4Ny43IiB5PSI0NTQuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjNWY2NjczIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iNTYwIj48dHNwYW4geD0iMjg3LjciIGR5PSIwIj7mlofmoaPmr5Tlr7nmqKHlnZc8L3RzcGFuPjwvdGV4dD4KICA8bGluZSB4MT0iNTk5LjAiIHkxPSI0MDguMCIgeDI9IjYwMS4wIiB5Mj0iNDA4LjAiIHN0cm9rZT0iIzFmNGU3OSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG1hcmtlci1lbmQ9InVybCgjYXJyb3cpIi8+CiAgPHJlY3QgeD0iNDM3LjMiIHk9IjMzNC4wIiB3aWR0aD0iMTUzLjciIGhlaWdodD0iMTQ4LjAiIHJ4PSI4IiBmaWxsPSIjZmFmOWY1IiBzdHJva2U9IiNkOWQ2Y2MiIHN0cm9rZS13aWR0aD0iMS40IiBmaWx0ZXI9InVybCgjc29mdC1zaGFkb3cpIi8+CiAgPGNpcmNsZSBjeD0iNDYzLjMiIGN5PSIzNjIuMCIgcj0iMTUiIGZpbGw9IiMxZjRlNzkiLz4KICA8dGV4dCB4PSI0NjMuMyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmZmZmYiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI4MDAiPjx0c3BhbiB4PSI0NjMuMyIgZHk9IjAiPjM8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI0ODkuMyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjQ4OS4zIiBkeT0iMCI+Q29uZmlybWF0aW9uPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNDU5LjMiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI0NTkuMyIgZHk9IjAiPuivouivgeWHveaooeWdlzwvdHNwYW4+PC90ZXh0PgogIDxsaW5lIHgxPSI3NzAuNyIgeTE9IjQwOC4wIiB4Mj0iNzcyLjciIHkyPSI0MDguMCIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KICA8cmVjdCB4PSI2MDkuMCIgeT0iMzM0LjAiIHdpZHRoPSIxNTMuNyIgaGVpZ2h0PSIxNDguMCIgcng9IjgiIGZpbGw9IiNmYWY5ZjUiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8Y2lyY2xlIGN4PSI2MzUuMCIgY3k9IjM2Mi4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjYzNS4wIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjYzNS4wIiBkeT0iMCI+NDwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjY2MS4wIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iNjYxLjAiIGR5PSIwIj5JbnZvaWNlPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iNjMxLjAiIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI2MzEuMCIgZHk9IjAiPuWPkeelqOaooeWdlzwvdHNwYW4+PC90ZXh0PgogIDxsaW5lIHgxPSI5NDIuMyIgeTE9IjQwOC4wIiB4Mj0iOTQ0LjMiIHkyPSI0MDguMCIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgbWFya2VyLWVuZD0idXJsKCNhcnJvdykiLz4KICA8cmVjdCB4PSI3ODAuNyIgeT0iMzM0LjAiIHdpZHRoPSIxNTMuNyIgaGVpZ2h0PSIxNDguMCIgcng9IjgiIGZpbGw9IiNmYWY5ZjUiIHN0cm9rZT0iI2Q5ZDZjYyIgc3Ryb2tlLXdpZHRoPSIxLjQiIGZpbHRlcj0idXJsKCNzb2Z0LXNoYWRvdykiLz4KICA8Y2lyY2xlIGN4PSI4MDYuNyIgY3k9IjM2Mi4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9IjgwNi43IiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9IjgwNi43IiBkeT0iMCI+NTwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjgzMi43IiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9InN0YXJ0IiBmaWxsPSIjMTExODI3IiBmb250LXNpemU9IjE3IiBmb250LXdlaWdodD0iNzYwIj48dHNwYW4geD0iODMyLjciIGR5PSIwIj5DcmVkZW50aWFsPC90c3Bhbj48L3RleHQ+CiAgPHRleHQgeD0iODAyLjciIHk9IjQ1NC4wIiB0ZXh0LWFuY2hvcj0ic3RhcnQiIGZpbGw9IiM1ZjY2NzMiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSI1NjAiPjx0c3BhbiB4PSI4MDIuNyIgZHk9IjAiPuWHreivgeaooeWdlzwvdHNwYW4+PC90ZXh0PgogIDxyZWN0IHg9Ijk1Mi4zIiB5PSIzMzQuMCIgd2lkdGg9IjE1My43IiBoZWlnaHQ9IjE0OC4wIiByeD0iOCIgZmlsbD0iI2Y3ZjVlZSIgc3Ryb2tlPSIjMWY0ZTc5IiBzdHJva2Utd2lkdGg9IjEuNCIgZmlsdGVyPSJ1cmwoI3NvZnQtc2hhZG93KSIvPgogIDxyZWN0IHg9Ijk1Mi4zIiB5PSIzMzQuMCIgd2lkdGg9IjE1My43IiBoZWlnaHQ9IjUiIHJ4PSIyLjUiIGZpbGw9IiMxZjRlNzkiLz4KICA8Y2lyY2xlIGN4PSI5NzguMyIgY3k9IjM2Mi4wIiByPSIxNSIgZmlsbD0iIzFmNGU3OSIvPgogIDx0ZXh0IHg9Ijk3OC4zIiB5PSIzNjcuMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjgwMCI+PHRzcGFuIHg9Ijk3OC4zIiBkeT0iMCI+NjwvdHNwYW4+PC90ZXh0PgogIDx0ZXh0IHg9IjEwMDQuMyIgeT0iMzY3LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzExMTgyNyIgZm9udC1zaXplPSIxNyIgZm9udC13ZWlnaHQ9Ijc2MCI+PHRzcGFuIHg9IjEwMDQuMyIgZHk9IjAiPlBkZkV4dHJhY3Q8L3RzcGFuPjwvdGV4dD4KICA8dGV4dCB4PSI5NzQuMyIgeT0iNDU0LjAiIHRleHQtYW5jaG9yPSJzdGFydCIgZmlsbD0iIzVmNjY3MyIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9IjU2MCI+PHRzcGFuIHg9Ijk3NC4zIiBkeT0iMCI+6YCa55So5o+Q5Y+W5qih5Z2XPC90c3Bhbj48L3RleHQ+Cjwvc3ZnPgo=" alt="图 10.1：实体关系概览图" />
+<figcaption aria-hidden="true">图 10.1：实体关系概览图</figcaption>
+</figure>
+<hr />
+<h2 id="附录-a-外部依赖">附录 A 外部依赖</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>依赖</th>
+<th>用途</th>
+<th>是否必需</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen-VL（通义千问视觉语言模型）</td>
+<td>文档图像理解和信息提取</td>
+<td>是</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>数据持久化存储</td>
+<td>是</td>
+</tr>
+<tr>
+<td>LibreOffice</td>
+<td>DOCX/DOC 转 PDF</td>
+<td>文档比对必需</td>
+</tr>
+<tr>
+<td>Poppler（pdf2image 依赖）</td>
+<td>PDF 转图片</td>
+<td>是</td>
+</tr>
+<tr>
+<td>Camelot（OpenCV）</td>
+<td>PDF 表格提取（原生流水解析）</td>
+<td>原生流水功能必需</td>
+</tr>
+<tr>
+<td>SunECM 文档管理平台</td>
+<td>外部文档存取</td>
+<td>可选，通过配置启用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="附录-b-术语表">附录 B 术语表</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>术语</th>
+<th>定义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>流水</td>
+<td>银行账户交易明细记录</td>
+</tr>
+<tr>
+<td>询证函</td>
+<td>审计过程中向银行发送的确认函，用于核实企业账户信息</td>
+</tr>
+<tr>
+<td>凭证</td>
+<td>身份证、银行卡、授权书等身份或业务类文件</td>
+</tr>
+<tr>
+<td>原生 PDF</td>
+<td>含可提取文本层的电子 PDF（非扫描件）</td>
+</tr>
+<tr>
+<td>diff</td>
+<td>两段文本之间的字符级差异</td>
+</tr>
+<tr>
+<td>幻觉检测</td>
+<td>检测和修正 AI 模型生成的虚假或不准确内容</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="附录-c-约束与假设">附录 C 约束与假设</h2>
+<p><strong>约束：</strong> - AI 模型依赖外部 API
+服务，识别准确率受模型能力限制 - DOCX 转 PDF 依赖
+LibreOffice，转换质量取决于原始文档复杂度 - 原生 PDF
+文本提取对扫描件无效（扫描件需走 AI 识别路线） - 单文件上传大小限制
+50MB</p>
+<p><strong>假设：</strong> - 用户上传的文档为有效且可读的文件 - 银行流水
+PDF 的排版在各银行内部相对统一 - 询证函格式遵循国家标准模板 - AI 模型
+API 服务可用且响应稳定</p>
+</main>
+</div>
+</body>
+</html>
