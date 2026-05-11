@@ -15,14 +15,16 @@ api.interceptors.request.use((config) => {
 });
 
 // 响应拦截器：401 时清除认证状态并跳转错误页面（防止死循环）
+let _redirecting = false;
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !_redirecting) {
+      _redirecting = true;
       clearAuth();
-      if (window.location.pathname !== "/auth-error") {
-        window.location.href = "/auth-error";
-      }
+      sessionStorage.removeItem("vlagent_token");
+      sessionStorage.removeItem("vlagent_entry_url");
+      window.location.replace("/auth-error");
     }
     return Promise.reject(error);
   }

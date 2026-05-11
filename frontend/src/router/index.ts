@@ -74,6 +74,11 @@ router.beforeEach((to, _from, next) => {
     if (to.meta.public) {
         next()
     } else if (!isAuthenticated()) {
+        // 跳转前先把 URL 中的 token 存入 sessionStorage，防止路由跳转后丢失
+        const tokenParam = to.query.token as string | undefined
+        if (tokenParam) {
+            sessionStorage.setItem('vlagent_token', tokenParam)
+        }
         next({ name: 'AuthError' })
     } else {
         const { hasPermission, permissionsLoaded } = useUser()

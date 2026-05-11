@@ -43,6 +43,11 @@ config: |
             try_files $uri $uri/ /index.html;
         }
 
+        # index.html 禁止缓存，防止浏览器从缓存加载旧页面导致 URL token 丢失
+        location = /index.html {
+            add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
+
         location ~* \.mjs$ {
             default_type application/javascript;
             expires 30d;

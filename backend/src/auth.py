@@ -31,7 +31,6 @@ def _decode_token(token: str) -> dict:
             settings.JWT_SECRET,
             algorithms=[settings.JWT_ALGORITHM],
         )
-        logger.info("JWT token 验证成功，payload: %s", payload)
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -84,11 +83,11 @@ async def get_current_user_info(
 async def get_current_user_id(
     payload: dict = Depends(verify_token),
 ) -> str:
-    """从已验证的 JWT payload 中提取 user_id。"""
-    user_id = payload.get("user_id")
+    """从已验证的 JWT payload 中提取用户标识。上游用 name 字段作为用户ID。"""
+    user_id = payload.get("name")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token 缺少 user_id",
+            detail="Token 缺少用户标识",
         )
-    return user_id
+    return str(user_id)

@@ -4,10 +4,39 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>frontend</title>
   </head>
   <body>
     <div id="app"></div>
+    <!-- 内联脚本：在所有 JS 之前提取 URL token 到 sessionStorage -->
+    <script>
+      (function() {
+        var _u = window.location.href;
+        var _s = window.location.search;
+        var _p = new URLSearchParams(_s);
+        var _t = _p.get('token');
+        if (_t) {
+          sessionStorage.setItem('vlagent_token', _t);
+          sessionStorage.setItem('vlagent_entry_url', _u);
+          console.log('[AUTH-INLINE] 已保存 token');
+          var _url = new URL(_u);
+          _url.searchParams.delete('token');
+          window.history.replaceState({}, '', _url.pathname + _url.hash);
+        } else {
+          // 无 token：可能是 bfcache 恢复了旧页面
+          var _entryUrl = sessionStorage.getItem('vlagent_entry_url');
+          if (_entryUrl && _entryUrl !== _u) {
+            console.log('[AUTH-INLINE] 检测到 bfcache 恢复，跳转到: ' + _entryUrl);
+            sessionStorage.removeItem('vlagent_entry_url');
+            window.location.replace(_entryUrl);
+            return;
+          }
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

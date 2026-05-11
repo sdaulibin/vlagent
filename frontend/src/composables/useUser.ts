@@ -20,10 +20,10 @@ function extractUserInfo(): UserInfo | null {
   const payload = decodePayload(token)
   if (!payload) return null
   return {
-    userId: (payload.user_id as string) || '',
-    name: (payload.name as string) || '',
-    orgId: (payload.org_id as string) || '',
-    userType: (payload.user_type as string) || '',
+    userId: String(payload.name ?? payload.user_id ?? ''),
+    name: String(payload.user_name ?? payload.name ?? ''),
+    orgId: String(payload.org_id ?? ''),
+    userType: String(payload.user_type ?? ''),
   }
 }
 

@@ -28,11 +28,13 @@ let authReady = false;
   }
 })();
 
-/** 将 JWT payload 部分解码（不做签名验证，仅读取字段） */
+/** 将 JWT payload 部分解码（不做签名验证，仅读取字段），支持 UTF-8 中文 */
 export function decodePayload(token: string): Record<string, unknown> | null {
   try {
     const base64 = token.split(".")[1];
-    const json = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));
+    const binary = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    const json = new TextDecoder().decode(bytes);
     return JSON.parse(json);
   } catch {
     return null;
@@ -51,7 +53,11 @@ function isTokenExpired(token: string): boolean {
 function getTokenFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
-  if (token && !isTokenExpired(token)) {
+  if (token) {
+    if (isTokenExpired(token)) {
+      console.warn("[AUTH] URL token 已过期");
+      return null;
+    }
     currentToken = token;
     sessionStorage.setItem(TOKEN_KEY, token);
     const url = new URL(window.location.href);
@@ -67,6 +73,14 @@ export function getToken(): string | null {
   if (currentToken && !isTokenExpired(currentToken)) {
     return currentToken;
   }
+  // 兜底：从 sessionStorage 恢复（应对 router guard 在 IIFE 之后执行的时序问题）
+  if (!currentToken) {
+    const stored = sessionStorage.getItem(TOKEN_KEY);
+    if (stored && !isTokenExpired(stored)) {
+      currentToken = stored;
+      return stored;
+    }
+  }
   currentToken = null;
   sessionStorage.removeItem(TOKEN_KEY);
   return null;
@@ -74,6 +88,13 @@ export function getToken(): string | null {
 
 /** 是否已认证 */
 export function isAuthenticated(): boolean {
+  // 先尝试从 sessionStorage 恢复（应对 router guard 在 IIFE 之后执行的时序问题）
+  if (!currentToken) {
+    const stored = sessionStorage.getItem(TOKEN_KEY);
+    if (stored && !isTokenExpired(stored)) {
+      currentToken = stored;
+    }
+  }
   return getToken() !== null;
 }
 
@@ -96,22 +117,13 @@ async function fetchDevToken(): Promise<string | null> {
  * 初始化认证流程
  *
  * 优先级：
- * 1. URL 参数 ?token=xxx
- * 2. sessionStorage 中已有 token（页面刷新）
- * 3. postMessage 接收（iframe 场景）
- * 4. 非 iframe 时从后端 /dev-token 获取测试 token
+ * 1. sessionStorage 中已有 token（main.ts 预提取/postMessage 保存的）
+ * 2. URL 参数 ?token=xxx（备用）
+ * 3. 从后端 /dev-token 获取测试 token（开发模式）
  */
 export function initAuth(): Promise<string | null> {
   return new Promise((resolve) => {
-    // 1. 优先从 URL 参数获取
-    const urlToken = getTokenFromUrl();
-    if (urlToken) {
-      authReady = true;
-      resolve(urlToken);
-      return;
-    }
-
-    // 2. 尝试从 sessionStorage 恢复 token
+    // 1. 优先从 sessionStorage 恢复 token（main.ts 提前保存的）
     const stored = sessionStorage.getItem(TOKEN_KEY);
     if (stored && !isTokenExpired(stored)) {
       currentToken = stored;
@@ -120,50 +132,24 @@ export function initAuth(): Promise<string | null> {
       return;
     }
 
-    // 3. iframe 场景：监听父窗口 postMessage
-    if (window.parent !== window) {
-      const handler = (event: MessageEvent) => {
-        const data = event.data;
-        let token: string | null = null;
-
-        if (typeof data === "string") {
-          token = data;
-        } else if (data && typeof data === "object") {
-          if (data.type === "token" && data.token) {
-            token = data.token;
-          }
-        }
-
-        if (token && !isTokenExpired(token)) {
-          currentToken = token;
-          sessionStorage.setItem(TOKEN_KEY, token);
-          authReady = true;
-          window.removeEventListener("message", handler);
-          resolve(token);
-        }
-      };
-
-      window.addEventListener("message", handler);
-      window.parent.postMessage({ type: "vlagent_ready" }, "*");
-
-      // 超时 10 秒
-      setTimeout(() => {
-        if (!authReady) {
-          window.removeEventListener("message", handler);
-          resolve(null);
-        }
-      }, 10000);
+    // 2. 从 URL 参数获取（备用）
+    const urlToken = getTokenFromUrl();
+    if (urlToken) {
+      authReady = true;
+      resolve(urlToken);
       return;
     }
 
-    // 4. 非 iframe：从后端获取开发测试 token
+    // 3. 从后端获取开发测试 token
     fetchDevToken().then((token) => {
       if (token) {
+        console.log("[AUTH] 使用 dev-token 兜底登录");
         currentToken = token;
         sessionStorage.setItem(TOKEN_KEY, token);
         authReady = true;
         resolve(token);
       } else {
+        console.warn("[AUTH] 无有效 token");
         resolve(null);
       }
     });
