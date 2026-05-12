@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
     DATABASE_ECHO: bool = False
+
+    # Upstream Database (ioa)
+    DATABASE_UPSTREAM_URL: str = Field(default="", description="上游数据库连接 URL（ioa 库）")
+    SYNC_INTERVAL_MINUTES: int = Field(default=5, description="上游数据同步间隔（分钟）")
     
     class Config:
         env_file = ".env"

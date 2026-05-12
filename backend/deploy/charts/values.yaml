@@ -166,9 +166,11 @@ envConfig:
 secret:
   enabled: true
   DATABASE_URL: ""
+  DATABASE_UPSTREAM_URL: ""
   QWEN35_KEY: ""
   JWT_SECRET: ""
   ECM_PASSWORD: ""
+  SYNC_INTERVAL_MINUTES: "120"
 
 # 额外的环境变量 (可选)
 envs: []

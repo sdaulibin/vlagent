@@ -21,6 +21,25 @@ SessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
 
+# 上游数据库（只读，ioa 库）
+upstream_engine = None
+UpstreamSessionLocal = None
+
+if settings.DATABASE_UPSTREAM_URL:
+    upstream_engine = create_async_engine(
+        settings.DATABASE_UPSTREAM_URL,
+        echo=settings.DATABASE_ECHO,
+        future=True,
+        pool_pre_ping=True,
+        pool_size=2,
+        max_overflow=3,
+        pool_recycle=300,
+        pool_timeout=30,
+    )
+    UpstreamSessionLocal = sessionmaker(
+        upstream_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
 
 async def init_db():
     # Import models to register them with SQLModel
@@ -121,6 +140,14 @@ async def init_db():
             await conn.execute(text(
                 f"CREATE INDEX IF NOT EXISTS ix_{tbl}_user_id ON {tbl} (user_id)"
             ))
+
+        # modules 表：新增 agent_id 字段（幂等）
+        await conn.execute(text(
+            "ALTER TABLE modules ADD COLUMN IF NOT EXISTS agent_id INTEGER"
+        ))
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_modules_agent_id ON modules (agent_id)"
+        ))
 
     # Seed modules 表（幂等：仅表为空时插入）
     async with SessionLocal() as session:

@@ -16,4 +16,5 @@ class Module(SQLModel, table=True):
     hover_class: str
     sort_order: int = Field(default=0)
     status: bool = Field(default=True)
+    agent_id: Optional[int] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.now)

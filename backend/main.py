@@ -12,11 +12,13 @@ from contextlib import asynccontextmanager
 from src.database import init_db
 from src.config import settings
 from src.file_provider.service import init_jvm, shutdown_jvm
+from src.sync.scheduler import start_scheduler, stop_scheduler, run_sync
 from api import api_router
 
 logger = logging.getLogger(__name__)
 
 # 配置日志
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logging.getLogger("src.auth").setLevel(logging.INFO)
 logging.getLogger("src.auth").addHandler(logging.StreamHandler())
 
@@ -27,7 +29,12 @@ async def lifespan(app: FastAPI):
     if settings.ECM_ENABLED:
         if not init_jvm():
             logger.warning("JVM 启动失败，影像平台功能不可用")
+    # 启动时立即执行一次同步，然后开启定时调度
+    if settings.DATABASE_UPSTREAM_URL:
+        await run_sync()
+        start_scheduler()
     yield
+    stop_scheduler()
     if settings.ECM_ENABLED:
         shutdown_jvm()
 
