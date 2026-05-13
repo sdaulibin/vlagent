@@ -51,10 +51,6 @@ async def sync_permissions() -> dict:
 
     for user in users:
         agent_array = user["agent"] or []
-        # 必须包含 vlagent 主入口 id
-        if VLAGENT_AGENT_ID not in agent_array:
-            skipped_no_vlagent += 1
-            continue
         # 与子模块 id 取交集，映射为 module key
         user_agent_ids = set(agent_array) & valid_agent_ids
         if not user_agent_ids:
@@ -67,8 +63,8 @@ async def sync_permissions() -> dict:
                 new_permissions.append((user["user_id"], key))
 
     affected_users = {p[0] for p in new_permissions}
-    logger.info("[权限同步] 有效用户: %d 人 (跳过: 无vlagent权限=%d, 无子模块=%d)",
-                len(affected_users), skipped_no_vlagent, skipped_no_modules)
+    logger.info("[权限同步] 有效用户: %d 人 (跳过: 无子模块=%d)",
+                len(affected_users), skipped_no_modules)
 
     for uid in sorted(affected_users):
         user_keys = [k for u, k in new_permissions if u == uid]

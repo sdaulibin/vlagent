@@ -46,7 +46,8 @@ async def sync_modules() -> dict:
         for agent in upstream_agents:
             agent_id = agent["id"]
             matched_agent_ids.add(agent_id)
-            is_active = agent["is_show"] == 1 and not agent["is_delete"]
+            # 仅根据 is_delete 判断状态（上游 is_show=0 是默认值，不代表禁用）
+            is_active = not agent["is_delete"]
 
             # 优先按 agent_id 匹配
             mod = local_modules.get(agent_id)
