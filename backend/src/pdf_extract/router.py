@@ -24,8 +24,9 @@ from src.pdf_extract.exporter import export_csv, export_xlsx
 
 router = APIRouter(prefix="/pdf_extract", tags=["PDF Extract"])
 
-UPLOAD_DIR = os.getenv("PDF_EXTRACT_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "pdf_extract"))
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_PDF_EXTRACT
+UPLOAD_DIR = UPLOAD_DIR_PDF_EXTRACT
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 DOWNLOAD_DIR = os.getenv("PDF_EXTRACT_DOWNLOAD_DIR",

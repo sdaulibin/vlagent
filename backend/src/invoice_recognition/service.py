@@ -121,70 +121,75 @@ def _extract_invoice_info(image_path: str) -> dict:
             duration=round(duration, 2), error_msg=f"解析失败: {str(e)}"
         )
 
-async def process_invoice_recognitions(db: AsyncSession, file_record: InvoiceFile):
+async def process_invoice_recognitions(file_record_id: int):
     """
-    后台任务处理整个发票 PDF 的拆分、识别并批量存入明细
+    后台任务处理整个发票 PDF 的拆分、识别并批量存入明细。
+    使用独立 session，避免依赖请求级 session 生命周期。
     """
+    from src.database import SessionLocal
+
     tmp_dir = tempfile.mkdtemp(prefix="invoice_")
     start_time = datetime.utcnow()
-    
-    try:
-        # 更新状态为 processing
-        file_record.status = "processing"
-        db.add(file_record)
-        await db.commit()
-        
-        # 判断文件类型：图片直接识别，PDF 先拆分为图片
-        file_ext = os.path.splitext(file_record.file_path)[1].lower()
-        is_image = file_ext in ('.jpg', '.jpeg', '.png')
-        
-        if is_image:
-            # 图片文件直接作为单页处理
-            image_paths = [file_record.file_path]
-        else:
-            # PDF 拆分为图片
-            image_paths = split_pdf_to_images(file_record.file_path, tmp_dir, dpi=200)
-            if not image_paths:
-                raise ValueError("PDF 转换图片失败，未产生文件。")
-            
-        file_record.page_count = len(image_paths)
-        
-        # 2. 对每页单独识别（在线程池中执行，避免同步 HTTP 调用阻塞事件循环）
-        loop = asyncio.get_event_loop()
-        for i, img_path in enumerate(image_paths):
-            print(f"  后台任务: 正在分析第 {i + 1}/{len(image_paths)} 页发票...")
-            page_data = await loop.run_in_executor(None, _extract_invoice_info, img_path)
-            
-            print(f"  后台任务 => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')}, 金额: {page_data.get('invoice_amount')}, 耗时: {page_data.get('duration')}s")
-            
-            result_record = InvoiceResult(
-                file_id=file_record.id,
-                user_id=file_record.user_id,
-                page_number=i + 1,
-                invoice_type=page_data.get("invoice_type"),
-                invoice_no=page_data.get("invoice_no"),
-                invoice_date=page_data.get("invoice_date"),
-                buyer_name=page_data.get("buyer_name"),
-                buyer_tax_id=page_data.get("buyer_tax_id"),
-                seller_name=page_data.get("seller_name"),
-                seller_tax_id=page_data.get("seller_tax_id"),
-                invoice_amount=page_data.get("invoice_amount"),
-                raw_text=page_data.get("raw_text"),
-                error_msg=page_data.get("error_msg")
-            )
-            db.add(result_record)
-            
-        file_record.status = "done"
-        
-    except Exception as e:
-        print(f"Invoice Process Error: {e}")
-        file_record.status = "failed"
-        file_record.error_msg = str(e)
-    finally:
-        end_time = datetime.utcnow()
-        file_record.recognition_duration = (end_time - start_time).total_seconds()
-        db.add(file_record)
-        await db.commit()
-        
-        if os.path.exists(tmp_dir):
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    async with SessionLocal() as db:
+        file_record = await db.get(InvoiceFile, file_record_id)
+        if not file_record:
+            return
+
+        try:
+            # 更新状态为 processing
+            file_record.status = "processing"
+            db.add(file_record)
+            await db.commit()
+
+            # 判断文件类型：图片直接识别，PDF 先拆分为图片
+            file_ext = os.path.splitext(file_record.file_path)[1].lower()
+            is_image = file_ext in ('.jpg', '.jpeg', '.png')
+
+            if is_image:
+                image_paths = [file_record.file_path]
+            else:
+                image_paths = split_pdf_to_images(file_record.file_path, tmp_dir, dpi=200)
+                if not image_paths:
+                    raise ValueError("PDF 转换图片失败，未产生文件。")
+            file_record.page_count = len(image_paths)
+
+            # 2. 对每页单独识别（在线程池中执行，避免同步 HTTP 调用阻塞事件循环）
+            loop = asyncio.get_event_loop()
+            for i, img_path in enumerate(image_paths):
+                print(f"  后台任务: 正在分析第 {i + 1}/{len(image_paths)} 页发票...")
+                page_data = await loop.run_in_executor(None, _extract_invoice_info, img_path)
+
+                print(f"  后台任务 => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')}, 金额: {page_data.get('invoice_amount')}, 耗时: {page_data.get('duration')}s")
+
+                result_record = InvoiceResult(
+                    file_id=file_record.id,
+                    user_id=file_record.user_id,
+                    page_number=i + 1,
+                    invoice_type=page_data.get("invoice_type"),
+                    invoice_no=page_data.get("invoice_no"),
+                    invoice_date=page_data.get("invoice_date"),
+                    buyer_name=page_data.get("buyer_name"),
+                    buyer_tax_id=page_data.get("buyer_tax_id"),
+                    seller_name=page_data.get("seller_name"),
+                    seller_tax_id=page_data.get("seller_tax_id"),
+                    invoice_amount=page_data.get("invoice_amount"),
+                    raw_text=page_data.get("raw_text"),
+                    error_msg=page_data.get("error_msg")
+                )
+                db.add(result_record)
+
+            file_record.status = "done"
+
+        except Exception as e:
+            print(f"Invoice Process Error: {e}")
+            file_record.status = "failed"
+            file_record.error_msg = str(e)
+        finally:
+            end_time = datetime.utcnow()
+            file_record.recognition_duration = (end_time - start_time).total_seconds()
+            db.add(file_record)
+            await db.commit()
+
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)

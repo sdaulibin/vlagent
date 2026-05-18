@@ -13,6 +13,7 @@ const userInfo = ref<UserInfo | null>(null)
 const permittedModules = ref<string[]>([])
 const modules = ref<ModuleInfo[]>([])
 const permissionsLoaded = ref(false)
+let permissionsLoading: Promise<void> | null = null
 
 function extractUserInfo(): UserInfo | null {
   const token = getToken()
@@ -28,6 +29,12 @@ function extractUserInfo(): UserInfo | null {
 }
 
 async function loadPermissions() {
+  if (permissionsLoading) return permissionsLoading
+  permissionsLoading = _doLoadPermissions()
+  return permissionsLoading
+}
+
+async function _doLoadPermissions() {
   userInfo.value = extractUserInfo()
   try {
     const [keys, mods] = await Promise.all([

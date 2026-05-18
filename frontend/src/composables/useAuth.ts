@@ -11,7 +11,6 @@
 const TOKEN_KEY = "vlagent_token";
 
 let currentToken: string | null = null;
-let authReady = false;
 
 /** 模块加载时立即从 sessionStorage 恢复 token，确保路由守卫可以同步获取 */
 (function initFromStorage() {
@@ -31,7 +30,7 @@ let authReady = false;
 /** 将 JWT payload 部分解码（不做签名验证，仅读取字段），支持 UTF-8 中文 */
 export function decodePayload(token: string): Record<string, unknown> | null {
   try {
-    const base64 = token.split(".")[1];
+    const base64 = token.split(".")[1]!;
     const binary = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));
     const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
     const json = new TextDecoder().decode(bytes);
@@ -127,7 +126,6 @@ export function initAuth(): Promise<string | null> {
     const stored = sessionStorage.getItem(TOKEN_KEY);
     if (stored && !isTokenExpired(stored)) {
       currentToken = stored;
-      authReady = true;
       resolve(stored);
       return;
     }
@@ -135,7 +133,6 @@ export function initAuth(): Promise<string | null> {
     // 2. 从 URL 参数获取（备用）
     const urlToken = getTokenFromUrl();
     if (urlToken) {
-      authReady = true;
       resolve(urlToken);
       return;
     }
@@ -146,7 +143,6 @@ export function initAuth(): Promise<string | null> {
         console.log("[AUTH] 使用 dev-token 兜底登录");
         currentToken = token;
         sessionStorage.setItem(TOKEN_KEY, token);
-        authReady = true;
         resolve(token);
       } else {
         console.warn("[AUTH] 无有效 token");
@@ -159,6 +155,5 @@ export function initAuth(): Promise<string | null> {
 /** 清除认证状态 */
 export function clearAuth(): void {
   currentToken = null;
-  authReady = false;
   sessionStorage.removeItem(TOKEN_KEY);
 }

@@ -14,7 +14,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：401 时清除认证状态并跳转错误页面（防止死循环）
+// 响应拦截器：统一错误处理
 let _redirecting = false;
 api.interceptors.response.use(
   (response) => response,
@@ -25,10 +25,59 @@ api.interceptors.response.use(
       sessionStorage.removeItem("vlagent_token");
       sessionStorage.removeItem("vlagent_entry_url");
       window.location.replace("/auth-error");
+    } else if (error.response?.status === 403) {
+      showErrorToast("无权访问，请联系管理员");
+    } else if (error.response?.status === 422) {
+      showErrorToast("请求参数错误");
+    } else if (error.response?.status && error.response.status >= 500) {
+      const detail = error.response?.data?.detail || error.response?.data?.message;
+      showErrorToast(detail || "服务器异常，请稍后重试");
+    } else if (!error.response) {
+      showErrorToast("网络异常，请检查网络连接");
     }
     return Promise.reject(error);
   }
 );
+
+// 全局错误 Toast（无需引入 UI 库，使用原生 DOM 实现）
+let _toastTimer: ReturnType<typeof setTimeout> | null = null;
+function showErrorToast(message: string) {
+  let container = document.getElementById("global-error-toast");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "global-error-toast";
+    Object.assign(container.style, {
+      position: "fixed", top: "16px", left: "50%", transform: "translateX(-50%)",
+      zIndex: "99999", pointerEvents: "none",
+    });
+    document.body.appendChild(container);
+  }
+
+  // 复用已有 toast 元素，避免重复创建
+  container.textContent = message;
+  Object.assign(container.style, {
+    background: "#fef2f2",
+    color: "#991b1b",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    padding: "10px 20px",
+    fontSize: "14px",
+    fontFamily: "system-ui, sans-serif",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    opacity: "1",
+    transition: "opacity 0.3s",
+    pointerEvents: "auto",
+  });
+
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => {
+    if (container) container.style.opacity = "0";
+    _toastTimer = setTimeout(() => {
+      container?.remove();
+      _toastTimer = null;
+    }, 300);
+  }, 4000);
+}
 
 /** 通过 POST 获取文件并返回 blob URL（用于 img/iframe src） */
 async function fetchFileAsBlobUrl(path: string): Promise<string> {

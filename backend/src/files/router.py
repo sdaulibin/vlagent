@@ -31,8 +31,9 @@ from services import pdf_processor
 
 router = APIRouter(prefix="/files", tags=["files"])
 
-# Load config from env
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "bank_statement"))
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_BANK_STATEMENT
+UPLOAD_DIR = UPLOAD_DIR_BANK_STATEMENT
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

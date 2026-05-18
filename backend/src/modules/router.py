@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.auth import get_current_user_id
+from src.config import settings
 from src.database import get_session
 from src.modules.models import Module
 from src.permissions.models import UserPermission
@@ -15,7 +16,7 @@ async def get_modules(
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ):
-    """获取当前用户有权限的模块列表（含完整元数据），无权限记录时返回全部"""
+    """获取当前用户有权限的模块列表（含完整元数据），无权限记录时根据配置决定返回全部或空列表"""
     # 查询用户权限
     perm_stmt = select(UserPermission.module).where(
         UserPermission.user_id == user_id
@@ -33,6 +34,8 @@ async def get_modules(
     all_modules = result.scalars().all()
 
     if not permitted_keys:
-        return all_modules
+        if settings.PERMISSION_DEFAULT_OPEN:
+            return all_modules
+        return []
 
     return [m for m in all_modules if m.key in permitted_keys]

@@ -104,13 +104,6 @@ async function loadPdfs() {
 
 // ---- PDF page rendering with highlight ----
 
-interface TextItem {
-  str: string;
-  transform: number[];
-  width: number;
-  itemIdx: number;
-}
-
 async function renderPdfPage(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pdfDoc: any,
@@ -162,10 +155,10 @@ async function renderPdfPage(
 
   // Sort items into reading order: top-to-bottom (PDF Y descending), left-to-right (X ascending)
   allItems.sort((a, b) => {
-    const ay = a.transform[5];
-    const by = b.transform[5];
-    if (Math.abs(ay - by) > 3) return by - ay; // higher PDF Y = higher on page = read first
-    return a.transform[4] - b.transform[4];
+    const ay = a.transform[5]!;
+    const by = b.transform[5]!;
+    if (Math.abs(ay - by) > 3) return by - ay;
+    return a.transform[4]! - b.transform[4]!;
   });
 
   // Build stripped text — matches backend's _strip_all_whitespace
@@ -173,11 +166,14 @@ async function renderPdfPage(
   let normText = '';
   const charMap: { itemIdx: number; charInItem: number }[] = [];
   for (let i = 0; i < allItems.length; i++) {
-    const str = allItems[i].str;
+    const item = allItems[i];
+    if (!item) continue;
+    const str = item.str;
     for (let c = 0; c < str.length; c++) {
-      if (/\s/.test(str[c])) continue;
+      const ch = str[c];
+      if (!ch || /\s/.test(ch)) continue;
       charMap.push({ itemIdx: i, charInItem: c });
-      normText += str[c];
+      normText += ch;
     }
   }
 
@@ -214,7 +210,9 @@ async function renderPdfPage(
     // Record each matched character's original position within its text item
     const endIdx = bestIdx + segNorm.length;
     for (let c = bestIdx; c < endIdx && c < charMap.length; c++) {
-      const { itemIdx, charInItem } = charMap[c];
+      const entry = charMap[c];
+      if (!entry) continue;
+      const { itemIdx, charInItem } = entry;
       if (!itemCharPositions.has(itemIdx)) {
         itemCharPositions.set(itemIdx, []);
       }
@@ -225,25 +223,27 @@ async function renderPdfPage(
   // Render character-precise highlight rectangles
   for (const [itemIdx, chars] of itemCharPositions) {
     const item = allItems[itemIdx];
+    if (!item) continue;
     const tx = item.transform;
-    const [vx, vy] = viewport.convertToViewportPoint(tx[4], tx[5]);
-    const fontSize = Math.sqrt(tx[0] ** 2 + tx[1] ** 2) * viewport.scale;
+    const [vx, vy] = viewport.convertToViewportPoint(tx[4]!, tx[5]!);
+    const fontSize = Math.sqrt(tx[0]! ** 2 + tx[1]! ** 2) * viewport.scale;
     const fullW = Math.abs(item.width || fontSize * item.str.length * 0.6) * viewport.scale;
     const h = fontSize * 1.3;
     const strLen = item.str.length;
-    if (strLen === 0 || fullW < 1 || h < 1) continue;
+    if (strLen === 0 || fullW < 1 || h < 1 || chars.length === 0) continue;
 
     // Sort positions and find contiguous ranges
     chars.sort((a, b) => a - b);
     const ranges: [number, number][] = [];
-    let rs = chars[0], re = chars[0];
+    let rs = chars[0]!, re = chars[0]!;
     for (let i = 1; i < chars.length; i++) {
-      if (chars[i] <= re + 1) {
-        re = chars[i];
+      const c = chars[i]!;
+      if (c <= re + 1) {
+        re = c;
       } else {
         ranges.push([rs, re]);
-        rs = chars[i];
-        re = chars[i];
+        rs = c;
+        re = c;
       }
     }
     ranges.push([rs, re]);

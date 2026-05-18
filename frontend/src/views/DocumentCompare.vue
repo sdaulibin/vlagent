@@ -179,8 +179,8 @@ onUnmounted(() => {
             :fileA="fileA"
             :fileB="fileB"
             :isProcessing="isSubmitting"
-            @update:fileA="fileA = $event"
-            @update:fileB="fileB = $event"
+            @update:fileA="fileA = $event ?? null"
+            @update:fileB="fileB = $event ?? null"
             @compare="startCompare"
           />
         </div>

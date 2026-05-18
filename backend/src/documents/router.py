@@ -24,10 +24,9 @@ router = APIRouter(prefix="/documents", tags=["文档比对"])
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
-UPLOAD_DIR = os.getenv(
-    "DOCUMENT_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "documents"),
-)
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_DOCUMENT
+UPLOAD_DIR = UPLOAD_DIR_DOCUMENT
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MIME_TYPES = {

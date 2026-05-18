@@ -22,6 +22,29 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "upload"
     DOWNLOAD_DIR: str = "download"
     RECOGNITION_TIMEOUT: int = 1800  # 自动停止识别任务的超时时间（秒）30分钟
+
+    # 各模块上传目录（默认在 UPLOAD_DIR 下的子目录）
+    UPLOAD_DIR_BANK_STATEMENT: str = Field(
+        default="", description="银行流水上传目录（默认 upload/bank_statement）"
+    )
+    UPLOAD_DIR_CONFIRMATION: str = Field(
+        default="", description="询证函上传目录（默认 upload/confirmation）"
+    )
+    UPLOAD_DIR_FORMAT_COMPARE: str = Field(
+        default="", description="格式比对上传目录（默认 upload/format_compare）"
+    )
+    UPLOAD_DIR_DOCUMENT: str = Field(
+        default="", description="文档比对上传目录（默认 upload/documents）"
+    )
+    UPLOAD_DIR_INVOICE: str = Field(
+        default="", description="发票识别上传目录（默认 upload/invoice）"
+    )
+    UPLOAD_DIR_CREDENTIAL: str = Field(
+        default="", description="凭证识别上传目录（默认 upload/credentials）"
+    )
+    UPLOAD_DIR_PDF_EXTRACT: str = Field(
+        default="", description="PDF提取上传目录（默认 upload/pdf_extract）"
+    )
     
     # Image Platform (SunECM)
     ECM_ENABLED: bool = False
@@ -38,6 +61,9 @@ class Settings(BaseSettings):
     JWT_SECRET: str = Field(default="", description="Shared secret for JWT token verification (HS256)")
     JWT_ALGORITHM: str = "HS256"
 
+    # Permission: 无权限记录时是否默认开放所有模块（生产环境应设为 False）
+    PERMISSION_DEFAULT_OPEN: bool = Field(default=True, description="无权限记录时是否默认开放所有模块")
+
     # Database
     DATABASE_URL: str = Field(..., description="Required. Read from environment variable DATABASE_URL")
     DATABASE_ECHO: bool = False
@@ -53,6 +79,26 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# 解析各模块上传目录（未配置时使用默认路径）
+import os as _os
+
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+
+
+def _resolve_upload_dir(custom: str, default_subdir: str) -> str:
+    if custom:
+        return custom
+    return _os.path.join(_PROJECT_ROOT, settings.UPLOAD_DIR, default_subdir)
+
+
+UPLOAD_DIR_BANK_STATEMENT = _resolve_upload_dir(settings.UPLOAD_DIR_BANK_STATEMENT, "bank_statement")
+UPLOAD_DIR_CONFIRMATION = _resolve_upload_dir(settings.UPLOAD_DIR_CONFIRMATION, "confirmation")
+UPLOAD_DIR_FORMAT_COMPARE = _resolve_upload_dir(settings.UPLOAD_DIR_FORMAT_COMPARE, "format_compare")
+UPLOAD_DIR_DOCUMENT = _resolve_upload_dir(settings.UPLOAD_DIR_DOCUMENT, "documents")
+UPLOAD_DIR_INVOICE = _resolve_upload_dir(settings.UPLOAD_DIR_INVOICE, "invoice")
+UPLOAD_DIR_CREDENTIAL = _resolve_upload_dir(settings.UPLOAD_DIR_CREDENTIAL, "credentials")
+UPLOAD_DIR_PDF_EXTRACT = _resolve_upload_dir(settings.UPLOAD_DIR_PDF_EXTRACT, "pdf_extract")
 
 # 向后兼容的模块级变量 (Qwen VL)
 # OPENAI_KEY = settings.OPENAI_KEY

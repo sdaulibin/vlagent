@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
@@ -17,7 +17,7 @@ from sqlalchemy import or_
 
 from src.auth import get_current_user_id
 from src.database import get_session
-from src.credentials.service import process_credential
+from src.credentials.service import process_credential_async
 from src.credentials.schemas import CredentialExtractionResponse
 from src.credentials.prompts import PROMPT_MAPPING
 from src.credentials.models import (
@@ -29,11 +29,9 @@ from src.credentials.models import (
 
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 
-# 配置上传目录
-UPLOAD_DIR = os.getenv(
-    "CREDENTIAL_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "credentials"),
-)
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_CREDENTIAL
+UPLOAD_DIR = UPLOAD_DIR_CREDENTIAL
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -55,13 +53,14 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
 
 @router.post("/extract", response_model=CredentialRecordResponse)
 async def extract_credential(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     credential_type: str = Form(..., description=f"支持的类型: {', '.join(PROMPT_MAPPING.keys())}"),
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
 ):
     """
-    提取凭证类文件(图片/PDF)的结构化信息，并保存记录。
+    提取凭证类文件(图片/PDF)的结构化信息，异步后台处理。
     """
     if credential_type not in PROMPT_MAPPING:
         raise HTTPException(status_code=400, detail=f"不受支持的类型: {credential_type}")
@@ -87,51 +86,15 @@ async def extract_credential(
     await session.commit()
     await session.refresh(record)
 
-    # 执行提取
-    start_time = time.time()
-    try:
-        result = process_credential(file_path, credential_type)
-        duration = time.time() - start_time
+    # 提交后台任务处理
+    background_tasks.add_task(process_credential_async, record.id)
 
-        # 保存结果
-        cred_result = CredentialResult(
-            record_id=record.id,
-            credential_type=result["credential_type"],
-            extracted_data=json.dumps(result["extracted_data"], ensure_ascii=False),
-            user_id=user_id,
-        )
-        session.add(cred_result)
-
-        record.status = "done"
-        record.processing_duration = round(duration, 2)
-        await session.commit()
-        await session.refresh(record)
-
-        # 构造返回
-        await session.refresh(cred_result)
-        return CredentialRecordResponse(
-            id=record.id,
-            filename=record.filename,
-            credential_type=record.credential_type,
-            status=record.status,
-            processing_duration=record.processing_duration,
-            result=result["extracted_data"],
-        )
-    except Exception as e:
-        duration = time.time() - start_time
-        record.status = "failed"
-        record.error_msg = str(e)
-        record.processing_duration = round(duration, 2)
-        await session.commit()
-        await session.refresh(record)
-        return CredentialRecordResponse(
-            id=record.id,
-            filename=record.filename,
-            credential_type=record.credential_type,
-            status=record.status,
-            processing_duration=record.processing_duration,
-            error_msg=str(e),
-        )
+    return CredentialRecordResponse(
+        id=record.id,
+        filename=record.filename,
+        credential_type=record.credential_type,
+        status=record.status,
+    )
 
 
 @router.post("/list", response_model=list[CredentialRecordListItem])

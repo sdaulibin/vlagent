@@ -1,26 +1,40 @@
 """
 询证函格式比对 - 数据模型
+
+拆分为两张表：
+- FormatCompareFile: 上传文件元数据
+- FormatCompareResult: 比对结果
 """
 from sqlmodel import SQLModel, Field
 from datetime import datetime
 from typing import Optional, List, Any
 
 
-class FormatCompareTask(SQLModel, table=True):
-    """格式比对任务"""
-    __tablename__ = "format_compare_tasks"
+class FormatCompareFile(SQLModel, table=True):
+    """格式比对文件记录"""
+    __tablename__ = "format_compare_files"
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[str] = Field(default=None, index=True)
     filename: str = Field(index=True)
     file_path: str
-    format_type: Optional[str] = Field(default=None, description="识别的格式类型: format_1/format_2/capital_verification")
     status: str = Field(default="pending")  # pending, processing, done, failed
+    error_msg: Optional[str] = None
+    duration_ms: Optional[float] = Field(default=None, description="比对耗时(ms)")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class FormatCompareResult(SQLModel, table=True):
+    """格式比对结果"""
+    __tablename__ = "format_compare_results"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[str] = Field(default=None, index=True)
+    file_id: int = Field(index=True, foreign_key="format_compare_files.id")
+    format_type: Optional[str] = Field(default=None, description="识别的格式类型: format_1/format_2/capital_verification")
     passed: Optional[bool] = Field(default=None, description="比对是否通过")
     mismatches_json: Optional[str] = Field(default=None, description="差异JSON")
     extracted_content_json: Optional[str] = Field(default=None, description="AI提取的结构化内容JSON")
-    error_msg: Optional[str] = None
-    duration_ms: Optional[float] = Field(default=None, description="比对耗时(ms)")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

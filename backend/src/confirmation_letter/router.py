@@ -12,8 +12,7 @@ from uuid import uuid4
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from fastapi.concurrency import run_in_threadpool
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
@@ -29,14 +28,14 @@ from src.confirmation_letter.models import (
     ConfirmationRecognitionDTO,
     FormatMismatch,
 )
-from src.confirmation_letter.service import process_confirmation_letter
+from src.confirmation_letter.service import process_confirmation_letter_async
 
 
 router = APIRouter(prefix="/confirmation", tags=["confirmation_letter"])
 
-# 配置上传目录
-UPLOAD_DIR = os.getenv("CONFIRMATION_UPLOAD_DIR",
-                       os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "confirmation"))
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_CONFIRMATION
+UPLOAD_DIR = UPLOAD_DIR_CONFIRMATION
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -215,12 +214,12 @@ async def preview_confirmation_file(file_id: int, session: AsyncSession = Depend
 @router.post("/{file_id}/recognize")
 async def recognize_confirmation_file(
     file_id: int,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
 ):
-    """识别询证函字段"""
+    """识别询证函字段（异步后台处理）"""
     try:
-        # 获取文件记录
         result = await session.execute(
             select(ConfirmationFile).where(ConfirmationFile.id == file_id)
         )
@@ -230,99 +229,21 @@ async def recognize_confirmation_file(
             raise HTTPException(status_code=404, detail="询证函记录不存在")
         if conf_file.user_id is not None and conf_file.user_id != user_id:
             raise HTTPException(status_code=403, detail="无权访问该文件")
-        
+
         if conf_file.status == "done":
             return {"status": "already_done", "message": "已识别完成"}
-        
+
         if conf_file.status == "processing":
             return {"status": "processing", "message": "正在识别中"}
-        
-        # 更新状态
+
+        # 更新状态为处理中，提交后台任务
         conf_file.status = "processing"
         await session.commit()
-        
-        start_time = time.time()
-        
-        try:
-            # 执行识别
-            recognition_result = await run_in_threadpool(
-                process_confirmation_letter, 
-                conf_file.file_path
-            )
-            
-            # 打印识别结果到服务端日志
-            duration_s = round(time.time() - start_time, 1)
-            print(f"\n{'=' * 50}")
-            print(f"  询证函识别完成: {conf_file.filename}  耗时: {duration_s}s")
-            print(f"{'-' * 50}")
-            _field_labels = {
-                "confirmation_no": "函证编号", "recipient_bank": "询证函抬头",
-                "accounting_firm": "事务所名称",
-                "reply_address": "回函地址", "contact_person": "联系人",
-                "phone": "电话", "postal_code": "邮编",
-                "debit_account": "扣费账号", "cutoff_date": "截止日期",
-                "start_date": "起始日期", "end_date": "终止日期",
-                "seal_date": "印章日期",
-                "signature_name": "落款名称",
-            }
-            for key, label in _field_labels.items():
-                print(f"  {label}: {recognition_result.get(key, '')}")
-            print(f"{'=' * 50}")
-            
-            # 删除旧的识别结果（如果有）
-            old_result = await session.execute(
-                select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
-            )
-            old = old_result.scalar_one_or_none()
-            if old:
-                await session.delete(old)
-            
-            # 创建新的识别结果记录
-            conf_result = ConfirmationResult(
-                file_id=file_id,
-                user_id=user_id,
-                confirmation_no=recognition_result.get("confirmation_no", ""),
-                recipient_bank=recognition_result.get("recipient_bank", ""),
-                accounting_firm=recognition_result.get("accounting_firm", ""),
-                reply_address=recognition_result.get("reply_address", ""),
-                contact_person=recognition_result.get("contact_person", ""),
-                phone=recognition_result.get("phone", ""),
-                postal_code=recognition_result.get("postal_code", ""),
-                debit_account=recognition_result.get("debit_account", ""),
-                cutoff_date=recognition_result.get("cutoff_date", ""),
-                start_date=recognition_result.get("start_date", ""),
-                end_date=recognition_result.get("end_date", ""),
-                seal_date=recognition_result.get("seal_date", ""),
-                signature_name=recognition_result.get("signature_name", ""),
-                format_type=recognition_result.get("format_type", "unknown"),
-                format_check_passed=recognition_result.get("format_check_passed", False),
-                format_mismatches_json=json.dumps(
-                    recognition_result.get("format_mismatches", []),
-                    ensure_ascii=False,
-                ),
-            )
-            session.add(conf_result)
-            
-            # 更新文件状态
-            conf_file.status = "done"
-            conf_file.recognition_duration = round((time.time() - start_time) * 1000, 2)
-            conf_file.updated_at = datetime.utcnow()
-            
-            await session.commit()
-            
-            return {
-                "status": "success",
-                "file_id": conf_file.id,
-                "recognition_duration_ms": conf_file.recognition_duration,
-                "result": recognition_result
-            }
-            
-        except Exception as e:
-            conf_file.status = "failed"
-            conf_file.error_msg = str(e)
-            await session.commit()
-            raise
-    
+
+        background_tasks.add_task(process_confirmation_letter_async, file_id)
+
+        return {"status": "processing", "file_id": file_id, "message": "已提交识别任务"}
+
     except HTTPException:
         raise
     except Exception as e:

@@ -171,6 +171,10 @@ const goBack = () => {
   router.push('/');
 };
 
+const openPreview = () => {
+  if (previewUrl.value) window.open(previewUrl.value, '_blank');
+};
+
 const getStatusText = (status: string) => {
   switch (status) {
     case 'pending': return '待提取';
@@ -364,7 +368,7 @@ onMounted(() => {
           <h3 class="content-card-title">提取结果</h3>
           <div v-if="selectedRecordId" class="flex items-center gap-2">
             <button
-              @click="window.open(previewUrl, '_blank')"
+              @click="openPreview()"
               class="btn-toolbar"
             >
               <Eye class="w-3.5 h-3.5" />

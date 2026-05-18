@@ -70,7 +70,7 @@ const router = createRouter({
 })
 
 // 路由守卫：未认证时重定向到错误页面，无权限时重定向到首页
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
     if (to.meta.public) {
         next()
     } else if (!isAuthenticated()) {
@@ -81,9 +81,10 @@ router.beforeEach((to, _from, next) => {
         }
         next({ name: 'AuthError' })
     } else {
-        const { hasPermission, permissionsLoaded } = useUser()
-        const moduleKey = to.path.slice(1)
-        if (permissionsLoaded.value && moduleKey && moduleKey !== '' && !hasPermission(moduleKey)) {
+        const { hasPermission, loadPermissions } = useUser()
+        await loadPermissions()
+        const moduleKey = to.path.split('/')[1]
+        if (moduleKey && moduleKey !== '' && !hasPermission(moduleKey)) {
             next({ name: 'Home' })
         } else {
             next()

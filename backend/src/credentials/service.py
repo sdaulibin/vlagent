@@ -302,15 +302,14 @@ def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
 
     return data
 
-def _compress_images_for_ai(image_paths: List[str], max_size=1600, quality=85) -> List[str]:
+def _compress_images_for_ai(image_paths: List[str], output_dir: str, max_size=1600, quality=85) -> List[str]:
     """Compress images to reduce API payload size."""
     from services.pdf.pdf_utils import resize_image_high_quality
-    
-    compressed_dir = tempfile.mkdtemp(prefix="compressed_cred_")
+
     compressed_paths = []
-    
+
     for i, path in enumerate(image_paths):
-        out_path = os.path.join(compressed_dir, f"page_{i:03d}.jpg")
+        out_path = os.path.join(output_dir, f"page_{i:03d}.jpg")
         success = resize_image_high_quality(
             path, out_path,
             max_width=max_size, max_height=max_size, quality=quality
@@ -319,30 +318,29 @@ def _compress_images_for_ai(image_paths: List[str], max_size=1600, quality=85) -
             compressed_paths.append(out_path)
         else:
             compressed_paths.append(path)
-            
+
     return compressed_paths
 
-def _grid_split_image(image_path: str, rows=2, cols=2) -> List[str]:
+def _grid_split_image(image_path: str, output_dir: str, rows=2, cols=2) -> List[str]:
     """Split an A4 form into a grid (e.g., 2x2) for higher precision recognition."""
     try:
         with Image.open(image_path) as img:
             w, h = img.size
             print(f"[DEBUG] Grid splitting dense form ({rows}x{cols}), original size: {w}x{h}")
-            tmp_dir = tempfile.mkdtemp(prefix="grid_split_")
             split_paths = []
-            
+
             dw = w // cols
             dh = h // rows
-            
+
             for r in range(rows):
                 for c in range(cols):
                     left = c * dw
                     top = r * dh
                     right = (c + 1) * dw if c < cols - 1 else w
                     bottom = (r + 1) * dh if r < rows - 1 else h
-                    
+
                     part = img.crop((left, top, right, bottom))
-                    part_path = os.path.join(tmp_dir, f"part_{r}_{c}.jpg")
+                    part_path = os.path.join(output_dir, f"part_{r}_{c}.jpg")
                     part.convert("RGB").save(part_path, "JPEG", quality=95)
                     split_paths.append(part_path)
             return split_paths
@@ -350,24 +348,23 @@ def _grid_split_image(image_path: str, rows=2, cols=2) -> List[str]:
         print(f"[WARNING] Grid split failed: {e}")
     return [image_path]
 
-def _split_multi_form_image(image_path: str) -> List[str]:
+def _split_multi_form_image(image_path: str, output_dir: str) -> List[str]:
     """Split electronic seal documents (multi-part forms) for higher precision."""
     try:
         with Image.open(image_path) as img:
             w, h = img.size
-            if h > w * 0.4: 
+            if h > w * 0.4:
                 print(f"[DEBUG] Image ratio (H/W={h/w:.2f}) suggests multi-part form, spliting horizontally...")
-                tmp_dir = tempfile.mkdtemp(prefix="split_img_")
-                
+
                 # Split in half horizontally
                 top_part = img.crop((0, 0, w, h // 2))
-                top_path = os.path.join(tmp_dir, "part_top.jpg")
+                top_path = os.path.join(output_dir, "part_top.jpg")
                 top_part.convert("RGB").save(top_path, "JPEG", quality=95)
-                
+
                 bottom_part = img.crop((0, h // 2, w, h))
-                bottom_path = os.path.join(tmp_dir, "part_bottom.jpg")
+                bottom_path = os.path.join(output_dir, "part_bottom.jpg")
                 bottom_part.convert("RGB").save(bottom_path, "JPEG", quality=95)
-                
+
                 return [top_path, bottom_path]
     except Exception as e:
         print(f"[WARNING] Image split failed: {e}")
@@ -399,45 +396,38 @@ def _merge_json_results(results: List[dict]) -> dict:
 
 def extract_fields_from_images(image_paths: List[str], credential_type: str) -> dict:
     """Call AI to extract fields from document images."""
-    final_image_paths = []
-    tmp_split_paths = []
+    with tempfile.TemporaryDirectory(prefix="cred_work_") as work_dir:
+        final_image_paths = []
 
-    # Strategy 1: Grid split for dense A4 forms (Account Opening only - NOT Power of Attorney)
-    DENSE_TYPES = ["account_opening_app"]  # 移除 power_of_attorney
-    if credential_type in DENSE_TYPES and len(image_paths) == 1:
-        tmp_split_paths = _grid_split_image(image_paths[0], rows=2, cols=2)
-        final_image_paths = tmp_split_paths
-        max_size = 2048 # resolution boost
-    # Strategy 2: Simple horizontal split for Electronic Seal
-    elif credential_type == "electronic_seal" and len(image_paths) == 1:
-        tmp_split_paths = _split_multi_form_image(image_paths[0])
-        final_image_paths = tmp_split_paths
-        max_size = 1600
-    # Strategy 3: Power of Attorney - higher resolution to preserve small checkbox symbols
-    elif credential_type == "power_of_attorney" and len(image_paths) == 1:
-        final_image_paths = image_paths
-        max_size = 3072  # 提升分辨率以保留方框内符号细节
-        quality = 95     # 提升质量
-    else:
-        final_image_paths = image_paths
-        max_size = 1600
+        # Strategy 1: Grid split for dense A4 forms (Account Opening only - NOT Power of Attorney)
+        DENSE_TYPES = ["account_opening_app"]
+        if credential_type in DENSE_TYPES and len(image_paths) == 1:
+            final_image_paths = _grid_split_image(image_paths[0], work_dir, rows=2, cols=2)
+            max_size = 2048
+        # Strategy 2: Simple horizontal split for Electronic Seal
+        elif credential_type == "electronic_seal" and len(image_paths) == 1:
+            final_image_paths = _split_multi_form_image(image_paths[0], work_dir)
+            max_size = 1600
+        # Strategy 3: Power of Attorney - higher resolution to preserve small checkbox symbols
+        elif credential_type == "power_of_attorney" and len(image_paths) == 1:
+            final_image_paths = image_paths
+            max_size = 3072
+        else:
+            final_image_paths = image_paths
+            max_size = 1600
 
-    # 根据凭证类型调整压缩质量
-    if credential_type == "power_of_attorney":
-        compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size, quality=95)
-    else:
-        compressed_paths = _compress_images_for_ai(final_image_paths, max_size=max_size)
-    prompt = PROMPT_MAPPING.get(credential_type)
+        # 根据凭证类型调整压缩质量
+        compress_dir = os.path.join(work_dir, "compressed")
+        os.makedirs(compress_dir, exist_ok=True)
+        if credential_type == "power_of_attorney":
+            compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size, quality=95)
+        else:
+            compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size)
+        prompt = PROMPT_MAPPING.get(credential_type)
 
-    # 【调试】确认prompt已加载
-    if credential_type == "power_of_attorney":
-        print(f"[DEBUG] Prompt 前100字符: {prompt[:100] if prompt else 'None'}")
-        print(f"[DEBUG] Prompt 包含'默认 false': {'默认 false' in prompt if prompt else False}")
+        if not prompt:
+            raise ValueError(f"Unsupported credential type: {credential_type}")
 
-    if not prompt:
-        raise ValueError(f"Unsupported credential type: {credential_type}")
-
-    try:
         # Single image case
         if len(compressed_paths) == 1:
             response = request_qwen35(
@@ -447,9 +437,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             ).strip()
             try:
                 data = json.loads(fix_json(response))
-                # 后处理 Boolean 字段
                 data = _post_process_boolean_fields(data, credential_type)
-                # 后处理授权事项列表
                 data = _post_process_authorized_items(data, credential_type)
                 return data
             except Exception as e:
@@ -470,28 +458,13 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                     continue
 
             merged = _merge_json_results(part_results)
-            # 后处理 Boolean 字段
             merged = _post_process_boolean_fields(merged, credential_type)
-            # 后处理授权事项列表
             merged = _post_process_authorized_items(merged, credential_type)
             return merged
 
-    finally:
-        # Clean temporary directories
-        all_dirs_to_clean = set()
-        for p in compressed_paths + tmp_split_paths:
-            d = os.path.dirname(p)
-            if d and d.startswith(tempfile.gettempdir()) and ("grid_split_" in d or "compressed_cred_" in d or "split_img_" in d):
-                all_dirs_to_clean.add(d)
-
-        for d in all_dirs_to_clean:
-            shutil.rmtree(d, ignore_errors=True)
-
 def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:
     """Process PDF or image to extract structured fields."""
-    tmp_dir = tempfile.mkdtemp(prefix="cred_process_")
-    
-    try:
+    with tempfile.TemporaryDirectory(prefix="cred_process_") as tmp_dir:
         ext = os.path.splitext(file_path)[-1].lower()
         if ext == '.pdf':
             image_paths = split_pdf_to_images(file_path, tmp_dir, dpi=200)
@@ -499,15 +472,52 @@ def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:
                 raise ValueError("PDF conversion failed")
         else:
             image_paths = [file_path]
-            
+
         result = extract_fields_from_images(image_paths, credential_type)
-        
+
         print(f"\n[Recognition Result - {credential_type}] -> {json.dumps(result, ensure_ascii=False)}")
-        
+
         return {
             "credential_type": credential_type,
             "extracted_data": result
         }
-    finally:
-        if os.path.exists(tmp_dir):
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+async def process_credential_async(record_id: int):
+    """
+    后台任务处理凭证提取，使用独立 session。
+    """
+    import asyncio
+    import time
+    from src.database import SessionLocal
+    from src.credentials.models import CredentialRecord, CredentialResult
+
+    async with SessionLocal() as db:
+        record = await db.get(CredentialRecord, record_id)
+        if not record:
+            return
+
+        start_time = time.time()
+
+        try:
+            result = await asyncio.to_thread(process_credential, record.file_path, record.credential_type)
+            duration = time.time() - start_time
+
+            cred_result = CredentialResult(
+                record_id=record.id,
+                user_id=record.user_id,
+                credential_type=result["credential_type"],
+                extracted_data=json.dumps(result["extracted_data"], ensure_ascii=False),
+            )
+            db.add(cred_result)
+
+            record.status = "done"
+            record.processing_duration = round(duration, 2)
+            await db.commit()
+
+        except Exception as e:
+            duration = time.time() - start_time
+            record.status = "failed"
+            record.error_msg = str(e)
+            record.processing_duration = round(duration, 2)
+            await db.commit()

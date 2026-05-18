@@ -10,8 +10,8 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: 'update:fileA', file: File): void;
-  (e: 'update:fileB', file: File): void;
+  (e: 'update:fileA', file: File | undefined): void;
+  (e: 'update:fileB', file: File | undefined): void;
   (e: 'compare'): void;
 }>();
 

@@ -59,7 +59,7 @@ async def init_db():
     )
     from src.documents.models import DocumentCompareTask, DocumentPageDiff
     from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult
-    from src.confirmation_compare.models import FormatCompareTask
+    from src.confirmation_compare.models import FormatCompareFile, FormatCompareResult
     from src.invoice_recognition.models import InvoiceFile, InvoiceResult
     from src.credentials.models import CredentialRecord, CredentialResult
     from src.pdf_extract.models import PdfExtractTask, PdfExtractResult
@@ -147,6 +147,11 @@ async def init_db():
         ))
         await conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_modules_agent_id ON modules (agent_id)"
+        ))
+
+        # 权限表：添加 (user_id, module) 联合唯一索引（幂等）
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_permission_module ON user_permissions (user_id, module)"
         ))
 
     # Seed modules 表（幂等：仅表为空时插入）

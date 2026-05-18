@@ -71,6 +71,9 @@ pipeline {
         string(name: 'JWT_ALGORITHM', defaultValue: 'HS256', description: 'JWT 算法')
         string(name: 'JWT_SECRET', defaultValue: 'ioa', description: 'JWT 密钥')
         string(name: 'DATABASE_URL', defaultValue: 'postgresql+asyncpg://postgres:123456@localhost/vlagent', description: '数据库 URL')
+        string(name: 'DATABASE_UPSTREAM_URL', defaultValue: 'postgresql+asyncpg://postgres:ioadev123456@10.238.146.99:30432/ioa', description: '上游数据库 URL')
+        string(name: 'SYNC_INTERVAL_MINUTES', defaultValue: '120', description: '同步间隔时间(分钟)')
+        string(name: 'PERMISSION_DEFAULT_OPEN', defaultValue: 'true', description: '无权限记录时是否默认开放所有模块(SIT环境默认开放)')
     }
     stages {
 
@@ -145,8 +148,11 @@ pipeline {
                         --set envConfig.ECM_CACHE_IP="${env.ECM_CACHE_IP}" \
                         --set envConfig.ECM_CACHE_PORT="${env.ECM_CACHE_PORT}" \
                         --set envConfig.JWT_ALGORITHM="${env.JWT_ALGORITHM}" \
+                        --set envConfig.PERMISSION_DEFAULT_OPEN="${env.PERMISSION_DEFAULT_OPEN}" \
                         --set secret.enabled=true \
                         --set secret.DATABASE_URL="${env.DATABASE_URL}" \
+                        --set secret.DATABASE_UPSTREAM_URL="${env.DATABASE_UPSTREAM_URL}" \
+                        --set secret.SYNC_INTERVAL_MINUTES="${env.SYNC_INTERVAL_MINUTES}" \
                         --set secret.QWEN35_KEY="${env.QWEN35_KEY}" \
                         --set secret.JWT_SECRET="${env.JWT_SECRET}" \
                         --set secret.ECM_PASSWORD="${env.ECM_PASSWORD}"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { FileText, ArrowLeft, Play, Trash2, Upload, RefreshCcw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
@@ -70,10 +70,6 @@ const displayFields = [
   { key: 'seal_name', label: '印章名称' },
   { key: 'signature_name', label: '落款名称' },
 ];
-
-const hasRetryableLetters = computed(() => {
-  return letters.value.some(l => l.status === 'pending' || l.status === 'failed');
-});
 
 const loadLetters = async () => {
   try {

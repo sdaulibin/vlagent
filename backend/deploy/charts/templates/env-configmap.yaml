@@ -36,6 +36,11 @@ data:
   JWT_ALGORITHM: {{ .Values.envConfig.JWT_ALGORITHM | default "HS256" | quote }}
 
   # ==============================================================================
+  # 权限配置
+  # ==============================================================================
+  PERMISSION_DEFAULT_OPEN: {{ .Values.envConfig.PERMISSION_DEFAULT_OPEN | default "true" | quote }}
+
+  # ==============================================================================
   # 影像平台 (SunECM) 配置
   # ==============================================================================
   ECM_ENABLED: {{ .Values.envConfig.ECM_ENABLED | default "false" | quote }}

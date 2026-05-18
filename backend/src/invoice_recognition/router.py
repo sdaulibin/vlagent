@@ -22,9 +22,9 @@ from src.invoice_recognition.service import process_invoice_recognitions
 
 router = APIRouter(prefix="/invoice_recognition", tags=["Invoice Recognition"])
 
-# 上传目录
-UPLOAD_DIR = os.getenv("INVOICE_UPLOAD_DIR",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "upload", "invoice"))
+# 从统一配置读取上传目录
+from src.config import UPLOAD_DIR_INVOICE
+UPLOAD_DIR = UPLOAD_DIR_INVOICE
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload", response_model=InvoiceRecognitionResponse)
@@ -66,8 +66,8 @@ async def upload_invoice_pdf(
     await db.commit()
     await db.refresh(db_file)
 
-    # 3. 提交后台任务处理识别
-    background_tasks.add_task(process_invoice_recognitions, db, db_file)
+    # 3. 提交后台任务处理识别（传 ID 而非 session+object，后台任务使用独立 session）
+    background_tasks.add_task(process_invoice_recognitions, db_file.id)
 
     return InvoiceRecognitionResponse(
         file_id=db_file.id,

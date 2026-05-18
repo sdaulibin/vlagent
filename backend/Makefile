@@ -45,6 +45,37 @@ dev:
 	@echo "🚀 Starting development server..."
 	uv run uvicorn main:app --reload --port 8000
 
+# =============================================================================
+# 数据库迁移 (Alembic)
+# =============================================================================
+
+db-migrate:
+	@echo "📦 Running database migrations..."
+	uv run alembic upgrade head
+	@echo "✅ Migrations complete"
+
+db-migration:
+	@echo "📝 Generating new migration..."
+	@read -p "Migration message: " msg; \
+	uv run alembic revision --autogenerate -m "$$msg"
+	@echo "✅ Migration generated"
+
+db-rollback:
+	@echo "⏪ Rolling back one migration..."
+	uv run alembic downgrade -1
+	@echo "✅ Rollback complete"
+
+db-stamp:
+	@echo "📌 Stamping database with current alembic version..."
+	uv run alembic stamp head
+	@echo "✅ Database stamped"
+
+db-history:
+	uv run alembic history --verbose
+
+db-current:
+	uv run alembic current
+
 staging:
 	@echo "🚀 Starting staging server..."
 	. .venv/bin/activate && python -m uvicorn main:app --host 0.0.0.0 --port 8000
@@ -182,10 +213,19 @@ help:
 	@echo ""
 	@echo "🧹 清理:"
 	@echo "  clean            清理临时文件"
+	@echo ""
+	@echo "🗄️ 数据库迁移:"
+	@echo "  db-migrate       执行数据库迁移 (alembic upgrade head)"
+	@echo "  db-migration     生成新的迁移脚本 (需要输入描述)"
+	@echo "  db-rollback      回滚一个版本"
+	@echo "  db-stamp         标记当前数据库版本 (首次使用)"
+	@echo "  db-history       查看迁移历史"
+	@echo "  db-current       查看当前版本"
 
 .DEFAULT_GOAL := help
 
 .PHONY: install dev staging prod \
         docker-build docker-run docker-stop docker-logs docker-shell \
         ci-prepare ci-build ci-push ci-export ci-chart \
+        db-migrate db-migration db-rollback db-stamp db-history db-current \
         clean help
