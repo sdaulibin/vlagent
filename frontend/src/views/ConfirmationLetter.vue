@@ -10,41 +10,7 @@ import {
   deleteConfirmationLetter,
   getConfirmationPreviewUrl
 } from '../api';
-
-interface FormatMismatch {
-  item: string;
-  expected: string;
-  actual: string;
-  severity: string;
-}
-
-interface RecognitionData {
-  confirmation_no: string;
-  accounting_firm: string;
-  reply_address: string;
-  contact_person: string;
-  phone: string;
-  postal_code: string;
-  debit_account: string;
-  cutoff_date: string;
-  start_date: string;
-  end_date: string;
-  seal_date: string;
-  seal_name: string;
-  signature_name: string;
-  recipient_bank: string;
-  format_type?: string;
-  format_check_passed?: boolean;
-  format_mismatches?: FormatMismatch[];
-}
-
-interface ConfirmationLetterItem {
-  id: number;
-  filename: string;
-  status: string;
-  recognition: RecognitionData | null;
-  recognition_duration: number | null;
-}
+import type { ConfirmationLetterItem } from '../types';
 
 const router = useRouter();
 const letters = ref<ConfirmationLetterItem[]>([]);

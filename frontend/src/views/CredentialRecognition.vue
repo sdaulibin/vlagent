@@ -10,6 +10,7 @@ import {
   getCredentialFileUrl,
 } from '../api';
 import PowerOfAttorneyResult from '../components/PowerOfAttorneyResult.vue';
+import type { CredentialRecordItem } from '../types';
 
 const router = useRouter();
 
@@ -41,17 +42,6 @@ const resultData = ref<any>(null);
 const errorMsg = ref('');
 const selectedRecordId = ref<number | null>(null);
 const previewUrl = ref('');
-
-// 提取记录列表
-interface CredentialRecordItem {
-  id: number;
-  filename: string;
-  credential_type: string;
-  status: string;
-  processing_duration: number | null;
-  error_msg: string | null;
-  created_at: string | null;
-}
 
 const records = ref<CredentialRecordItem[]>([]);
 

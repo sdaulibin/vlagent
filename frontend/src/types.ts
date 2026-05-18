@@ -187,3 +187,153 @@ export interface TaskDetail extends TaskItem {
   error_msg: string | null;
   pages: PageDiff[];
 }
+
+// ===== 通用任务/记录基类 =====
+
+/** 所有功能模块的列表项共享字段 */
+export interface BaseRecordItem {
+  id: number;
+  filename: string;
+  status: string;
+  error_msg: string | null;
+  created_at: string | null;
+}
+
+// ===== 询证函识别 =====
+
+export interface FormatMismatch {
+  item: string;
+  expected: string;
+  actual: string;
+  severity: string;
+}
+
+export interface RecognitionData {
+  confirmation_no: string;
+  accounting_firm: string;
+  reply_address: string;
+  contact_person: string;
+  phone: string;
+  postal_code: string;
+  debit_account: string;
+  cutoff_date: string;
+  start_date: string;
+  end_date: string;
+  seal_date: string;
+  seal_name: string;
+  signature_name: string;
+  recipient_bank: string;
+  format_type?: string;
+  format_check_passed?: boolean;
+  format_mismatches?: FormatMismatch[];
+}
+
+export interface ConfirmationLetterItem {
+  id: number;
+  filename: string;
+  status: string;
+  recognition: RecognitionData | null;
+  recognition_duration: number | null;
+}
+
+// ===== 询证函格式比对 =====
+
+export interface MismatchItem {
+  section: string;
+  item: string;
+  location: string;
+  expected: string;
+  actual: string;
+  severity: string;
+}
+
+export interface CompareTask {
+  id: number;
+  filename: string;
+  format_type: string | null;
+  status: string;
+  passed: boolean | null;
+  mismatches: MismatchItem[];
+  extracted_content: any[] | null;
+  template_content: any[] | null;
+  error_msg: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface TemplateInfo {
+  format_key: string;
+  format_name: string;
+  pdf_filename: string;
+}
+
+// ===== 发票识别 =====
+
+export interface InvoicePageResult {
+  page_number: number;
+  invoice_type: string | null;
+  invoice_no: string | null;
+  invoice_date: string | null;
+  invoice_amount: string | null;
+  buyer_name: string | null;
+  buyer_tax_id: string | null;
+  seller_name: string | null;
+  seller_tax_id: string | null;
+  raw_text: string | null;
+  error_msg: string | null;
+}
+
+export interface InvoiceFileItem extends BaseRecordItem {
+  page_count: number | null;
+  recognition_duration: number | null;
+}
+
+export interface InvoiceDetail {
+  file_id: number;
+  filename: string;
+  status: string;
+  page_count: number | null;
+  recognition_duration: number | null;
+  results: InvoicePageResult[];
+  error_msg: string | null;
+}
+
+// ===== 凭证类识别 =====
+
+export interface CredentialRecordItem extends BaseRecordItem {
+  credential_type: string;
+  processing_duration: number | null;
+}
+
+// ===== 通用 PDF 提取 =====
+
+export interface ExtractFieldItem {
+  name: string;
+  type: string;
+  description?: string;
+}
+
+export interface ExtractField {
+  name: string;
+  description: string;
+  type: string;
+  items?: ExtractFieldItem[];
+}
+
+export interface PdfExtractTaskItem extends BaseRecordItem {
+  output_format: string;
+  page_count: number | null;
+  processing_duration: number | null;
+}
+
+export interface PdfExtractTaskDetail {
+  id: number;
+  filename: string;
+  status: string;
+  output_format: string;
+  page_count: number | null;
+  processing_duration: number | null;
+  fields: ExtractField[];
+  result: Record<string, any> | null;
+  error_msg: string | null;
+}

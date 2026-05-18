@@ -9,40 +9,7 @@ import {
   deleteInvoiceFile,
   getInvoiceFileUrl
 } from '../api';
-
-interface InvoiceFileItem {
-  id: number;
-  filename: string;
-  status: string;
-  page_count: number | null;
-  recognition_duration: number | null;
-  error_msg: string | null;
-  created_at: string | null;
-}
-
-interface InvoicePageResult {
-  page_number: number;
-  invoice_type: string | null;
-  invoice_no: string | null;
-  invoice_date: string | null;
-  invoice_amount: string | null;
-  buyer_name: string | null;
-  buyer_tax_id: string | null;
-  seller_name: string | null;
-  seller_tax_id: string | null;
-  raw_text: string | null;
-  error_msg: string | null;
-}
-
-interface InvoiceDetail {
-  file_id: number;
-  filename: string;
-  status: string;
-  page_count: number | null;
-  recognition_duration: number | null;
-  results: InvoicePageResult[];
-  error_msg: string | null;
-}
+import type { InvoiceFileItem, InvoiceDetail } from '../types';
 
 const router = useRouter();
 const files = ref<InvoiceFileItem[]>([]);

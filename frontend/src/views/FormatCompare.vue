@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, computed } from "vue";
 import {
   ArrowLeft,
   Upload,
@@ -21,35 +21,7 @@ import {
   getFormatCompareTemplates,
   runFormatCompare,
 } from "../api";
-
-interface MismatchItem {
-  section: string;
-  item: string;
-  location: string;
-  expected: string;
-  actual: string;
-  severity: string;
-}
-
-interface CompareTask {
-  id: number;
-  filename: string;
-  format_type: string | null;
-  status: string;
-  passed: boolean | null;
-  mismatches: MismatchItem[];
-  extracted_content: any[] | null;
-  template_content: any[] | null;
-  error_msg: string | null;
-  duration_ms: number | null;
-  created_at: string;
-}
-
-interface TemplateInfo {
-  format_key: string;
-  format_name: string;
-  pdf_filename: string;
-}
+import type { CompareTask, TemplateInfo } from "../types";
 
 const router = useRouter();
 const tasks = ref<CompareTask[]>([]);
@@ -59,11 +31,6 @@ const isUploading = ref(false);
 const isComparing = ref(false);
 const taskFileUrl = ref<string>('');
 const templateFileUrl = ref<string>('');
-const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
-
-const hasProcessingTasks = computed(() =>
-  tasks.value.some(t => t.status === 'processing')
-);
 
 const formatTypeLabels: Record<string, string> = {
   format_1: "格式一（银行询证函）",
@@ -136,41 +103,20 @@ const handleCompare = async () => {
   }
 
   try {
-    await runFormatCompare(taskId);
+    selectedTask.value = await runFormatCompare(taskId);
+    // 重新加载预览 blob URL
+    taskFileUrl.value = await getFormatCompareFileUrl(taskId);
+    if (selectedTask.value?.format_type) {
+      templateFileUrl.value = await getFormatCompareTemplateUrl(selectedTask.value.format_type);
+    }
     await loadTasks();
-    startPolling();
   } catch (e) {
     console.error("比对失败", e);
+    // 失败时刷新真实状态
     await loadTasks();
+    selectedTask.value = await getFormatCompareTask(taskId);
   } finally {
     isComparing.value = false;
-  }
-};
-
-const startPolling = () => {
-  if (pollTimer.value) return;
-  pollTimer.value = setInterval(async () => {
-    await loadTasks();
-    if (selectedTask.value) {
-      const current = tasks.value.find(t => t.id === selectedTask.value!.id);
-      if (current && (current.status === 'done' || current.status === 'failed')) {
-        selectedTask.value = current;
-        taskFileUrl.value = await getFormatCompareFileUrl(current.id);
-        if (current.format_type) {
-          templateFileUrl.value = await getFormatCompareTemplateUrl(current.format_type);
-        }
-      }
-    }
-    if (!hasProcessingTasks.value) {
-      stopPolling();
-    }
-  }, 3000);
-};
-
-const stopPolling = () => {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-    pollTimer.value = null;
   }
 };
 
@@ -283,16 +229,9 @@ const headerHasMismatch = (
   );
 };
 
-onMounted(async () => {
-  await loadTasks();
-  await loadTemplates();
-  if (hasProcessingTasks.value) {
-    startPolling();
-  }
-});
-
-onUnmounted(() => {
-  stopPolling();
+onMounted(() => {
+  loadTasks();
+  loadTemplates();
 });
 </script>
 

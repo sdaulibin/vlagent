@@ -9,42 +9,7 @@ import {
   deletePdfExtractTask,
   downloadPdfExtract
 } from '../api';
-
-interface ExtractFieldItem {
-  name: string;
-  type: string;
-  description?: string;
-}
-
-interface ExtractField {
-  name: string;
-  description: string;
-  type: string;
-  items?: ExtractFieldItem[];
-}
-
-interface TaskItem {
-  id: number;
-  filename: string;
-  status: string;
-  output_format: string;
-  page_count: number | null;
-  processing_duration: number | null;
-  error_msg: string | null;
-  created_at: string | null;
-}
-
-interface TaskDetail {
-  id: number;
-  filename: string;
-  status: string;
-  output_format: string;
-  page_count: number | null;
-  processing_duration: number | null;
-  fields: ExtractField[];
-  result: Record<string, any> | null;
-  error_msg: string | null;
-}
+import type { PdfExtractTaskItem as TaskItem, PdfExtractTaskDetail as TaskDetail, ExtractField, ExtractFieldItem } from '../types';
 
 const router = useRouter();
 const tasks = ref<TaskItem[]>([]);
