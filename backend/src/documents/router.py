@@ -81,6 +81,16 @@ async def compare_documents(
         if not (f.filename or "").lower().endswith(allowed):
             raise HTTPException(status_code=400, detail=f"仅支持 PDF 和 Word 文档，不支持: {f.filename}")
 
+    # 验证文件内容（魔数校验，DOCX/DOC 无可靠魔数，仅校验 PDF）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    for f in (file_a, file_b):
+        header = await read_file_header(f)
+        ext = os.path.splitext(f.filename or "")[1].lower()
+        if ext == ".pdf":
+            is_valid, error_msg = validate_file_content(f.filename or "", header, [".pdf"])
+            if not is_valid:
+                raise HTTPException(status_code=400, detail=error_msg)
+
     user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
     os.makedirs(user_upload_dir, exist_ok=True)
 
@@ -137,7 +147,7 @@ async def compare_documents(
     return {"task_id": task.id, "status": "pending"}
 
 
-@router.post("/list", response_model=list[DocumentTaskListItem])
+@router.get("/list", response_model=list[DocumentTaskListItem])
 async def list_tasks(db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有比对任务列表"""
     statement = select(DocumentCompareTask).where(
@@ -148,7 +158,7 @@ async def list_tasks(db: AsyncSession = Depends(get_session), user_id: str = Dep
     return [DocumentTaskListItem.model_validate(t) for t in tasks]
 
 
-@router.post("/list/{task_id}", response_model=DocumentCompareResponse)
+@router.get("/list/{task_id}", response_model=DocumentCompareResponse)
 async def get_task(task_id: int, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取任务详情（含页级 diff）"""
     task = await db.get(DocumentCompareTask, task_id)
@@ -166,7 +176,7 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_session), user_i
     return resp
 
 
-@router.post("/{task_id}/status", response_model=DocumentTaskStatusResponse)
+@router.get("/{task_id}/status", response_model=DocumentTaskStatusResponse)
 async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """轮询任务状态"""
     task = await db.get(DocumentCompareTask, task_id)
@@ -226,7 +236,7 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_i
     )
 
 
-@router.post("/{task_id}/file/{doc_type}")
+@router.get("/{task_id}/file/{doc_type}")
 async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取原始文件（POST，需认证）"""
     return await _serve_task_file(task_id, doc_type, db, user_id)

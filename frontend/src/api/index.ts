@@ -79,9 +79,9 @@ function showErrorToast(message: string) {
   }, 4000);
 }
 
-/** 通过 POST 获取文件并返回 blob URL（用于 img/iframe src） */
+/** 通过 GET 获取文件并返回 blob URL（用于 img/iframe src） */
 async function fetchFileAsBlobUrl(path: string): Promise<string> {
-  const response = await api.post(path, {}, { responseType: "blob" });
+  const response = await api.get(path, { responseType: "blob" });
   return URL.createObjectURL(response.data);
 }
 
@@ -93,17 +93,17 @@ export const uploadFile = async (file: File) => {
 };
 
 export const getFiles = async () => {
-  const response = await api.post("/files");
+  const response = await api.get("/files");
   return response.data;
 };
 
 export const getFileTransactions = async (fileId: number) => {
-  const response = await api.post(`/transactions/${fileId}`);
+  const response = await api.get(`/transactions/${fileId}`);
   return response.data;
 };
 
 export const getFileSummary = async (fileId: number) => {
-  const response = await api.post(`/transactions/${fileId}/summary`);
+  const response = await api.get(`/transactions/${fileId}/summary`);
   return response.data;
 };
 
@@ -170,17 +170,17 @@ export const compareDocuments = async (fileA: File, fileB: File) => {
 };
 
 export const getDocumentTasks = async () => {
-  const response = await api.post("/documents/list");
+  const response = await api.get("/documents/list");
   return response.data;
 };
 
 export const getDocumentTask = async (taskId: number) => {
-  const response = await api.post(`/documents/list/${taskId}`);
+  const response = await api.get(`/documents/list/${taskId}`);
   return response.data;
 };
 
 export const getDocumentTaskStatus = async (taskId: number) => {
-  const response = await api.post(`/documents/${taskId}/status`);
+  const response = await api.get(`/documents/${taskId}/status`);
   return response.data;
 };
 
@@ -199,12 +199,12 @@ export const uploadConfirmationLetter = async (file: File) => {
 };
 
 export const getConfirmationLetters = async () => {
-  const response = await api.post("/confirmation");
+  const response = await api.get("/confirmation");
   return response.data;
 };
 
 export const getConfirmationLetter = async (letterId: number) => {
-  const response = await api.post(`/confirmation/${letterId}`);
+  const response = await api.get(`/confirmation/${letterId}`);
   return response.data;
 };
 
@@ -239,12 +239,12 @@ export const uploadFormatCompare = async (file: File) => {
 };
 
 export const getFormatCompareTasks = async () => {
-  const response = await api.post("/format-compare");
+  const response = await api.get("/format-compare");
   return response.data;
 };
 
 export const getFormatCompareTask = async (taskId: number) => {
-  const response = await api.post(`/format-compare/${taskId}`);
+  const response = await api.get(`/format-compare/${taskId}`);
   return response.data;
 };
 
@@ -260,7 +260,7 @@ export const getFormatCompareTemplateUrl = (formatKey: string) =>
   fetchFileAsBlobUrl(`/format-compare/templates/${formatKey}/preview`);
 
 export const getFormatCompareTemplates = async () => {
-  const response = await api.post("/format-compare/templates");
+  const response = await api.get("/format-compare/templates");
   return response.data;
 };
 
@@ -279,12 +279,12 @@ export const uploadInvoice = async (file: File) => {
 };
 
 export const getInvoiceFiles = async () => {
-  const response = await api.post("/invoice_recognition/list");
+  const response = await api.get("/invoice_recognition/list");
   return response.data;
 };
 
 export const getInvoiceResult = async (fileId: number) => {
-  const response = await api.post(`/invoice_recognition/list/${fileId}`);
+  const response = await api.get(`/invoice_recognition/list/${fileId}`);
   return response.data;
 };
 
@@ -307,12 +307,12 @@ export const extractCredential = async (file: File, credentialType: string) => {
 };
 
 export const getCredentialRecords = async () => {
-  const response = await api.post("/credentials/list");
+  const response = await api.get("/credentials/list");
   return response.data;
 };
 
 export const getCredentialRecord = async (recordId: number) => {
-  const response = await api.post(`/credentials/list/${recordId}`);
+  const response = await api.get(`/credentials/list/${recordId}`);
   return response.data;
 };
 
@@ -336,12 +336,12 @@ export const uploadPdfExtract = async (file: File, fields: string, outputFormat:
 };
 
 export const getPdfExtractTasks = async () => {
-  const response = await api.post("/pdf_extract/list");
+  const response = await api.get("/pdf_extract/list");
   return response.data;
 };
 
 export const getPdfExtractTask = async (taskId: number) => {
-  const response = await api.post(`/pdf_extract/list/${taskId}`);
+  const response = await api.get(`/pdf_extract/list/${taskId}`);
   return response.data;
 };
 

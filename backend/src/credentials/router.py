@@ -65,6 +65,13 @@ async def extract_credential(
     if credential_type not in PROMPT_MAPPING:
         raise HTTPException(status_code=400, detail=f"不受支持的类型: {credential_type}")
 
+    # 验证文件格式（扩展名 + 魔数）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf", ".jpg", ".jpeg", ".png"])
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     # 创建用户目录
     user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
     os.makedirs(user_upload_dir, exist_ok=True)
@@ -97,7 +104,7 @@ async def extract_credential(
     )
 
 
-@router.post("/list", response_model=list[CredentialRecordListItem])
+@router.get("/list", response_model=list[CredentialRecordListItem])
 async def list_records(
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
@@ -120,7 +127,7 @@ async def list_records(
     ]
 
 
-@router.post("/list/{record_id}", response_model=CredentialRecordResponse)
+@router.get("/list/{record_id}", response_model=CredentialRecordResponse)
 async def get_record(
     record_id: int,
     session: AsyncSession = Depends(get_session),
@@ -154,7 +161,7 @@ async def get_record(
     )
 
 
-@router.post("/{record_id}/file")
+@router.get("/{record_id}/file")
 async def get_record_file(
     record_id: int,
     session: AsyncSession = Depends(get_session),

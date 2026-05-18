@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/file-provider", tags=["file-provider"])
 
 
-@router.post("/status")
+@router.get("/status")
 async def get_status():
     """检查 JVM 和影像平台 SDK 状态"""
     ready = service.is_jvm_ready()
@@ -135,7 +135,7 @@ async def upload_file(
 
     try:
         # 保存上传文件到临时目录
-        tmp_path = os.path.join(tmp_dir, file.filename)
+        tmp_path = os.path.join(tmp_dir, os.path.basename(file.filename))
         with open(tmp_path, "wb") as f:
             content = await file.read()
             f.write(content)

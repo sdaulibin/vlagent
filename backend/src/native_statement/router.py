@@ -25,9 +25,16 @@ async def parse_pdf(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
 
+    # 验证文件内容（魔数校验）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     # 保存上传文件到临时目录
     tmp_dir = tempfile.mkdtemp(prefix="native_stmt_")
-    tmp_path = os.path.join(tmp_dir, file.filename)
+    tmp_path = os.path.join(tmp_dir, os.path.basename(file.filename))
 
     try:
         with open(tmp_path, "wb") as f:
@@ -61,8 +68,15 @@ async def parse_pdf_to_excel(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
 
+    # 验证文件内容（魔数校验）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     tmp_dir = tempfile.mkdtemp(prefix="native_stmt_")
-    tmp_path = os.path.join(tmp_dir, file.filename)
+    tmp_path = os.path.join(tmp_dir, os.path.basename(file.filename))
 
     try:
         with open(tmp_path, "wb") as f:
@@ -79,7 +93,7 @@ async def parse_pdf_to_excel(file: UploadFile = File(...)):
         excel_buffer = export_to_excel(result)
 
         # 生成下载文件名
-        base_name = os.path.splitext(file.filename)[0]
+        base_name = os.path.splitext(os.path.basename(file.filename))[0]
         download_name = f"{base_name}_解析结果.xlsx"
 
         return StreamingResponse(
@@ -105,8 +119,15 @@ async def check_pdf_type(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
 
+    # 验证文件内容（魔数校验）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     tmp_dir = tempfile.mkdtemp(prefix="native_stmt_")
-    tmp_path = os.path.join(tmp_dir, file.filename)
+    tmp_path = os.path.join(tmp_dir, os.path.basename(file.filename))
 
     try:
         with open(tmp_path, "wb") as f:

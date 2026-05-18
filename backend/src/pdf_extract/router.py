@@ -49,6 +49,13 @@ async def upload_pdf_extract(
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="仅支持 PDF 文件")
 
+    # 验证文件内容（魔数校验）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     # 解析字段
     try:
         fields_data = json.loads(fields)
@@ -67,7 +74,7 @@ async def upload_pdf_extract(
 
     # 保存文件
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    safe_filename = os.path.basename(file.filename).replace(" ", "_")
     unique_filename = f"{timestamp}_{safe_filename}"
     file_path = os.path.join(user_upload_dir, unique_filename)
 
@@ -100,7 +107,7 @@ async def upload_pdf_extract(
     )
 
 
-@router.post("/list", response_model=List[PdfExtractTaskListItem])
+@router.get("/list", response_model=List[PdfExtractTaskListItem])
 async def list_pdf_extract_tasks(
     db: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
@@ -123,7 +130,7 @@ async def list_pdf_extract_tasks(
     ]
 
 
-@router.post("/list/{task_id}", response_model=PdfExtractTaskResponse)
+@router.get("/list/{task_id}", response_model=PdfExtractTaskResponse)
 async def get_pdf_extract_task(
     task_id: int,
     db: AsyncSession = Depends(get_session),
@@ -157,7 +164,7 @@ async def get_pdf_extract_task(
     )
 
 
-@router.post("/download/{task_id}")
+@router.get("/download/{task_id}")
 async def download_pdf_extract(
     task_id: int,
     db: AsyncSession = Depends(get_session),

@@ -107,7 +107,7 @@ def _to_file_dto(file_obj: ConfirmationFile, rec_obj: ConfirmationResult | None)
     )
 
 
-@router.post("", response_model=List[ConfirmationFileDTO])
+@router.get("", response_model=List[ConfirmationFileDTO])
 async def get_confirmation_files(session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有询证函文件记录"""
     statement = (
@@ -137,9 +137,12 @@ async def upload_confirmation_file(
 ):
     """上传询证函文件"""
     try:
-        # 验证文件格式
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="仅支持 PDF 格式文件")
+        # 验证文件格式（扩展名 + 魔数）
+        from services.pdf.file_validator import validate_file_content, read_file_header
+        header = await read_file_header(file)
+        is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
 
         user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
         os.makedirs(user_upload_dir, exist_ok=True)
@@ -171,7 +174,7 @@ async def upload_confirmation_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{file_id}", response_model=ConfirmationFileDTO)
+@router.get("/{file_id}", response_model=ConfirmationFileDTO)
 async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取单个询证函详情（文件 + 识别结果）"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)
@@ -189,7 +192,7 @@ async def get_confirmation_file(file_id: int, session: AsyncSession = Depends(ge
     return _to_file_dto(file, recognition)
 
 
-@router.post("/{file_id}/file")
+@router.get("/{file_id}/file")
 async def preview_confirmation_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """预览询证函原始文件"""
     statement = select(ConfirmationFile).where(ConfirmationFile.id == file_id)

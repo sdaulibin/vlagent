@@ -53,7 +53,7 @@ def _build_safe_upload_path(upload_dir: str, original_filename: str) -> str:
     return str(target_path)
 
 
-@router.post("", response_model=List[FileRecord])
+@router.get("", response_model=List[FileRecord])
 async def get_files(session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取所有文件列表"""
     statement = select(FileRecord).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None))).order_by(desc(FileRecord.created_at))
@@ -105,7 +105,7 @@ async def upload_file(file: UploadFile = File(...), session: AsyncSession = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{file_id}", response_model=FileRecord)
+@router.get("/{file_id}", response_model=FileRecord)
 async def get_file(file_id: int, session: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
     """获取单个文件详情"""
     statement = select(FileRecord).where(FileRecord.id == file_id).where(or_(FileRecord.user_id == user_id, FileRecord.user_id.is_(None)))

@@ -79,9 +79,8 @@ const goToPage = (index: number) => {
 // ---- PDF loading ----
 
 async function loadPdf(docType: 'a' | 'b') {
-  const response = await api.post(
+  const response = await api.get(
     `/documents/${props.taskId}/file/${docType}`,
-    {},
     { responseType: 'arraybuffer' }
   );
   const data = new Uint8Array(response.data);

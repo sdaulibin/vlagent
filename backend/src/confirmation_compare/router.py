@@ -88,14 +88,14 @@ async def _get_file_with_result(file_id: int, session: AsyncSession, user_id: st
     return file_obj, result_obj
 
 
-@router.post("/templates", response_model=list[TemplateInfo])
+@router.get("/templates", response_model=list[TemplateInfo])
 async def list_templates():
     """获取可用模板列表"""
     templates = get_template_list()
     return [TemplateInfo(**t) for t in templates]
 
 
-@router.post("/templates/{format_key}/preview")
+@router.get("/templates/{format_key}/preview")
 async def preview_template(format_key: str):
     """预览模板 PDF"""
     path = get_template_pdf_path(format_key)
@@ -111,13 +111,17 @@ async def upload_file(
     user_id: str = Depends(get_current_user_id),
 ):
     """上传询证函（仅保存文件，不立即比对）"""
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(400, "仅支持 PDF 文件")
+    # 验证文件格式（扩展名 + 魔数）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, [".pdf"])
+    if not is_valid:
+        raise HTTPException(400, error_msg)
 
     user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
     os.makedirs(user_upload_dir, exist_ok=True)
 
-    safe_name = f"{uuid4().hex[:8]}_{file.filename}"
+    safe_name = f"{uuid4().hex[:8]}_{os.path.basename(file.filename)}"
     file_path = os.path.join(user_upload_dir, safe_name)
     with open(file_path, "wb") as f:
         content = await file.read()
@@ -197,7 +201,7 @@ async def _run_compare_async(file_id: int):
         await db.commit()
 
 
-@router.post("", response_model=list[FormatCompareTaskDTO])
+@router.get("", response_model=list[FormatCompareTaskDTO])
 async def list_tasks(
     session: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
@@ -221,7 +225,7 @@ async def list_tasks(
     return dtos
 
 
-@router.post("/{file_id}", response_model=FormatCompareTaskDTO)
+@router.get("/{file_id}", response_model=FormatCompareTaskDTO)
 async def get_task(
     file_id: int,
     session: AsyncSession = Depends(get_session),
@@ -232,7 +236,7 @@ async def get_task(
     return _to_dto(file_obj, result_obj)
 
 
-@router.post("/{file_id}/file")
+@router.get("/{file_id}/file")
 async def preview_uploaded_file(
     file_id: int,
     session: AsyncSession = Depends(get_session),

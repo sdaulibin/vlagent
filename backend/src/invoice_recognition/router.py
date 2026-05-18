@@ -41,12 +41,19 @@ async def upload_invoice_pdf(
     if not file.filename.lower().endswith(allowed_extensions):
         raise HTTPException(status_code=400, detail="仅支持 PDF、JPG、PNG 文件。")
 
+    # 验证文件内容（魔数校验）
+    from services.pdf.file_validator import validate_file_content, read_file_header
+    header = await read_file_header(file)
+    is_valid, error_msg = validate_file_content(file.filename, header, list(allowed_extensions))
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     # 创建用户目录
     user_upload_dir = os.path.join(UPLOAD_DIR, user_id)
     os.makedirs(user_upload_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    safe_filename = os.path.basename(file.filename).replace(" ", "_")
     unique_filename = f"{timestamp}_{safe_filename}"
     file_path = os.path.join(user_upload_dir, unique_filename)
 
@@ -77,7 +84,7 @@ async def upload_invoice_pdf(
     )
 
 
-@router.post("/list", response_model=List[InvoiceFileListItem])
+@router.get("/list", response_model=List[InvoiceFileListItem])
 async def list_invoice_files(
     db: AsyncSession = Depends(get_session),
     user_id: str = Depends(get_current_user_id),
@@ -101,7 +108,7 @@ async def list_invoice_files(
     ]
 
 
-@router.post("/list/{file_id}", response_model=InvoiceRecognitionResponse)
+@router.get("/list/{file_id}", response_model=InvoiceRecognitionResponse)
 async def get_invoice_result(
     file_id: int,
     db: AsyncSession = Depends(get_session),
@@ -146,7 +153,7 @@ async def get_invoice_result(
     )
 
 
-@router.post("/{file_id}/file")
+@router.get("/{file_id}/file")
 async def get_invoice_file(
     file_id: int,
     db: AsyncSession = Depends(get_session),
