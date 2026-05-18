@@ -1,6 +1,5 @@
 import logging
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.database import SessionLocal, UpstreamSessionLocal
@@ -23,7 +22,7 @@ async def sync_modules() -> dict:
 
     async with UpstreamSessionLocal() as upstream:
         rows = await upstream.execute(text(
-            "SELECT id, name, description, sorting, is_show, is_delete "
+            "SELECT id, name, description, sorting, is_delete "
             "FROM hi_agent_list WHERE pid = :pid AND is_delete = false"
         ), {"pid": VLAGENT_AGENT_ID})
         upstream_agents = rows.mappings().all()

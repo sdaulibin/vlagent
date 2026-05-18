@@ -1,7 +1,5 @@
 import logging
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlalchemy import text, select, func
 
 from src.database import SessionLocal, UpstreamSessionLocal
 from src.modules.models import Module
@@ -46,16 +44,13 @@ async def sync_permissions() -> dict:
 
     # 3. 计算权限映射
     new_permissions: list[tuple[str, str]] = []
-    skipped_no_vlagent = 0
     skipped_no_modules = 0
 
     for user in users:
         agent_array = user["agent"] or []
-        # 与子模块 id 取交集，映射为 module key
         user_agent_ids = set(agent_array) & valid_agent_ids
         if not user_agent_ids:
             skipped_no_modules += 1
-            logger.debug("[权限同步] 用户 %s 含 vlagent 主入口但无子模块权限", user["user_id"])
             continue
         for aid in user_agent_ids:
             key = agent_id_to_key.get(aid)
@@ -74,16 +69,12 @@ async def sync_permissions() -> dict:
 
     # 4. 全量替换 user_permissions（事务）
     async with SessionLocal() as session:
-        async with session.begin():
-            # 查询旧权限数量
-            old_count = (await session.execute(
-                select(UserPermission)
-            )).scalars().all()
-            old_count = len(old_count)
-
-            await session.execute(text("DELETE FROM user_permissions"))
-            for user_id, module_key in new_permissions:
-                session.add(UserPermission(user_id=user_id, module=module_key))
+        old_count = await session.scalar(
+            select(func.count()).select_from(UserPermission)
+        )
+        await session.execute(text("DELETE FROM user_permissions"))
+        for user_id, module_key in new_permissions:
+            session.add(UserPermission(user_id=user_id, module=module_key))
         await session.commit()
 
     logger.info("[权限同步] 完成: 旧权限=%d条 → 新权限=%d条, 涉及用户=%d人",
