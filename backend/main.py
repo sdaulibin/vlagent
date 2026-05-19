@@ -23,28 +23,28 @@ logging.getLogger("src.auth").setLevel(logging.INFO)
 logging.getLogger("src.auth").addHandler(logging.StreamHandler())
 
 
+def _run_alembic_upgrade():
+    """使用 alembic Python API 执行迁移（无需 CLI）"""
+    from alembic.config import Config
+    from alembic import command
+    try:
+        alembic_cfg = Config(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic.ini")
+        )
+        alembic_cfg.set_main_option(
+            "script_location",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic"),
+        )
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic upgrade to head: ok")
+    except Exception as e:
+        logger.warning(f"Alembic upgrade failed: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _run_alembic_upgrade()
     await init_db()
-    # Alembic: 直接写入版本标记，不走 env.py 的 async 引擎
-    try:
-        from sqlalchemy import text
-        from src.database import engine
-        revision = "135eef68092d"  # baseline revision
-        async with engine.begin() as conn:
-            await conn.execute(text(
-                "CREATE TABLE IF NOT EXISTS alembic_version "
-                "(version_num VARCHAR(32) NOT NULL, CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
-            ))
-            result = await conn.execute(text("SELECT version_num FROM alembic_version"))
-            row = result.first()
-            if row is None:
-                await conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:rev)"), {"rev": revision})
-                logger.info(f"Alembic version stamped: {revision}")
-            else:
-                logger.info(f"Alembic version: {row[0]}")
-    except Exception as e:
-        logger.debug(f"Alembic stamp skipped: {e}")
     if settings.ECM_ENABLED:
         if not init_jvm():
             logger.warning("JVM 启动失败，影像平台功能不可用")
@@ -62,7 +62,7 @@ app = FastAPI(
     title="vlagent API",
     description="Bank Transaction Identification Service",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS Configuration
@@ -85,7 +85,8 @@ app.add_middleware(
 )
 
 # Include API Router
-app.include_router(api_router, prefix="/api")
+_api_prefix = os.getenv("API_PREFIX", "/api")
+app.include_router(api_router, prefix=_api_prefix)
 
 
 @app.get("/")

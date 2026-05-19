@@ -206,6 +206,27 @@ async def init_db():
             for seed in seeds:
                 session.add(seed)
             await session.commit()
+        else:
+            # 已有数据：回填分类字段（幂等）
+            _CATEGORY_DATA = {
+                "bank-statement": ("bank", "银行流水", "#2563eb", "linear-gradient(135deg, #2563eb, #3b82f6)", "Bank Statement"),
+                "confirmation-letter": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #059669, #10b981)", "Confirmation Letter"),
+                "document-compare": ("document", "文档比对", "#ea580c", "linear-gradient(135deg, #ea580c, #f97316)", "Document Compare"),
+                "format-compare": ("document", "文档比对", "#ea580c", "linear-gradient(135deg, #d97706, #f59e0b)", "Format Compare"),
+                "invoice-recognition": ("invoice", "发票识别", "#dc2626", "linear-gradient(135deg, #dc2626, #ef4444)", "Invoice Recognition"),
+                "credential-recognition": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #7c3aed, #8b5cf6)", "Credential Recognition"),
+                "pdf-extract": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #0891b2, #06b6d4)", "PDF Extract"),
+            }
+            result = await session.execute(select(Module))
+            for module in result.scalars().all():
+                if module.key in _CATEGORY_DATA and not module.category:
+                    cat, label, color, bg, name_en = _CATEGORY_DATA[module.key]
+                    module.category = cat
+                    module.category_label = label
+                    module.category_color = color
+                    module.bg_color = bg
+                    module.name_en = name_en
+            await session.commit()
 
 
 async def get_session() -> AsyncSession:
