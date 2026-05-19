@@ -149,6 +149,18 @@ async def init_db():
             "CREATE INDEX IF NOT EXISTS ix_modules_agent_id ON modules (agent_id)"
         ))
 
+        # modules 表：新增分类字段（幂等兜底，alembic 迁移也会处理）
+        for col in [
+            ("category", "VARCHAR"),
+            ("category_label", "VARCHAR"),
+            ("category_color", "VARCHAR"),
+            ("bg_color", "VARCHAR"),
+            ("name_en", "VARCHAR"),
+        ]:
+            await conn.execute(text(
+                f"ALTER TABLE modules ADD COLUMN IF NOT EXISTS {col[0]} {col[1]}"
+            ))
+
         # 权限表：添加 (user_id, module) 联合唯一索引（幂等）
         await conn.execute(text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_permission_module ON user_permissions (user_id, module)"

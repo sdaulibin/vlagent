@@ -32,12 +32,13 @@ RUN groupadd --gid 1000 appgroup && \
 COPY .venv /app/.venv
 
 # 复制应用源代码
-COPY main.py api.py /app/
+COPY main.py api.py alembic.ini /app/
 COPY src /app/src
 COPY config /app/config
 COPY lib /app/lib
 COPY services /app/services
 COPY scripts /app/scripts
+COPY alembic /app/alembic
 
 # 修复 .venv 内的 Python 软链接（Jenkins Agent 里的路径在 Runtime 镜像中不存在）
 RUN REAL_PYTHON=$(which python3) && \
