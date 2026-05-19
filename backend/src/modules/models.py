@@ -14,6 +14,11 @@ class Module(SQLModel, table=True):
     route: str
     gradient: str
     hover_class: str
+    category: str = Field(default="")
+    category_label: str = Field(default="")
+    category_color: str = Field(default="")
+    bg_color: str = Field(default="")
+    name_en: str = Field(default="")
     sort_order: int = Field(default=0)
     status: bool = Field(default=True)
     agent_id: Optional[int] = Field(default=None, index=True)

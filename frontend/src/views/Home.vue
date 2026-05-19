@@ -2,49 +2,51 @@
     <div class="home-container">
         <!-- Header -->
         <header class="home-header">
-            <div class="flex items-center justify-center gap-3 mb-3">
-                <div class="home-logo">
-                    <Scan class="w-6 h-6 text-white" />
-                </div>
-                <h1 class="home-title">智能文档识别平台</h1>
-            </div>
-            <p class="home-subtitle">基于 AI 大模型的智能文档信息提取解决方案</p>
+            <span class="home-label">AI DOCUMENT RECOGNITION PLATFORM</span>
+            <h1 class="home-title">智能文档识别平台</h1>
+            <p class="home-subtitle">基于大模型的银行文档智能识别，涵盖流水、发票、凭证、询证函等多种文档类型</p>
         </header>
 
-        <!-- Scenario Cards -->
-        <main class="max-w-5xl mx-auto px-6 pb-16">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <router-link
-                    v-for="m in visibleModules"
-                    :key="m.key"
-                    :to="m.route"
-                    class="scenario-card group"
-                >
-                    <div class="scenario-card-icon" :class="m.gradient">
-                        <component :is="iconMap[m.icon]" class="w-5 h-5 text-white" />
-                    </div>
-                    <h3 class="scenario-card-title">{{ m.title }}</h3>
-                    <p class="scenario-card-desc">{{ m.description }}</p>
-                    <div class="scenario-card-link" :class="m.hover_class">
-                        立即使用
-                        <ArrowRight class="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
-                    </div>
-                </router-link>
-            </div>
-        </main>
+        <!-- Filter Tabs -->
+        <div class="home-filter">
+            <button
+                v-for="cat in categories"
+                :key="cat.key"
+                :class="{ active: filter === cat.key }"
+                @click="filter = cat.key"
+            >
+                {{ cat.label }}
+            </button>
+        </div>
+
+        <!-- Card Grid -->
+        <div class="home-grid">
+            <router-link
+                v-for="m in filteredModules"
+                :key="m.key"
+                :to="m.route"
+                class="home-card"
+            >
+                <div class="home-card-image" :style="{ background: m.bg_color }">
+                    <span class="home-card-tag" :style="{ color: m.category_color, borderColor: m.category_color }">{{ m.category_label }}</span>
+                    <component :is="iconMap[m.icon]" class="home-card-svg" />
+                </div>
+                <div class="home-card-body">
+                    <h3 class="home-card-title">{{ m.title }}</h3>
+                    <p class="home-card-name">{{ m.name_en }}</p>
+                    <p class="home-card-desc">{{ m.description }}</p>
+                </div>
+            </router-link>
+        </div>
 
         <!-- Footer -->
-        <footer class="home-footer">
-            <p>Powered by Qwen-VL Large Model</p>
-        </footer>
+        <footer class="home-footer">Powered by Qwen-VL Large Model</footer>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Component } from 'vue'
+import { ref, computed, type Component } from 'vue'
 import {
-    Scan, ArrowRight,
     CreditCard, FileText, FileDiff, FileSearch,
     Receipt, FileCheck2, FileScan,
 } from 'lucide-vue-next'
@@ -57,5 +59,27 @@ const iconMap: Record<string, Component> = {
     Receipt, FileCheck2, FileScan,
 }
 
-const visibleModules = computed(() => modules.value.filter(m => hasPermission(m.key)))
+const filter = ref('all')
+
+const visibleModules = computed(() =>
+    modules.value.filter(m => hasPermission(m.key))
+)
+
+const categories = computed(() => {
+    const cats = [{ key: 'all', label: '全部' }]
+    const seen = new Set<string>()
+    for (const m of visibleModules.value) {
+        if (m.category && !seen.has(m.category)) {
+            seen.add(m.category)
+            cats.push({ key: m.category, label: m.category_label || m.category })
+        }
+    }
+    return cats
+})
+
+const filteredModules = computed(() =>
+    filter.value === 'all'
+        ? visibleModules.value
+        : visibleModules.value.filter(m => m.category === filter.value)
+)
 </script>

@@ -24,7 +24,7 @@ api.interceptors.response.use(
       clearAuth();
       sessionStorage.removeItem("vlagent_token");
       sessionStorage.removeItem("vlagent_entry_url");
-      window.location.replace("/auth-error");
+      window.location.replace(import.meta.env.BASE_URL + "auth-error");
     } else if (error.response?.status === 403) {
       showErrorToast("无权访问，请联系管理员");
     } else if (error.response?.status === 422) {
@@ -150,6 +150,11 @@ export interface ModuleInfo {
   route: string;
   gradient: string;
   hover_class: string;
+  category: string;
+  category_label: string;
+  category_color: string;
+  bg_color: string;
+  name_en: string;
   sort_order: number;
   status: boolean;
 }
