@@ -74,12 +74,12 @@ server:
       nginx.ingress.kubernetes.io/proxy-transfer-encoding: "true"
       nginx.ingress.kubernetes.io/ssl-redirect: "false"
     hosts:
-      - host: vlagent.sit.qdb.com
+      - host: aisit.qdccb.cn
         paths:
-          - path: /api
+          - path: /vlagent/api
             pathType: Prefix
             servicePortName: http
-          - path: /
+          - path: /vlagent/
             pathType: Prefix
             serviceName: vlagent-frontend
             servicePortName: http
@@ -161,6 +161,8 @@ envConfig:
   ECM_GROUP_NAME: "group107"
   ECM_USERNAME: "ibd"
   JWT_ALGORITHM: "HS256"
+  API_PREFIX: "/vlagent/api"
+  CORS_ORIGINS: "https://aisit.qdccb.cn:9900"
 
 # 敏感配置 (Secret)
 secret:

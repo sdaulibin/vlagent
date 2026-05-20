@@ -74,6 +74,8 @@ pipeline {
         string(name: 'DATABASE_UPSTREAM_URL', defaultValue: 'postgresql+asyncpg://postgres:ioadev123456@10.238.146.99:30432/ioa', description: '上游数据库 URL')
         string(name: 'SYNC_INTERVAL_MINUTES', defaultValue: '120', description: '同步间隔时间(分钟)')
         string(name: 'PERMISSION_DEFAULT_OPEN', defaultValue: 'true', description: '无权限记录时是否默认开放所有模块(SIT环境默认开放)')
+        string(name: 'API_PREFIX', defaultValue: '/vlagent/api', description: 'API 路由前缀')
+        string(name: 'CORS_ORIGINS', defaultValue: 'https://aisit.qdccb.cn:9900', description: 'CORS 允许的源(逗号分隔)')
     }
     stages {
 
@@ -149,6 +151,8 @@ pipeline {
                         --set envConfig.ECM_CACHE_PORT="${env.ECM_CACHE_PORT}" \
                         --set envConfig.JWT_ALGORITHM="${env.JWT_ALGORITHM}" \
                         --set envConfig.PERMISSION_DEFAULT_OPEN="${env.PERMISSION_DEFAULT_OPEN}" \
+                        --set envConfig.API_PREFIX="${env.API_PREFIX}" \
+                        --set envConfig.CORS_ORIGINS="${env.CORS_ORIGINS}" \
                         --set secret.enabled=true \
                         --set secret.DATABASE_URL="${env.DATABASE_URL}" \
                         --set secret.DATABASE_UPSTREAM_URL="${env.DATABASE_UPSTREAM_URL}" \

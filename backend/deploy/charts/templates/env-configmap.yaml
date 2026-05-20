@@ -52,5 +52,11 @@ data:
   ECM_GROUP_NAME: {{ .Values.envConfig.ECM_GROUP_NAME | default "group107" | quote }}
   ECM_USERNAME: {{ .Values.envConfig.ECM_USERNAME | default "ibd" | quote }}
 
+  # ==============================================================================
+  # 路径前缀 & CORS
+  # ==============================================================================
+  API_PREFIX: {{ .Values.envConfig.API_PREFIX | default "/api" | quote }}
+  CORS_ORIGINS: {{ .Values.envConfig.CORS_ORIGINS | default "" | quote }}
+
   # 注意: 敏感配置 (DATABASE_URL, API Key, JWT Secret) 使用 Kubernetes Secret 管理
 {{- end }}

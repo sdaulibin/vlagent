@@ -19,12 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # modules 表：新增分类相关字段
-    op.add_column('modules', sa.Column('category', sa.VARCHAR(), nullable=True))
-    op.add_column('modules', sa.Column('category_label', sa.VARCHAR(), nullable=True))
-    op.add_column('modules', sa.Column('category_color', sa.VARCHAR(), nullable=True))
-    op.add_column('modules', sa.Column('bg_color', sa.VARCHAR(), nullable=True))
-    op.add_column('modules', sa.Column('name_en', sa.VARCHAR(), nullable=True))
+    # modules 表：新增分类字段（幂等：IF NOT EXISTS）
+    op.execute("""
+        ALTER TABLE modules ADD COLUMN IF NOT EXISTS category VARCHAR DEFAULT '';
+        ALTER TABLE modules ADD COLUMN IF NOT EXISTS category_label VARCHAR DEFAULT '';
+        ALTER TABLE modules ADD COLUMN IF NOT EXISTS category_color VARCHAR DEFAULT '';
+        ALTER TABLE modules ADD COLUMN IF NOT EXISTS bg_color VARCHAR DEFAULT '';
+        ALTER TABLE modules ADD COLUMN IF NOT EXISTS name_en VARCHAR DEFAULT '';
+    """)
 
     # 回填已有数据
     op.execute("""
@@ -58,40 +60,19 @@ def upgrade() -> None:
         WHERE key = 'pdf-extract';
     """)
 
-    # 设置 NOT NULL 约束（回填后再加）
-    op.alter_column('modules', 'category',
-               existing_type=sa.VARCHAR(),
-               nullable=False,
-               existing_server_default=sa.text("''::character varying"))
-    op.alter_column('modules', 'category_label',
-               existing_type=sa.VARCHAR(),
-               nullable=False,
-               existing_server_default=sa.text("''::character varying"))
-    op.alter_column('modules', 'category_color',
-               existing_type=sa.VARCHAR(),
-               nullable=False,
-               existing_server_default=sa.text("''::character varying"))
-    op.alter_column('modules', 'bg_color',
-               existing_type=sa.VARCHAR(),
-               nullable=False,
-               existing_server_default=sa.text("''::character varying"))
-    op.alter_column('modules', 'name_en',
-               existing_type=sa.VARCHAR(),
-               nullable=False,
-               existing_server_default=sa.text("''::character varying"))
-
-    # 权限表：添加联合唯一索引
-    op.drop_index(op.f('uq_user_permission_module'), table_name='user_permissions')
-    op.create_unique_constraint('uq_user_permission_module', 'user_permissions', ['user_id', 'module'])
+    # 权限表：确保联合唯一索引存在（幂等）
+    op.execute("""
+        DROP INDEX IF EXISTS uq_user_permission_module;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_user_permission_module ON user_permissions (user_id, module);
+    """)
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint('uq_user_permission_module', 'user_permissions', type_='unique')
-    op.create_index(op.f('uq_user_permission_module'), 'user_permissions', ['user_id', 'module'], unique=True)
-
-    op.drop_column('modules', 'name_en')
-    op.drop_column('modules', 'bg_color')
-    op.drop_column('modules', 'category_color')
-    op.drop_column('modules', 'category_label')
-    op.drop_column('modules', 'category')
+    op.execute("""
+        ALTER TABLE modules DROP COLUMN IF EXISTS name_en;
+        ALTER TABLE modules DROP COLUMN IF EXISTS bg_color;
+        ALTER TABLE modules DROP COLUMN IF EXISTS category_color;
+        ALTER TABLE modules DROP COLUMN IF EXISTS category_label;
+        ALTER TABLE modules DROP COLUMN IF EXISTS category;
+    """)

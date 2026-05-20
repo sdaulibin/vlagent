@@ -24,34 +24,45 @@ logging.getLogger("src.auth").addHandler(logging.StreamHandler())
 
 
 def _run_alembic_upgrade():
-    """使用 alembic Python API 执行迁移（无需 CLI）"""
-    from alembic.config import Config
-    from alembic import command
+    """通过子进程执行 alembic 迁移，完全隔离"""
+    import subprocess
+    import sys
     try:
-        alembic_cfg = Config(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic.ini")
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            capture_output=True, text=True, timeout=15,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
         )
-        alembic_cfg.set_main_option(
-            "script_location",
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "alembic"),
-        )
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Alembic upgrade to head: ok")
+        if result.returncode == 0:
+            logger.info("[ALEMBIC] upgrade to head: ok")
+        else:
+            logger.warning(f"[ALEMBIC] upgrade failed: {result.stderr.strip()}")
+    except subprocess.TimeoutExpired:
+        logger.warning("[ALEMBIC] upgrade timed out")
     except Exception as e:
-        logger.warning(f"Alembic upgrade failed: {e}")
+        logger.warning(f"[ALEMBIC] upgrade error: {e}")
+
+
+# 在模块加载时执行迁移（在 async 上下文之前）
+_run_alembic_upgrade()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _run_alembic_upgrade()
+    logger.info("[STARTUP] 1. 开始 init_db")
     await init_db()
+    logger.info("[STARTUP] 2. init_db 完成")
     if settings.ECM_ENABLED:
         if not init_jvm():
             logger.warning("JVM 启动失败，影像平台功能不可用")
+    logger.info("[STARTUP] 3. DATABASE_UPSTREAM_URL=%s", bool(settings.DATABASE_UPSTREAM_URL))
     # 启动时立即执行一次同步，然后开启定时调度
     if settings.DATABASE_UPSTREAM_URL:
+        logger.info("[STARTUP] 4. 开始上游数据同步")
         await run_sync()
+        logger.info("[STARTUP] 5. 同步完成，启动定时调度")
         start_scheduler()
+    logger.info("[STARTUP] 6. 启动完成，应用就绪")
     yield
     stop_scheduler()
     if settings.ECM_ENABLED:
