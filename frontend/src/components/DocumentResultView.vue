@@ -183,32 +183,93 @@ async function renderPdfPage(
   // Collect highlighted character positions per text item
   const itemCharPositions = new Map<number, number[]>();
 
-  for (const seg of segments as any[]) {
+  // Build a mapping: for each target segment, find its location in normText
+  // using context-window matching to disambiguate repeated text.
+  // Strategy: concatenate consecutive diff ops into a longer window string,
+  // find the window in normText, then extract individual segment positions.
+  const allOps = diffOps as any[];
+
+  // First, build the full concatenated side text from all ops relevant to this side,
+  // in order, with 'equal' segments included for context.
+  // We'll use the sequence of ops to create a context fingerprint for matching.
+  interface SegmentMatch { segIdx: number; matchStart: number; matchEnd: number; }
+  const resolvedMatches: SegmentMatch[] = [];
+
+  for (let segI = 0; segI < segments.length; segI++) {
+    const seg = segments[segI];
     const segNorm = seg.text.replace(/\s/g, '');
     if (!segNorm) continue;
 
     const expectedOffset: number = seg[offsetKey] ?? 0;
 
-    // Find all occurrences, pick the one closest to the backend offset
+    // Build a context window: current segment + neighboring segments (any op)
+    // to create a longer, more unique search string.
+    // Find this segment's position in allOps
+    let opIdx = -1;
+    for (let k = 0; k < allOps.length; k++) {
+      if (allOps[k] === seg) { opIdx = k; break; }
+    }
+
+    // Collect up to 3 ops before and after for context (include all op types)
+    const windowStart = Math.max(0, opIdx - 3);
+    const windowEnd = Math.min(allOps.length - 1, opIdx + 3);
+
+    // Build context string: concatenate all ops' stripped text in window
+    let contextStr = '';
+    let segStartInContext = -1;
+    let segEndInContext = -1;
+    for (let k = windowStart; k <= windowEnd; k++) {
+      const opText = allOps[k].text ? allOps[k].text.replace(/\s/g, '') : '';
+      if (!opText) continue;
+      if (k === opIdx) {
+        segStartInContext = contextStr.length;
+        segEndInContext = contextStr.length + opText.length;
+      }
+      contextStr += opText;
+    }
+
+    if (segStartInContext === -1 || contextStr.length === 0) {
+      // Fallback: simple indexOf with offset proximity
+      const idx = normText.indexOf(segNorm, Math.max(0, expectedOffset - 20));
+      if (idx !== -1) {
+        resolvedMatches.push({ segIdx: segI, matchStart: idx, matchEnd: idx + segNorm.length });
+      }
+      continue;
+    }
+
+    // Search for the context window in normText near the expected offset
     let bestIdx = -1;
     let bestDist = Infinity;
     let searchFrom = 0;
     while (searchFrom < normText.length) {
-      const idx = normText.indexOf(segNorm, searchFrom);
+      const idx = normText.indexOf(contextStr, searchFrom);
       if (idx === -1) break;
-      const dist = Math.abs(idx - expectedOffset);
+      // The segment's expected position within the context window
+      const segActualPos = idx + segStartInContext;
+      const dist = Math.abs(segActualPos - expectedOffset);
       if (dist < bestDist) {
         bestDist = dist;
-        bestIdx = idx;
+        bestIdx = segActualPos;
       }
       searchFrom = idx + 1;
     }
 
+    if (bestIdx === -1) {
+      // Fallback: try matching just the segment alone near the offset
+      const idx = normText.indexOf(segNorm, Math.max(0, expectedOffset - 20));
+      if (idx !== -1) {
+        bestIdx = idx;
+      }
+    }
+
     if (bestIdx === -1) continue;
 
-    // Record each matched character's original position within its text item
-    const endIdx = bestIdx + segNorm.length;
-    for (let c = bestIdx; c < endIdx && c < charMap.length; c++) {
+    resolvedMatches.push({ segIdx: segI, matchStart: bestIdx, matchEnd: bestIdx + segNorm.length });
+  }
+
+  // Apply resolved matches to char positions
+  for (const match of resolvedMatches) {
+    for (let c = match.matchStart; c < match.matchEnd && c < charMap.length; c++) {
       const entry = charMap[c];
       if (!entry) continue;
       const { itemIdx, charInItem } = entry;

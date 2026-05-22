@@ -311,42 +311,40 @@ def _is_mhtml_file(file_path: str) -> bool:
         return False
 
 
-def extract_pages(file_path: str) -> tuple[list[str], list[str]]:
-    """根据文件类型分发提取，返回 (text_pages, html_pages)
-    PDF/DOCX/DOC: 统一走 pdfplumber，html_pages 为空（前端用 PDF.js 渲染）
+def _ensure_pdf(file_path: str) -> str:
+    """将 DOCX/DOC 转为 PDF（如需），返回 PDF 文件路径。
+    已是 PDF 则直接返回原路径。调用方可缓存此结果避免重复转换。
     """
     lower = file_path.lower()
     if lower.endswith(".pdf"):
-        return extract_pages_from_pdf(file_path), []
+        return file_path
     elif lower.endswith((".docx", ".doc")):
         if _is_mhtml_file(file_path):
             raise ValueError(
                 "上传的文件不是有效的 Word 文档，而是网页另存为格式（MHTML）。"
                 "请用 WPS 或 Word 打开后另存为 .docx 格式再上传。"
             )
-        pdf_path = docx_to_pdf(file_path)
-        return extract_pages_from_pdf(pdf_path), []
+        return docx_to_pdf(file_path)
     else:
         raise ValueError(f"不支持的文件格式: {file_path}")
 
 
-def extract_pages_structured(file_path: str) -> list[list]:
-    """根据文件类型分发提取，返回每页的结构化块列表 [TextBlock | TableBlock, ...]"""
-    lower = file_path.lower()
-    if lower.endswith(".pdf"):
-        pdf_path = file_path
-    elif lower.endswith((".docx", ".doc")):
-        if _is_mhtml_file(file_path):
-            raise ValueError(
-                "上传的文件不是有效的 Word 文档，而是网页另存为格式（MHTML）。"
-                "请用 WPS 或 Word 打开后另存为 .docx 格式再上传。"
-            )
-        pdf_path = docx_to_pdf(file_path)
-    else:
-        raise ValueError(f"不支持的文件格式: {file_path}")
+def extract_pages(file_path: str, pdf_path: str | None = None) -> tuple[list[str], list[str]]:
+    """根据文件类型分发提取，返回 (text_pages, html_pages)
+    PDF/DOCX/DOC: 统一走 pdfplumber，html_pages 为空（前端用 PDF.js 渲染）
+    pdf_path: 可选，已转换的 PDF 路径，避免重复调用 LibreOffice。
+    """
+    resolved = pdf_path or _ensure_pdf(file_path)
+    return extract_pages_from_pdf(resolved), []
 
+
+def extract_pages_structured(file_path: str, pdf_path: str | None = None) -> list[list]:
+    """根据文件类型分发提取，返回每页的结构化块列表 [TextBlock | TableBlock, ...]
+    pdf_path: 可选，已转换的 PDF 路径，避免重复调用 LibreOffice。
+    """
+    resolved = pdf_path or _ensure_pdf(file_path)
     pages_blocks = []
-    with pdfplumber.open(pdf_path) as pdf:
+    with pdfplumber.open(resolved) as pdf:
         for page in pdf.pages:
             pages_blocks.append(_extract_page_blocks(page))
     return pages_blocks
@@ -761,20 +759,24 @@ async def process_document_comparison(task_id: int):
             db.add(task)
             await db.commit()
 
-            # 1. 提取页面文本（用于页级对齐）+ 结构化块（用于表格感知 diff）
+            # 1. 统一转 PDF（Word 文件只转一次，避免重复 LibreOffice 调用）
             loop = asyncio.get_event_loop()
-            text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path)
-            text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path)
-            blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path)
-            blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path)
+            pdf_a = await loop.run_in_executor(None, _ensure_pdf, task.file_a_path)
+            pdf_b = await loop.run_in_executor(None, _ensure_pdf, task.file_b_path)
+
+            # 2. 用同一份 PDF 分别提取纯文本和结构化块
+            text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path, pdf_a)
+            text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path, pdf_b)
+            blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path, pdf_a)
+            blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path, pdf_b)
 
             task.file_a_page_count = len(text_a_pages)
             task.file_b_page_count = len(text_b_pages)
 
-            # 2. 页级对齐（基于纯文本）
+            # 3. 页级对齐（基于纯文本）
             aligned = align_pages(text_a_pages, text_b_pages)
 
-            # 3. 逐页计算 diff 并写入
+            # 4. 逐页计算 diff 并写入
             for page_a_idx, page_b_idx, diff_type in aligned:
                 text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
                 text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
