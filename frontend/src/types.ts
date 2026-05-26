@@ -172,6 +172,20 @@ export interface PageDiff {
   diff_ops_json: string | null;
 }
 
+export interface SectionItem {
+  id: number;
+  doc_type: 'a' | 'b';
+  role: string;
+  title: string;
+  text_content: string;
+  source_indices: string | null;
+  parent_id: number | null;
+  order_index: number;
+  diff_type: string | null;
+  diff_ops_json: string | null;
+  page_number: number | null;
+}
+
 export interface TaskItem {
   id: number;
   file_a_name: string;
@@ -180,12 +194,14 @@ export interface TaskItem {
   file_b_page_count: number | null;
   status: string;
   comparison_duration: number | null;
+  comparison_mode: string | null;
   created_at: string;
 }
 
 export interface TaskDetail extends TaskItem {
   error_msg: string | null;
   pages: PageDiff[];
+  sections: SectionItem[];
 }
 
 // ===== 通用任务/记录基类 =====

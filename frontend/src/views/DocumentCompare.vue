@@ -205,7 +205,9 @@ onUnmounted(() => {
       :status="taskDetail.status"
       :errorMsg="taskDetail.error_msg"
       :comparisonDuration="taskDetail.comparison_duration"
+      :comparisonMode="taskDetail.comparison_mode"
       :pages="taskDetail.pages"
+      :sections="taskDetail.sections"
       @back="goBack"
     />
   </div>

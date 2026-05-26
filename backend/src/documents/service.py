@@ -52,27 +52,61 @@ def _find_soffice() -> str:
 
 
 def docx_to_pdf(docx_path: str, output_dir: str | None = None) -> str:
-    """用 LibreOffice headless 模式将 DOCX 转为 PDF，返回 PDF 文件路径"""
+    """用 LibreOffice headless 模式将 DOCX 转为 PDF，返回 PDF 文件路径。
+    若文件路径含非 ASCII 字符（如中文），拷贝到临时 ASCII 路径再转换。
+    """
+    import shutil
+    import tempfile
     soffice = _find_soffice()
     if output_dir is None:
         output_dir = os.path.dirname(docx_path)
 
+    tmpdir = None
+    actual_docx_path = docx_path
+    actual_output_dir = output_dir
+
+    if not docx_path.isascii() or not output_dir.isascii():
+        tmpdir = tempfile.mkdtemp(prefix="lo_convert_")
+        ext = os.path.splitext(docx_path)[1]
+        safe_name = "doc" + ext
+        actual_docx_path = os.path.join(tmpdir, safe_name)
+        shutil.copy2(docx_path, actual_docx_path)
+        actual_output_dir = tmpdir
+
+    # 使用独立 user profile 避免与已运行的 LibreOffice 实例冲突
+    profile_dir = tempfile.mkdtemp(prefix="lo_profile_")
+    user_env = f"-env:UserInstallation=file://{profile_dir}"
+
     cmd = [
-        soffice,
-        "--headless",
-        "--convert-to", "pdf",
-        "--outdir", output_dir,
-        docx_path,
+        soffice, "--headless", "--convert-to", "pdf",
+        user_env,
+        "--outdir", actual_output_dir, actual_docx_path,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
-        raise RuntimeError(f"LibreOffice 转换失败: {result.stderr}")
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        raise RuntimeError(f"LibreOffice 转换失败: {result.stderr} | stdout: {result.stdout}")
 
-    pdf_name = os.path.splitext(os.path.basename(docx_path))[0] + ".pdf"
-    pdf_path = os.path.join(output_dir, pdf_name)
-    if not os.path.isfile(pdf_path):
-        raise FileNotFoundError(f"转换后未找到 PDF: {pdf_path}")
-    return pdf_path
+    pdf_name = os.path.splitext(os.path.basename(actual_docx_path))[0] + ".pdf"
+    generated_pdf = os.path.join(actual_output_dir, pdf_name)
+    if not os.path.isfile(generated_pdf):
+        # 列出目录内容辅助排查
+        _files = os.listdir(actual_output_dir) if tmpdir else []
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        raise FileNotFoundError(f"转换后未找到 PDF: {generated_pdf}, 目录内容: {_files}, stdout: {result.stdout}")
+
+    final_pdf_name = os.path.splitext(os.path.basename(docx_path))[0] + ".pdf"
+    final_pdf_path = os.path.join(output_dir, final_pdf_name)
+    if generated_pdf != final_pdf_path:
+        shutil.move(generated_pdf, final_pdf_path)
+
+    if tmpdir:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    shutil.rmtree(profile_dir, ignore_errors=True)
+
+    return final_pdf_path
 
 
 def _normalize_text(text: str) -> str:
@@ -742,9 +776,10 @@ def _diff_table_rows(row_a: list[str], row_b: list[str]) -> list[tuple[int, str]
     return ops
 
 async def process_document_comparison(task_id: int):
-    """异步后台任务：提取 → 对齐 → diff → 写库
+    """异步后台任务：根据文件类型分发到对应管线。
 
-    自行创建数据库会话，避免使用请求作用域的 AsyncSession。
+    DOCX+DOCX → Plan B（python-docx 结构化提取 + section 级 diff）
+    其他情况  → Legacy（pdfplumber 页级 diff）
     """
     start_time = time.time()
 
@@ -759,75 +794,14 @@ async def process_document_comparison(task_id: int):
             db.add(task)
             await db.commit()
 
-            # 1. 统一转 PDF（Word 文件只转一次，避免重复 LibreOffice 调用）
+            is_a_docx = task.file_a_path.lower().endswith('.docx')
+            is_b_docx = task.file_b_path.lower().endswith('.docx')
             loop = asyncio.get_event_loop()
-            pdf_a = await loop.run_in_executor(None, _ensure_pdf, task.file_a_path)
-            pdf_b = await loop.run_in_executor(None, _ensure_pdf, task.file_b_path)
 
-            # 2. 用同一份 PDF 分别提取纯文本和结构化块
-            text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path, pdf_a)
-            text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path, pdf_b)
-            blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path, pdf_a)
-            blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path, pdf_b)
-
-            task.file_a_page_count = len(text_a_pages)
-            task.file_b_page_count = len(text_b_pages)
-
-            # 3. 页级对齐（基于纯文本）
-            aligned = align_pages(text_a_pages, text_b_pages)
-
-            # 4. 逐页计算 diff 并写入
-            for page_a_idx, page_b_idx, diff_type in aligned:
-                text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
-                text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
-
-                diff_ops = None
-                if diff_type == "modified" and text_a is not None and text_b is not None:
-                    # 先检查内容是否实际相同（排版差异导致的字符顺序不同）
-                    if _is_content_identical(text_a, text_b):
-                        diff_type = "equal"
-                    else:
-                        # 尝试结构化 diff：当两页的 block 结构类型一致时，
-                        # 表格按行/单元格比对，非表格按行对齐+字符级 diff
-                        page_blocks_a = blocks_a[page_a_idx] if page_a_idx is not None and page_a_idx < len(blocks_a) else []
-                        page_blocks_b = blocks_b[page_b_idx] if page_b_idx is not None and page_b_idx < len(blocks_b) else []
-                        can_structured = (
-                            len(page_blocks_a) == len(page_blocks_b)
-                            and all(type(ba) == type(bb) for ba, bb in zip(page_blocks_a, page_blocks_b))
-                        )
-
-                        if can_structured and page_blocks_a:
-                            ops = compute_structured_diff(page_blocks_a, page_blocks_b)
-                        else:
-                            # block 结构不同（如一个有边框表格 TableBlock，一个无边框 TextBlock），
-                            # 退化为整页纯文本行级对齐
-                            ops = _diff_aligned_blocks(
-                                TextBlock(text=text_a),
-                                TextBlock(text=text_b),
-                                0, 0,
-                            )
-
-                        if all(op == 0 for op, *_ in ops):
-                            diff_type = "equal"
-                        else:
-                            diff_ops = json.dumps(ops, ensure_ascii=False)
-
-                page_diff = DocumentPageDiff(
-                    task_id=task.id,
-                    user_id=task.user_id,
-                    page_a=(page_a_idx + 1) if page_a_idx is not None else None,
-                    page_b=(page_b_idx + 1) if page_b_idx is not None else None,
-                    diff_type=diff_type,
-                    text_a=text_a,
-                    text_b=text_b,
-                    diff_ops_json=diff_ops,
-                )
-                db.add(page_diff)
-
-            task.comparison_duration = round(time.time() - start_time, 2)
-            task.status = "done"
-            db.add(task)
-            await db.commit()
+            if is_a_docx and is_b_docx:
+                await _compare_docx_plan_b(task, db, loop, start_time)
+            else:
+                await _compare_legacy(task, db, loop, start_time)
 
         except Exception as e:
             logger.exception("文档比对失败 task=%d", task.id)
@@ -836,3 +810,328 @@ async def process_document_comparison(task_id: int):
             task.comparison_duration = round(time.time() - start_time, 2)
             db.add(task)
             await db.commit()
+
+
+async def _compare_legacy(task, db, loop, start_time):
+    """现有管线：PDF → pdfplumber → 页级对齐 → diff"""
+    # 1. 统一转 PDF
+    pdf_a = await loop.run_in_executor(None, _ensure_pdf, task.file_a_path)
+    pdf_b = await loop.run_in_executor(None, _ensure_pdf, task.file_b_path)
+
+    # 2. 提取纯文本和结构化块
+    text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path, pdf_a)
+    text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path, pdf_b)
+    blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path, pdf_a)
+    blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path, pdf_b)
+
+    task.file_a_page_count = len(text_a_pages)
+    task.file_b_page_count = len(text_b_pages)
+
+    # 3. 页级对齐
+    aligned = align_pages(text_a_pages, text_b_pages)
+
+    # 4. 逐页计算 diff
+    for page_a_idx, page_b_idx, diff_type in aligned:
+        text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
+        text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
+
+        diff_ops = None
+        if diff_type == "modified" and text_a is not None and text_b is not None:
+            if _is_content_identical(text_a, text_b):
+                diff_type = "equal"
+            else:
+                page_blocks_a = blocks_a[page_a_idx] if page_a_idx is not None and page_a_idx < len(blocks_a) else []
+                page_blocks_b = blocks_b[page_b_idx] if page_b_idx is not None and page_b_idx < len(blocks_b) else []
+                can_structured = (
+                    len(page_blocks_a) == len(page_blocks_b)
+                    and all(type(ba) == type(bb) for ba, bb in zip(page_blocks_a, page_blocks_b))
+                )
+
+                if can_structured and page_blocks_a:
+                    ops = compute_structured_diff(page_blocks_a, page_blocks_b)
+                else:
+                    ops = _diff_aligned_blocks(
+                        TextBlock(text=text_a),
+                        TextBlock(text=text_b),
+                        0, 0,
+                    )
+
+                if all(op == 0 for op, *_ in ops):
+                    diff_type = "equal"
+                else:
+                    diff_ops = json.dumps(ops, ensure_ascii=False)
+
+        page_diff = DocumentPageDiff(
+            task_id=task.id,
+            user_id=task.user_id,
+            page_a=(page_a_idx + 1) if page_a_idx is not None else None,
+            page_b=(page_b_idx + 1) if page_b_idx is not None else None,
+            diff_type=diff_type,
+            text_a=text_a,
+            text_b=text_b,
+            diff_ops_json=diff_ops,
+        )
+        db.add(page_diff)
+
+    task.comparison_mode = "page"
+    task.comparison_duration = round(time.time() - start_time, 2)
+    task.status = "done"
+    db.add(task)
+    await db.commit()
+
+
+# ---- Plan B: DOCX 结构化比对 ----
+
+def _section_signature(section) -> str:
+    """生成 SectionBlock 的匹配签名。"""
+    from src.documents.structuring import _strip_ws, _normalize_text
+    parts = []
+    if section.title:
+        parts.append(_strip_ws(_normalize_text(section.title)))
+    if section.text_content:
+        sig = _strip_ws(_normalize_text(section.text_content))[:200]
+        if sig:
+            parts.append(sig)
+    return " ".join(parts)
+
+
+def _align_and_diff_sections(sections_a, sections_b):
+    """Section 级对齐 + diff。"""
+    from src.documents.structuring import SectionDiffResult
+
+    sigs_a = [_section_signature(s) for s in sections_a]
+    sigs_b = [_section_signature(s) for s in sections_b]
+
+    matcher = SequenceMatcher(None, sigs_a, sigs_b, autojunk=False)
+    results = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for i, j in zip(range(i1, i2), range(j1, j2)):
+                results.append(_diff_section_pair(sections_a[i], sections_b[j]))
+        elif tag == "replace":
+            pairs = min(i2 - i1, j2 - j1)
+            for k in range(pairs):
+                results.append(_diff_section_pair(sections_a[i1 + k], sections_b[j1 + k]))
+            for k in range(pairs, i2 - i1):
+                results.append(SectionDiffResult(section_a=sections_a[i1 + k], section_b=None, diff_type="deleted"))
+            for k in range(pairs, j2 - j1):
+                results.append(SectionDiffResult(section_a=None, section_b=sections_b[j1 + k], diff_type="added"))
+        elif tag == "delete":
+            for i in range(i1, i2):
+                results.append(SectionDiffResult(section_a=sections_a[i], section_b=None, diff_type="deleted"))
+        elif tag == "insert":
+            for j in range(j1, j2):
+                results.append(SectionDiffResult(section_a=None, section_b=sections_b[j], diff_type="added"))
+
+    return results
+
+
+def _diff_section_pair(sa, sb):
+    """比对两个配对的 SectionBlock。"""
+    from src.documents.structuring import SectionDiffResult
+
+    text_a = _strip_all_whitespace(_normalize_text(sa.text_content))
+    text_b = _strip_all_whitespace(_normalize_text(sb.text_content))
+
+    if text_a == text_b:
+        return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
+
+    if _is_content_identical(sa.text_content, sb.text_content):
+        return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
+
+    ops = compute_text_diff(sa.text_content, sb.text_content)
+
+    if all(op == 0 for op, *_ in ops):
+        return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
+
+    return SectionDiffResult(section_a=sa, section_b=sb, diff_type="modified", diff_ops=ops)
+
+
+async def _convert_pdf_async(docx_path, loop):
+    """异步转换 DOCX → PDF，结果缓存到同目录。"""
+    pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
+    if os.path.exists(pdf_path):
+        return pdf_path
+    return await loop.run_in_executor(None, docx_to_pdf, docx_path, os.path.dirname(docx_path))
+
+
+def _compare_pdf_pages(pages_a: list[str], pages_b: list[str]) -> list[dict]:
+    """直接比较两个 PDF 的逐页文本，返回 page diff 结果。
+    不依赖 section 映射，直接按页序 1:1 对齐。
+    """
+    import json
+    max_pages = max(len(pages_a), len(pages_b))
+    results = []
+    for i in range(max_pages):
+        pa = i + 1 if i < len(pages_a) else None
+        pb = i + 1 if i < len(pages_b) else None
+
+        if pa is None:
+            results.append({"page_a": None, "page_b": pb, "diff_type": "added", "diff_ops_json": None})
+            continue
+        if pb is None:
+            results.append({"page_a": pa, "page_b": None, "diff_type": "deleted", "diff_ops_json": None})
+            continue
+
+        text_a = pages_a[i]
+        text_b = pages_b[i]
+        norm_a = _strip_all_whitespace(_normalize_text(text_a))
+        norm_b = _strip_all_whitespace(_normalize_text(text_b))
+
+        if norm_a == norm_b:
+            results.append({"page_a": pa, "page_b": pb, "diff_type": "equal", "diff_ops_json": None})
+            continue
+
+        ops = compute_text_diff(text_a, text_b)
+        if all(op == 0 for op, *_ in ops):
+            results.append({"page_a": pa, "page_b": pb, "diff_type": "equal", "diff_ops_json": None})
+        else:
+            results.append({
+                "page_a": pa, "page_b": pb, "diff_type": "modified",
+                "diff_ops_json": json.dumps(ops, ensure_ascii=False),
+            })
+    return results
+
+
+def _build_section_md(struct, diff_type_map, tag_key) -> str:
+    """生成单个文档的 section 结构 Markdown。"""
+    def _render_tree(sections, indent=0):
+        lines = []
+        for block in sections:
+            prefix = "  " * indent
+            dt = diff_type_map.get(id(block))
+            tag = ""
+            if dt == "modified":
+                tag = " **[已修改]**"
+            elif dt == "added":
+                tag = " **[新增]**"
+            elif dt == "deleted":
+                tag = " **[已删除]**"
+
+            if block.role.startswith("h"):
+                level = int(block.role[1])
+                lines.append(f"{prefix}- {'#' * level} {block.title}{tag}")
+            elif block.role == "table":
+                preview = block.text_content[:80].replace("\n", " ") if block.text_content else ""
+                lines.append(f"{prefix}- [表格] {preview}...{tag}")
+            elif block.role == "body":
+                preview = block.text_content[:80].replace("\n", " ") if block.text_content else ""
+                lines.append(f"{prefix}- [正文] {preview}{tag}")
+            elif block.role == "toc_item":
+                lines.append(f"{prefix}- [目录] {block.title}{tag}")
+            else:
+                lines.append(f"{prefix}- [{block.role}] {block.title}{tag}")
+
+            if block.children:
+                lines.extend(_render_tree(block.children, indent + 1))
+        return lines
+
+    return "\n".join(_render_tree(struct.main))
+
+
+async def _save_sections(db, task_id, user_id, struct_a, struct_b, section_diffs):
+    """将 section 结构信息持久化到 document_sections 表。"""
+    import json
+    from src.documents.models import DocumentSection
+
+    # 构建 section_a → (diff_type, diff_ops) 映射
+    diff_type_map = {}
+    diff_ops_map = {}
+    for sd in section_diffs:
+        if sd.section_a is not None:
+            diff_type_map[id(sd.section_a)] = sd.diff_type
+            if sd.diff_type == "modified" and sd.diff_ops:
+                diff_ops_map[id(sd.section_a)] = json.dumps(
+                    sd.diff_ops, ensure_ascii=False
+                )
+
+    # 扁平化收集所有 section，两遍写入：第一遍写顶层（parent_id=None），第二遍写子层
+    order = [0]
+    block_to_row = {}
+
+    def _collect(sections, doc_type, parent_block=None):
+        for block in sections:
+            order[0] += 1
+            source_indices = json.dumps([l.source_index for l in block.content])
+            row = DocumentSection(
+                task_id=task_id,
+                user_id=user_id,
+                doc_type=doc_type,
+                role=block.role,
+                title=block.title,
+                text_content=block.text_content,
+                source_indices=source_indices,
+                parent_id=None,
+                order_index=order[0],
+                diff_type=diff_type_map.get(id(block)) if doc_type == 'a' else None,
+                diff_ops_json=diff_ops_map.get(id(block)) if doc_type == 'a' else None,
+            )
+            db.add(row)
+            block_to_row[id(block)] = (row, parent_block)
+            if block.children:
+                _collect(block.children, doc_type, block)
+
+    _collect(struct_a.main, 'a')
+    _collect(struct_b.main, 'b')
+    await db.flush()
+
+    # 第二遍：更新 parent_id
+    for block_id, (row, parent_block) in block_to_row.items():
+        if parent_block is not None and id(parent_block) in block_to_row:
+            row.parent_id = block_to_row[id(parent_block)][0].id
+    await db.flush()
+
+
+def _build_virtual_page_map(input_lines: list) -> dict[int, list[int]]:
+    """基于 InputLine 的 page_break 构建虚拟页面映射，不依赖 PDF。
+    返回 {page_num: [source_index, ...]}，与 build_page_section_map 格式一致。
+    """
+    page_map: dict[int, list[int]] = {1: []}
+    current_page = 1
+    for line in input_lines:
+        if line.has_page_break and page_map[current_page]:
+            current_page += 1
+            page_map[current_page] = []
+        page_map[current_page].append(line.source_index)
+    # 移除末尾空页
+    while len(page_map) > 1 and not page_map[max(page_map)]:
+        del page_map[max(page_map)]
+    return page_map
+
+
+async def _compare_docx_plan_b(task, db, loop, start_time):
+    """DOCX 原生比对管线：python-docx 结构化提取 → section 级 diff。不依赖 PDF 转换。"""
+    from src.documents.structuring import (
+        extract_input_lines, build_structured_document, flatten_document,
+    )
+
+    # Step 1: python-docx 提取（并行）
+    lines_a, lines_b = await asyncio.gather(
+        loop.run_in_executor(None, extract_input_lines, task.file_a_path),
+        loop.run_in_executor(None, extract_input_lines, task.file_b_path),
+    )
+
+    # Step 2: 构建结构化文档
+    struct_a = await loop.run_in_executor(None, build_structured_document, lines_a)
+    struct_b = await loop.run_in_executor(None, build_structured_document, lines_b)
+    flatten_document(struct_a)
+    flatten_document(struct_b)
+
+    # Step 3: Section 级对齐 + diff
+    section_diffs = _align_and_diff_sections(struct_a.main, struct_b.main)
+
+    # Step 4: 持久化 section 数据（含 diff_ops_json）到 document_sections 表
+    await _save_sections(db, task.id, task.user_id, struct_a, struct_b, section_diffs)
+
+    # Step 5: 完成（不写 DocumentPageDiff，不转 PDF）
+    task.comparison_mode = "docx_native"
+    task.comparison_duration = round(time.time() - start_time, 2)
+    diff_map_a = {id(sd.section_a): sd.diff_type for sd in section_diffs if sd.section_a}
+    diff_map_b = {id(sd.section_b): sd.diff_type for sd in section_diffs if sd.section_b}
+    task.section_summary_a = _build_section_md(struct_a, diff_map_a, "a")
+    task.section_summary_b = _build_section_md(struct_b, diff_map_b, "b")
+    task.status = "done"
+    db.add(task)
+    await db.commit()
+

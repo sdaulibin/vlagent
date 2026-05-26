@@ -33,30 +33,19 @@ config: |
     server {
         listen 8001;
         server_name localhost;
-        root /usr/local/openresty/nginx/html;
         index index.html;
 
         gzip on;
         gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
-        location / {
-            try_files $uri $uri/ /index.html;
+        location /vlagent/ {
+            alias /usr/local/openresty/nginx/html/;
+            error_page 404 = /vlagent/index.html;
         }
 
-        # index.html 禁止缓存，防止浏览器从缓存加载旧页面导致 URL token 丢失
-        location = /index.html {
+        location = /vlagent/index.html {
+            alias /usr/local/openresty/nginx/html/index.html;
             add_header Cache-Control "no-store, no-cache, must-revalidate";
-        }
-
-        location ~* \.mjs$ {
-            default_type application/javascript;
-            expires 30d;
-            add_header Cache-Control "public, max-age=2592000";
-        }
-
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-            expires 30d;
-            add_header Cache-Control "public, max-age=2592000";
         }
     }
   }

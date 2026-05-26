@@ -13,9 +13,11 @@ from src.auth import get_current_user_id
 from src.documents.models import (
     DocumentCompareTask,
     DocumentPageDiff,
+    DocumentSection,
     DocumentTaskListItem,
     DocumentTaskStatusResponse,
     DocumentPageDiffItem,
+    DocumentSectionItem,
     DocumentCompareResponse,
 )
 from src.documents.service import process_document_comparison
@@ -171,8 +173,13 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_session), user_i
     pages_result = await db.execute(pages_stmt)
     pages = [DocumentPageDiffItem.model_validate(p) for p in pages_result.scalars().all()]
 
+    sections_stmt = select(DocumentSection).where(DocumentSection.task_id == task_id).order_by(DocumentSection.order_index)
+    sections_result = await db.execute(sections_stmt)
+    sections = [DocumentSectionItem.model_validate(s) for s in sections_result.scalars().all()]
+
     resp = DocumentCompareResponse.model_validate(task)
     resp.pages = pages
+    resp.sections = sections
     return resp
 
 
@@ -187,8 +194,8 @@ async def get_task_status(task_id: int, db: AsyncSession = Depends(get_session),
     return DocumentTaskStatusResponse.model_validate(task)
 
 
-async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_id: str):
-    """文件服务内部方法。DOCX/DOC 自动转 PDF 后返回，转换结果缓存到同目录"""
+async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_id: str, raw: bool = False):
+    """文件服务内部方法。raw=True 时返回原始文件，否则 DOCX/DOC 自动转 PDF 后返回"""
     task = await db.get(DocumentCompareTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -207,7 +214,17 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_i
 
     ext = os.path.splitext(filename)[1].lower()
 
-    # DOCX/DOC → PDF 转换（缓存到同目录，下次直接返回）
+    # raw=True：直接返回原始文件（DOCX 模式前端需要原始 DOCX）
+    if raw:
+        media_type = MIME_TYPES.get(ext, "application/octet-stream")
+        encoded_filename = quote(filename)
+        return FileResponse(
+            path=file_path,
+            media_type=media_type,
+            headers={"Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}"},
+        )
+
+    # 非 raw：DOCX/DOC → PDF 转换（缓存到同目录，下次直接返回）
     if ext in (".docx", ".doc"):
         pdf_path = os.path.splitext(file_path)[0] + ".pdf"
         if not os.path.exists(pdf_path):
@@ -237,9 +254,9 @@ async def _serve_task_file(task_id: int, doc_type: str, db: AsyncSession, user_i
 
 
 @router.get("/{task_id}/file/{doc_type}")
-async def get_task_file(task_id: int, doc_type: str, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
-    """获取原始文件（POST，需认证）"""
-    return await _serve_task_file(task_id, doc_type, db, user_id)
+async def get_task_file(task_id: int, doc_type: str, raw: bool = False, db: AsyncSession = Depends(get_session), user_id: str = Depends(get_current_user_id)):
+    """获取文件。raw=True 返回原始文件（不转 PDF）"""
+    return await _serve_task_file(task_id, doc_type, db, user_id, raw=raw)
 
 
 @router.delete("/{task_id}")
@@ -252,6 +269,7 @@ async def delete_task(task_id: int, db: AsyncSession = Depends(get_session), use
         raise HTTPException(status_code=403, detail="无权访问该任务")
 
     await db.execute(sql_delete(DocumentPageDiff).where(DocumentPageDiff.task_id == task_id))
+    await db.execute(sql_delete(DocumentSection).where(DocumentSection.task_id == task_id))
 
     for path in [task.file_a_path, task.file_b_path]:
         if path and os.path.exists(path):

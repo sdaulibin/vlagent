@@ -2,9 +2,10 @@
 import { computed, ref, shallowRef, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-vue-next';
 import { api } from '../api';
-import type { PageDiff } from '../types';
+import type { PageDiff, SectionItem } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import DocxDiffRenderer from './DocxDiffRenderer.vue';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -17,12 +18,29 @@ interface Props {
   status: string;
   errorMsg: string | null;
   comparisonDuration: number | null;
+  comparisonMode: string | null;
   pages: PageDiff[];
+  sections: SectionItem[];
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<{ (e: 'back'): void }>();
 
+const isDocxNative = computed(() => props.comparisonMode === 'docx_native');
+
+// Ref for DocxDiffRenderer component
+const docxRenderer = ref<InstanceType<typeof DocxDiffRenderer> | null>(null);
+
+function handleSectionClick(section: { id: number; title: string; diff_type: string; diff_ops_json: string | null; text_content: string }) {
+  console.log('[ResultView] handleSectionClick:', section.title, 'docxRenderer:', !!docxRenderer.value);
+  if (!docxRenderer.value) {
+    console.error('[ResultView] docxRenderer ref is null!');
+    return;
+  }
+  docxRenderer.value.scrollToSection(section);
+}
+
+// ---- PDF mode state ----
 const currentPageIndex = ref(0);
 const filter = ref('all');
 const pdfLoading = ref(false);
@@ -39,6 +57,21 @@ const canvasB = ref<HTMLCanvasElement | null>(null);
 const highlightA = ref<HTMLDivElement | null>(null);
 const highlightB = ref<HTMLDivElement | null>(null);
 
+// ---- Section mode state ----
+const sectionsA = computed(() => props.sections.filter(s => s.doc_type === 'a'));
+const sectionsB = computed(() => props.sections.filter(s => s.doc_type === 'b'));
+
+const sectionStats = computed(() => {
+  const a = sectionsA.value;
+  const all = a.length;
+  const modified = a.filter(s => s.diff_type === 'modified').length;
+  const added = a.filter(s => s.diff_type === 'added').length;
+  const deleted = a.filter(s => s.diff_type === 'deleted').length;
+  const equal = a.filter(s => s.diff_type === 'equal').length;
+  return { all, modified, added, deleted, equal };
+});
+
+// ---- PDF mode computed ----
 const filteredPages = computed(() => {
   if (filter.value === 'all') return props.pages;
   return props.pages.filter(p => p.diff_type === filter.value);
@@ -57,7 +90,6 @@ const stats = computed(() => {
   return { all, modified, added, deleted, equal };
 });
 
-// 预解析所有页面的 diff_ops_json，避免模板中重复 JSON.parse
 const parsedDiffOpsMap = computed(() => {
   const map = new Map<number, ReturnType<typeof parseDiffOps>>();
   for (const page of props.pages) {
@@ -152,7 +184,7 @@ async function renderPdfPage(
 
   if (allItems.length === 0 || segments.length === 0) return;
 
-  // Sort items into reading order: top-to-bottom (PDF Y descending), left-to-right (X ascending)
+  // Sort items into reading order
   allItems.sort((a, b) => {
     const ay = a.transform[5]!;
     const by = b.transform[5]!;
@@ -160,8 +192,6 @@ async function renderPdfPage(
     return a.transform[4]! - b.transform[4]!;
   });
 
-  // Build stripped text — matches backend's _strip_all_whitespace
-  // Track original char position within each text item for precise highlighting
   let normText = '';
   const charMap: { itemIdx: number; charInItem: number }[] = [];
   for (let i = 0; i < allItems.length; i++) {
@@ -180,18 +210,8 @@ async function renderPdfPage(
   const bgColor = side === 'a' ? 'rgba(239,68,68,0.35)' : 'rgba(34,197,94,0.35)';
   let totalMatches = 0;
 
-  // Collect highlighted character positions per text item
   const itemCharPositions = new Map<number, number[]>();
 
-  // Build a mapping: for each target segment, find its location in normText
-  // using context-window matching to disambiguate repeated text.
-  // Strategy: concatenate consecutive diff ops into a longer window string,
-  // find the window in normText, then extract individual segment positions.
-  const allOps = diffOps as any[];
-
-  // First, build the full concatenated side text from all ops relevant to this side,
-  // in order, with 'equal' segments included for context.
-  // We'll use the sequence of ops to create a context fingerprint for matching.
   interface SegmentMatch { segIdx: number; matchStart: number; matchEnd: number; }
   const resolvedMatches: SegmentMatch[] = [];
 
@@ -202,19 +222,15 @@ async function renderPdfPage(
 
     const expectedOffset: number = seg[offsetKey] ?? 0;
 
-    // Build a context window: current segment + neighboring segments (any op)
-    // to create a longer, more unique search string.
-    // Find this segment's position in allOps
     let opIdx = -1;
+    const allOps = diffOps as any[];
     for (let k = 0; k < allOps.length; k++) {
       if (allOps[k] === seg) { opIdx = k; break; }
     }
 
-    // Collect up to 3 ops before and after for context (include all op types)
     const windowStart = Math.max(0, opIdx - 3);
     const windowEnd = Math.min(allOps.length - 1, opIdx + 3);
 
-    // Build context string: concatenate all ops' stripped text in window
     let contextStr = '';
     let segStartInContext = -1;
     let segEndInContext = -1;
@@ -229,7 +245,6 @@ async function renderPdfPage(
     }
 
     if (segStartInContext === -1 || contextStr.length === 0) {
-      // Fallback: simple indexOf with offset proximity
       const idx = normText.indexOf(segNorm, Math.max(0, expectedOffset - 20));
       if (idx !== -1) {
         resolvedMatches.push({ segIdx: segI, matchStart: idx, matchEnd: idx + segNorm.length });
@@ -237,14 +252,12 @@ async function renderPdfPage(
       continue;
     }
 
-    // Search for the context window in normText near the expected offset
     let bestIdx = -1;
     let bestDist = Infinity;
     let searchFrom = 0;
     while (searchFrom < normText.length) {
       const idx = normText.indexOf(contextStr, searchFrom);
       if (idx === -1) break;
-      // The segment's expected position within the context window
       const segActualPos = idx + segStartInContext;
       const dist = Math.abs(segActualPos - expectedOffset);
       if (dist < bestDist) {
@@ -255,7 +268,6 @@ async function renderPdfPage(
     }
 
     if (bestIdx === -1) {
-      // Fallback: try matching just the segment alone near the offset
       const idx = normText.indexOf(segNorm, Math.max(0, expectedOffset - 20));
       if (idx !== -1) {
         bestIdx = idx;
@@ -267,7 +279,6 @@ async function renderPdfPage(
     resolvedMatches.push({ segIdx: segI, matchStart: bestIdx, matchEnd: bestIdx + segNorm.length });
   }
 
-  // Apply resolved matches to char positions
   for (const match of resolvedMatches) {
     for (let c = match.matchStart; c < match.matchEnd && c < charMap.length; c++) {
       const entry = charMap[c];
@@ -280,7 +291,6 @@ async function renderPdfPage(
     }
   }
 
-  // Render character-precise highlight rectangles
   for (const [itemIdx, chars] of itemCharPositions) {
     const item = allItems[itemIdx];
     if (!item) continue;
@@ -292,7 +302,6 @@ async function renderPdfPage(
     const strLen = item.str.length;
     if (strLen === 0 || fullW < 1 || h < 1 || chars.length === 0) continue;
 
-    // Sort positions and find contiguous ranges
     chars.sort((a, b) => a - b);
     const ranges: [number, number][] = [];
     let rs = chars[0]!, re = chars[0]!;
@@ -308,7 +317,6 @@ async function renderPdfPage(
     }
     ranges.push([rs, re]);
 
-    // Create a highlight rectangle for each contiguous range
     for (const [start, end] of ranges) {
       const left = vx + (start / strLen) * fullW;
       const width = ((end - start + 1) / strLen) * fullW;
@@ -372,7 +380,7 @@ function parseDiffOps(json: string | null): any[] {
 watch(currentPageIndex, () => { nextTick(renderCurrentPage); });
 
 watch(() => props.status, async (s) => {
-  if (s === 'done') {
+  if (s === 'done' && !isDocxNative.value) {
     await loadPdfs();
     nextTick(renderCurrentPage);
   }
@@ -381,7 +389,7 @@ watch(() => props.status, async (s) => {
 watch(filter, () => { currentPageIndex.value = 0; });
 
 onMounted(async () => {
-  if (props.status === 'done') {
+  if (props.status === 'done' && !isDocxNative.value) {
     await loadPdfs();
     nextTick(renderCurrentPage);
   }
@@ -399,12 +407,51 @@ const typeLabel: Record<string, string> = {
   deleted: '删除页',
 };
 
+const sectionTypeLabel: Record<string, string> = {
+  equal: '相同',
+  modified: '有差异',
+  added: '新增',
+  deleted: '已删除',
+};
+
 const typeBadgeClass: Record<string, string> = {
   equal: 'bg-slate-100 text-slate-600',
   modified: 'bg-orange-100 text-orange-700',
   added: 'bg-green-100 text-green-700',
   deleted: 'bg-red-100 text-red-700',
 };
+
+const roleLabel: Record<string, string> = {
+  h1: 'H1',
+  h2: 'H2',
+  h3: 'H3',
+  h4: 'H4',
+  body: '正文',
+  table: '表格',
+  toc_item: '目录',
+};
+
+// Flatten sections into a list for sidebar display (top-level + one level deep)
+const flatSectionsForSidebar = computed(() => {
+  return sectionsA.value
+    .filter(s => s.diff_type && s.diff_type !== 'equal')
+    .map(s => ({
+      id: s.id,
+      role: s.role,
+      title: s.title || (s.role === 'table' ? '[表格]' : '[正文]'),
+      diff_type: s.diff_type!,
+      diff_ops_json: s.diff_ops_json,
+      text_content: s.text_content,
+      parent_id: s.parent_id,
+    }));
+});
+
+// Filtered section list for sidebar
+const sectionFilter = ref('all');
+const filteredSections = computed(() => {
+  if (sectionFilter.value === 'all') return flatSectionsForSidebar.value;
+  return flatSectionsForSidebar.value.filter(s => s.diff_type === sectionFilter.value);
+});
 </script>
 
 <template>
@@ -423,158 +470,249 @@ const typeBadgeClass: Record<string, string> = {
 
       <div class="flex items-center gap-3">
         <span v-if="comparisonDuration" class="text-xs text-slate-400">耗时 {{ comparisonDuration }}s</span>
-        <button @click="goPrev" :disabled="!hasPrev"
-          class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
-          <ChevronLeft class="w-4 h-4" />
-        </button>
-        <span class="text-sm text-slate-600 min-w-[80px] text-center">
-          {{ currentPage ? `第 ${currentPageIndex + 1} / ${filteredPages.length} 组` : '-' }}
-        </span>
-        <button @click="goNext" :disabled="!hasNext"
-          class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
-          <ChevronRight class="w-4 h-4" />
-        </button>
+        <template v-if="!isDocxNative">
+          <button @click="goPrev" :disabled="!hasPrev"
+            class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronLeft class="w-4 h-4" />
+          </button>
+          <span class="text-sm text-slate-600 min-w-[80px] text-center">
+            {{ currentPage ? `第 ${currentPageIndex + 1} / ${filteredPages.length} 组` : '-' }}
+          </span>
+          <button @click="goNext" :disabled="!hasNext"
+            class="p-1.5 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronRight class="w-4 h-4" />
+          </button>
+        </template>
+        <template v-else>
+          <span class="text-xs text-slate-400">{{ flatSectionsForSidebar.length }} 处差异</span>
+        </template>
       </div>
     </div>
 
     <!-- 主体 -->
     <div class="document-result-main">
-      <!-- PDF 文档面板 -->
-      <div class="document-doc-panes">
-        <!-- 处理中 -->
-        <template v-if="status === 'processing' || status === 'pending'">
-          <div class="flex-1 flex items-center justify-center">
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
-              <p class="text-slate-500 text-sm">正在比对中...</p>
+      <!-- ===== DOCX 原生渲染模式 ===== -->
+      <template v-if="isDocxNative">
+        <div class="document-doc-panes">
+          <!-- 处理中 -->
+          <template v-if="status === 'processing' || status === 'pending'">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                <p class="text-slate-500 text-sm">正在比对中...</p>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="status === 'done'">
+            <DocxDiffRenderer
+              ref="docxRenderer"
+              :taskId="taskId"
+              :fileAName="fileAName"
+              :fileBName="fileBName"
+              :sectionsA="sectionsA"
+              :sectionsB="sectionsB"
+            />
+          </template>
+
+          <template v-else-if="status === 'failed'">
+            <div class="flex-1 flex items-center justify-center">
+              <p class="text-red-500 text-sm">{{ errorMsg || '比对失败' }}</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- DOCX section 侧边栏 -->
+        <div class="document-diff-sidebar">
+          <div class="p-4 border-b border-slate-100">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">比对结果</h3>
+            <div class="grid grid-cols-2 gap-2 text-center">
+              <div class="bg-slate-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-slate-700">{{ sectionStats.all }}</div>
+                <div class="text-xs text-slate-400">总节数</div>
+              </div>
+              <div class="bg-orange-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-orange-600">{{ sectionStats.modified }}</div>
+                <div class="text-xs text-orange-400">有差异</div>
+              </div>
             </div>
           </div>
-        </template>
 
-        <!-- PDF 加载中 -->
-        <template v-else-if="pdfLoading">
-          <div class="flex-1 flex items-center justify-center">
-            <div class="text-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
-              <p class="text-slate-500 text-sm">正在加载文档...</p>
-            </div>
+          <div class="flex gap-1 p-2 bg-slate-50 mx-4 my-3 rounded-lg">
+            <button v-for="f in ['all', 'modified', 'added', 'deleted']" :key="f"
+              @click="sectionFilter = f"
+              :class="['document-filter-tab', { active: sectionFilter === f }]">
+              {{ f === 'all' ? '全部' : f === 'modified' ? '差异' : f === 'added' ? '新增' : '删除' }}
+            </button>
           </div>
-        </template>
 
-        <!-- 文档内容 -->
-        <template v-else-if="currentPage">
-          <!-- 文档 A -->
-          <div class="document-doc-pane">
-            <div class="document-doc-header document-doc-header-original">
-              <span class="document-doc-badge document-badge-original">原文档</span>
-              <span v-if="currentPage.page_a" class="text-xs text-slate-500">第 {{ currentPage.page_a }} 页</span>
-              <span v-else class="text-xs text-slate-400">-</span>
-            </div>
-            <div ref="containerA" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
-              <template v-if="currentPage.diff_type === 'added'">
-                <div class="flex items-center justify-center h-full text-slate-400 text-sm">
-                  比对文档新增页，原文档中无对应内容
+          <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+            <div
+              v-for="section in filteredSections"
+              :key="section.id"
+              @click="handleSectionClick(section)"
+              class="diff-item cursor-pointer rounded-lg border border-transparent hover:bg-slate-50 p-2.5 transition-colors"
+            >
+              <div class="flex items-center gap-2 mb-1">
+                <span :class="['diff-badge text-xs px-1.5 py-0.5 rounded font-medium', typeBadgeClass[section.diff_type]]">
+                  {{ sectionTypeLabel[section.diff_type] }}
+                </span>
+                <span class="text-xs text-slate-400">{{ roleLabel[section.role] || section.role }}</span>
+              </div>
+              <p class="text-xs text-slate-600 line-clamp-2">{{ section.title }}</p>
+
+              <template v-if="section.diff_type === 'modified' && section.diff_ops_json">
+                <div class="text-xs leading-relaxed mt-1.5 line-clamp-3">
+                  <template v-for="(seg, si) in parseDiffOps(section.diff_ops_json).slice(0, 20)" :key="si">
+                    <span v-if="seg.op === -1" class="diff-text-del">{{ seg.text }}</span>
+                    <span v-else-if="seg.op === 1" class="diff-text-ins">{{ seg.text }}</span>
+                    <span v-else class="text-slate-400">{{ seg.text }}</span>
+                  </template>
                 </div>
               </template>
-              <template v-else-if="pdfDocA">
-                <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
-                  <canvas ref="canvasA" />
-                  <div ref="highlightA" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
-                </div>
-              </template>
-            </div>
-          </div>
-
-          <!-- 文档 B -->
-          <div class="document-doc-pane">
-            <div class="document-doc-header document-doc-header-compare">
-              <span class="document-doc-badge document-badge-compare">比对文档</span>
-              <span v-if="currentPage.page_b" class="text-xs text-slate-500">第 {{ currentPage.page_b }} 页</span>
-              <span v-else class="text-xs text-slate-400">-</span>
-            </div>
-            <div ref="containerB" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
-              <template v-if="currentPage.diff_type === 'deleted'">
-                <div class="flex items-center justify-center h-full text-slate-400 text-sm">
-                  原文档页面已删除，比对文档中无对应内容
-                </div>
-              </template>
-              <template v-else-if="pdfDocB">
-                <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
-                  <canvas ref="canvasB" />
-                  <div ref="highlightB" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
-                </div>
-              </template>
-            </div>
-          </div>
-        </template>
-
-        <!-- 失败 -->
-        <template v-else-if="status === 'failed'">
-          <div class="flex-1 flex items-center justify-center">
-            <p class="text-red-500 text-sm">{{ errorMsg || '比对失败' }}</p>
-          </div>
-        </template>
-      </div>
-
-      <!-- 差异侧边栏 -->
-      <div class="document-diff-sidebar">
-        <div class="p-4 border-b border-slate-100">
-          <h3 class="text-sm font-semibold text-slate-700 mb-3">比对结果</h3>
-          <div class="grid grid-cols-2 gap-2 text-center">
-            <div class="bg-slate-50 rounded-lg p-2">
-              <div class="text-lg font-bold text-slate-700">{{ stats.all }}</div>
-              <div class="text-xs text-slate-400">总页数</div>
-            </div>
-            <div class="bg-orange-50 rounded-lg p-2">
-              <div class="text-lg font-bold text-orange-600">{{ stats.modified }}</div>
-              <div class="text-xs text-orange-400">有差异</div>
             </div>
           </div>
         </div>
+      </template>
 
-        <div class="flex gap-1 p-2 bg-slate-50 mx-4 my-3 rounded-lg">
-          <button v-for="f in ['all', 'modified', 'added', 'deleted']" :key="f"
-            @click="filter = f"
-            :class="['document-filter-tab', { active: filter === f }]">
-            {{ f === 'all' ? '全部' : f === 'modified' ? '差异' : f === 'added' ? '新增' : '删除' }}
-          </button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-          <div
-            v-for="(page, idx) in filteredPages"
-            :key="page.id"
-            @click="goToPage(idx)"
-            :class="[
-              'diff-item cursor-pointer rounded-lg border p-2.5 transition-colors',
-              idx === currentPageIndex ? 'border-orange-300 bg-orange-50/50' : 'border-transparent hover:bg-slate-50'
-            ]"
-          >
-            <div class="flex items-center gap-2 mb-1">
-              <span :class="['diff-badge text-xs px-1.5 py-0.5 rounded font-medium', typeBadgeClass[page.diff_type]]">{{ typeLabel[page.diff_type] }}</span>
-              <span class="text-xs text-slate-400">
-                <template v-if="page.page_a && page.page_b">A:{{ page.page_a }} / B:{{ page.page_b }}</template>
-                <template v-else-if="page.page_a">A:{{ page.page_a }}</template>
-                <template v-else>B:{{ page.page_b }}</template>
-              </span>
+      <!-- ===== PDF 渲染模式（原有逻辑） ===== -->
+      <template v-else>
+        <div class="document-doc-panes">
+          <!-- 处理中 -->
+          <template v-if="status === 'processing' || status === 'pending'">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                <p class="text-slate-500 text-sm">正在比对中...</p>
+              </div>
             </div>
+          </template>
 
-            <template v-if="page.diff_type === 'modified' && page.diff_ops_json">
-              <div class="text-xs leading-relaxed mt-1.5 line-clamp-3">
-                <template v-for="(seg, si) in parsedDiffOpsMap.get(page.id) || []" :key="si">
-                  <span v-if="seg.op === -1" class="diff-text-del">{{ seg.text }}</span>
-                  <span v-else-if="seg.op === 1" class="diff-text-ins">{{ seg.text }}</span>
-                  <span v-else class="text-slate-400">{{ seg.text }}</span>
+          <!-- PDF 加载中 -->
+          <template v-else-if="pdfLoading">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-3"></div>
+                <p class="text-slate-500 text-sm">正在加载文档...</p>
+              </div>
+            </div>
+          </template>
+
+          <!-- 文档内容 -->
+          <template v-else-if="currentPage">
+            <!-- 文档 A -->
+            <div class="document-doc-pane">
+              <div class="document-doc-header document-doc-header-original">
+                <span class="document-doc-badge document-badge-original">原文档</span>
+                <span v-if="currentPage.page_a" class="text-xs text-slate-500">第 {{ currentPage.page_a }} 页</span>
+                <span v-else class="text-xs text-slate-400">-</span>
+              </div>
+              <div ref="containerA" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
+                <template v-if="currentPage.diff_type === 'added'">
+                  <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+                    比对文档新增页，原文档中无对应内容
+                  </div>
+                </template>
+                <template v-else-if="pdfDocA">
+                  <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
+                    <canvas ref="canvasA" />
+                    <div ref="highlightA" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
+                  </div>
                 </template>
               </div>
-            </template>
+            </div>
 
-            <p v-else-if="page.diff_type === 'equal'" class="text-xs text-slate-400 mt-1">页面内容一致</p>
-            <p v-else-if="page.diff_type === 'added'" class="text-xs text-green-600 mt-1">比对文档中新增的页面</p>
-            <p v-else-if="page.diff_type === 'deleted'" class="text-xs text-red-600 mt-1">原文档中已删除的页面</p>
+            <!-- 文档 B -->
+            <div class="document-doc-pane">
+              <div class="document-doc-header document-doc-header-compare">
+                <span class="document-doc-badge document-badge-compare">比对文档</span>
+                <span v-if="currentPage.page_b" class="text-xs text-slate-500">第 {{ currentPage.page_b }} 页</span>
+                <span v-else class="text-xs text-slate-400">-</span>
+              </div>
+              <div ref="containerB" class="document-doc-content" style="overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px;background:#f8fafc;">
+                <template v-if="currentPage.diff_type === 'deleted'">
+                  <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+                    原文档页面已删除，比对文档中无对应内容
+                  </div>
+                </template>
+                <template v-else-if="pdfDocB">
+                  <div style="position:relative;display:inline-block;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,0.12);border-radius:2px;">
+                    <canvas ref="canvasB" />
+                    <div ref="highlightB" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- 失败 -->
+          <template v-else-if="status === 'failed'">
+            <div class="flex-1 flex items-center justify-center">
+              <p class="text-red-500 text-sm">{{ errorMsg || '比对失败' }}</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- PDF 侧边栏 -->
+        <div class="document-diff-sidebar">
+          <div class="p-4 border-b border-slate-100">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">比对结果</h3>
+            <div class="grid grid-cols-2 gap-2 text-center">
+              <div class="bg-slate-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-slate-700">{{ stats.all }}</div>
+                <div class="text-xs text-slate-400">总页数</div>
+              </div>
+              <div class="bg-orange-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-orange-600">{{ stats.modified }}</div>
+                <div class="text-xs text-orange-400">有差异</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-1 p-2 bg-slate-50 mx-4 my-3 rounded-lg">
+            <button v-for="f in ['all', 'modified', 'added', 'deleted']" :key="f"
+              @click="filter = f"
+              :class="['document-filter-tab', { active: filter === f }]">
+              {{ f === 'all' ? '全部' : f === 'modified' ? '差异' : f === 'added' ? '新增' : '删除' }}
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+            <div
+              v-for="(page, idx) in filteredPages"
+              :key="page.id"
+              @click="goToPage(idx)"
+              :class="[
+                'diff-item cursor-pointer rounded-lg border p-2.5 transition-colors',
+                idx === currentPageIndex ? 'border-orange-300 bg-orange-50/50' : 'border-transparent hover:bg-slate-50'
+              ]"
+            >
+              <div class="flex items-center gap-2 mb-1">
+                <span :class="['diff-badge text-xs px-1.5 py-0.5 rounded font-medium', typeBadgeClass[page.diff_type]]">{{ typeLabel[page.diff_type] }}</span>
+                <span class="text-xs text-slate-400">
+                  <template v-if="page.page_a && page.page_b">A:{{ page.page_a }} / B:{{ page.page_b }}</template>
+                  <template v-else-if="page.page_a">A:{{ page.page_a }}</template>
+                  <template v-else>B:{{ page.page_b }}</template>
+                </span>
+              </div>
+
+              <template v-if="page.diff_type === 'modified' && page.diff_ops_json">
+                <div class="text-xs leading-relaxed mt-1.5 line-clamp-3">
+                  <template v-for="(seg, si) in parsedDiffOpsMap.get(page.id) || []" :key="si">
+                    <span v-if="seg.op === -1" class="diff-text-del">{{ seg.text }}</span>
+                    <span v-else-if="seg.op === 1" class="diff-text-ins">{{ seg.text }}</span>
+                    <span v-else class="text-slate-400">{{ seg.text }}</span>
+                  </template>
+                </div>
+              </template>
+
+              <p v-else-if="page.diff_type === 'equal'" class="text-xs text-slate-400 mt-1">页面内容一致</p>
+              <p v-else-if="page.diff_type === 'added'" class="text-xs text-green-600 mt-1">比对文档中新增的页面</p>
+              <p v-else-if="page.diff_type === 'deleted'" class="text-xs text-red-600 mt-1">原文档中已删除的页面</p>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>

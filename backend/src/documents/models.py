@@ -25,6 +25,9 @@ class DocumentCompareTask(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, processing, done, failed
     error_msg: Optional[str] = None
     comparison_duration: Optional[float] = Field(default=None, description="比对耗时(秒)")
+    comparison_mode: Optional[str] = Field(default=None, description="管线类型: structured 或 page")
+    section_summary_a: Optional[str] = Field(default=None, description="文件A section 结构汇总（Markdown）")
+    section_summary_b: Optional[str] = Field(default=None, description="文件B section 结构汇总（Markdown）")
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -46,6 +49,26 @@ class DocumentPageDiff(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
 
 
+class DocumentSection(SQLModel, table=True):
+    """文档 section 结构记录"""
+    __tablename__ = "document_sections"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: int = Field(index=True, foreign_key="document_compare_tasks.id")
+    user_id: Optional[str] = Field(default=None, index=True)
+    doc_type: str = Field(description="'a' 或 'b'")
+    role: str = Field(description="h1/h2/h3/h4/body/table/toc_item")
+    title: str = Field(default="")
+    text_content: str = Field(default="")
+    source_indices: Optional[str] = Field(default=None, description="JSON array of InputLine source_index")
+    parent_id: Optional[int] = Field(default=None, foreign_key="document_sections.id")
+    order_index: int = Field(default=0)
+    diff_type: Optional[str] = Field(default=None, description="equal/modified/added/deleted（仅 doc_type=a 填充）")
+    diff_ops_json: Optional[str] = Field(default=None, description="文本级 diff 操作 JSON（仅 modified）")
+    page_number: Optional[int] = Field(default=None, description="映射到的 PDF 页码")
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 # ---- DTO 模型（非数据库，用于 API 响应）----
 
 class DocumentTaskListItem(SQLModel):
@@ -58,6 +81,7 @@ class DocumentTaskListItem(SQLModel):
     status: str
     error_msg: Optional[str] = None
     comparison_duration: Optional[float] = None
+    comparison_mode: Optional[str] = None
     created_at: datetime
 
 
@@ -81,6 +105,21 @@ class DocumentPageDiffItem(SQLModel):
     diff_ops_json: Optional[str] = None
 
 
+class DocumentSectionItem(SQLModel):
+    """Section 结构项"""
+    id: int
+    doc_type: str
+    role: str
+    title: str = ""
+    text_content: str = ""
+    source_indices: Optional[str] = None
+    parent_id: Optional[int] = None
+    order_index: int = 0
+    diff_type: Optional[str] = None
+    diff_ops_json: Optional[str] = None
+    page_number: Optional[int] = None
+
+
 class DocumentCompareResponse(SQLModel):
     """完整任务详情"""
     id: int
@@ -91,5 +130,7 @@ class DocumentCompareResponse(SQLModel):
     status: str
     error_msg: Optional[str] = None
     comparison_duration: Optional[float] = None
+    comparison_mode: Optional[str] = None
     created_at: datetime
     pages: List[DocumentPageDiffItem] = []
+    sections: List[DocumentSectionItem] = []
