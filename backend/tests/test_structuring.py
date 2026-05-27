@@ -292,6 +292,16 @@ class TestFlatten:
         assert "第一节" in doc.main[0].text_content
         assert "内容" in doc.main[0].text_content
 
+    def test_flatten_document_children(self):
+        child = SectionBlock(role="h2", title="一、子节", content=[InputLine(text="子内容")])
+        doc = StructuredDocument(main=[
+            SectionBlock(role="h1", title="第一节", children=[child]),
+        ])
+        flatten_document(doc)
+        assert child.text_content != ""
+        assert "一、子节" in child.text_content
+        assert "子内容" in child.text_content
+
 
 # ---- 运行 ----
 

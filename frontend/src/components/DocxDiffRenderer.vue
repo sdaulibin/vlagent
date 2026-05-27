@@ -100,6 +100,133 @@ function buildCharMap(textNodes: Text[]): { normalizedText: string; charMap: Cha
 // Find segment positions using context-window matching (same strategy as PDF.js)
 interface SegmentMatch { start: number; end: number }
 
+function normalizeDiffText(text: string | undefined | null): string {
+  return (text || '').replace(/\s/g, '');
+}
+
+function collectEqualContext(ops: DiffOp[], opIdx: number, direction: 'before' | 'after', maxLen = 40): string {
+  let text = '';
+  if (direction === 'before') {
+    for (let i = opIdx - 1; i >= 0 && text.length < maxLen; i--) {
+      const op = ops[i];
+      if (!op || op.op !== 0) continue;
+      text = normalizeDiffText(op.text) + text;
+    }
+    return text.slice(-maxLen);
+  }
+
+  for (let i = opIdx + 1; i < ops.length && text.length < maxLen; i++) {
+    const op = ops[i];
+    if (!op || op.op !== 0) continue;
+    text += normalizeDiffText(op.text);
+  }
+  return text.slice(0, maxLen);
+}
+
+function pickDeletionContextText(after: string, before: string): { text: string; anchor: 'after' | 'before' } | null {
+  if (after) {
+    const slashIdx = after.indexOf('/');
+    if (slashIdx >= 0 && slashIdx <= 2 && slashIdx + 2 <= after.length) {
+      return { text: after.slice(0, slashIdx + 2), anchor: 'after' };
+    }
+    return { text: after.slice(0, Math.min(4, after.length)), anchor: 'after' };
+  }
+  if (before) {
+    return { text: before.slice(-Math.min(4, before.length)), anchor: 'before' };
+  }
+  return null;
+}
+
+function suffixMatchLength(text: string, suffix: string): number {
+  const max = Math.min(text.length, suffix.length);
+  for (let len = max; len > 0; len--) {
+    if (text.slice(text.length - len) === suffix.slice(suffix.length - len)) {
+      return len;
+    }
+  }
+  return 0;
+}
+
+function prefixMatchLength(text: string, prefix: string): number {
+  const max = Math.min(text.length, prefix.length);
+  for (let len = max; len > 0; len--) {
+    if (text.slice(0, len) === prefix.slice(0, len)) {
+      return len;
+    }
+  }
+  return 0;
+}
+
+function findBestContextRange(
+  normalizedText: string,
+  target: string,
+  before: string,
+  after: string,
+): SegmentMatch | null {
+  if (!target) return null;
+
+  let best: { start: number; score: number } | null = null;
+  let searchFrom = 0;
+
+  while (searchFrom < normalizedText.length) {
+    const idx = normalizedText.indexOf(target, searchFrom);
+    if (idx === -1) break;
+
+    const left = normalizedText.slice(Math.max(0, idx - before.length), idx);
+    const right = normalizedText.slice(idx + target.length, idx + target.length + after.length);
+    const score = suffixMatchLength(left, before) + prefixMatchLength(right, after);
+
+    if (!best || score > best.score) {
+      best = { start: idx, score };
+    }
+
+    searchFrom = idx + 1;
+  }
+
+  if (!best) return null;
+  return { start: best.start, end: best.start + target.length };
+}
+
+function locateDiffOpRange(ops: DiffOp[], opIdx: number, normalizedText: string): SegmentMatch | null {
+  const op = ops[opIdx];
+  if (!op) return null;
+
+  const target = normalizeDiffText(op.text);
+  if (!target) return null;
+
+  const before = collectEqualContext(ops, opIdx, 'before', 80);
+  const after = collectEqualContext(ops, opIdx, 'after', 80);
+  return findBestContextRange(normalizedText, target, before, after);
+}
+
+function locateDeletionContextRange(ops: DiffOp[], normalizedText: string): SegmentMatch | null {
+  for (let opIdx = 0; opIdx < ops.length; opIdx++) {
+    const op = ops[opIdx];
+    if (!op || op.op !== -1 || !normalizeDiffText(op.text)) continue;
+
+    const before = collectEqualContext(ops, opIdx, 'before');
+    const after = collectEqualContext(ops, opIdx, 'after');
+    const picked = pickDeletionContextText(after, before);
+    if (!picked) continue;
+
+    const beforeForTarget = picked.anchor === 'after'
+      ? before
+      : before.slice(0, Math.max(0, before.length - picked.text.length));
+    const afterForTarget = picked.anchor === 'after'
+      ? after.slice(picked.text.length)
+      : after;
+
+    const range = findBestContextRange(
+      normalizedText,
+      picked.text,
+      beforeForTarget,
+      afterForTarget,
+    );
+    if (range) return range;
+  }
+  return null;
+}
+
 function findSegmentMatches(
   segments: DiffOp[],
   allOps: DiffOp[],
@@ -174,82 +301,6 @@ function findSegmentMatches(
   return matches;
 }
 
-// Apply DOM highlights: split text nodes and wrap highlighted ranges in <span>
-function applyDomHighlights(
-  container: HTMLElement,
-  textNodes: Text[],
-  charMap: CharEntry[],
-  matches: SegmentMatch[],
-  cssClass: string,
-) {
-  // Collect character positions to highlight, grouped by nodeIdx
-  const nodeHighlightChars = new Map<number, number[]>();
-  for (const match of matches) {
-    for (let c = match.start; c < match.end && c < charMap.length; c++) {
-      const entry = charMap[c];
-      if (!entry) continue;
-      if (!nodeHighlightChars.has(entry.nodeIdx)) {
-        nodeHighlightChars.set(entry.nodeIdx, []);
-      }
-      nodeHighlightChars.get(entry.nodeIdx)!.push(entry.charOffset);
-    }
-  }
-
-  // For each affected text node, split and wrap contiguous ranges
-  // Process left-to-right, progressively splitting the text node
-  const nodeEntries = Array.from(nodeHighlightChars.entries()).sort((a, b) => a[0] - b[0]);
-
-  for (const [nodeIdx, chars] of nodeEntries) {
-    let textNode = textNodes[nodeIdx];
-    if (!textNode || !textNode.textContent || !textNode.parentNode) continue;
-
-    chars.sort((a, b) => a - b);
-    const ranges: [number, number][] = [];
-    let rs = chars[0]!, re = chars[0]!;
-    for (let i = 1; i < chars.length; i++) {
-      if (chars[i]! <= re + 1) {
-        re = chars[i]!;
-      } else {
-        ranges.push([rs, re]);
-        rs = chars[i]!;
-        re = chars[i]!;
-      }
-    }
-    ranges.push([rs, re]);
-
-    for (const [start, end] of ranges) {
-      if (!textNode.parentNode) break;
-
-      const remaining = textNode.textContent;
-      const highlightText = remaining.substring(start, end + 1);
-      if (!highlightText) continue;
-
-      const matchIdx = remaining.indexOf(highlightText);
-      if (matchIdx === -1) continue;
-
-      const beforeText = remaining.substring(0, matchIdx);
-      const afterText = remaining.substring(matchIdx + highlightText.length);
-      const parent = textNode.parentNode;
-
-      const span = document.createElement('span');
-      span.className = cssClass;
-      span.textContent = highlightText;
-
-      if (beforeText) {
-        parent.insertBefore(document.createTextNode(beforeText), textNode);
-      }
-      parent.insertBefore(span, textNode);
-
-      if (afterText) {
-        textNode.textContent = afterText;
-      } else {
-        parent.removeChild(textNode);
-        break;
-      }
-    }
-  }
-}
-
 // Check if a text node is inside a non-content element (style, script, header, footer)
 function isInsideNonContentElement(node: Node, container: HTMLElement): boolean {
   let el = node.parentElement;
@@ -295,99 +346,62 @@ function highlightSide(container: HTMLElement, sections: SectionItem[], side: 'a
 
   // Collect all char ranges to highlight across all sections, tagged with section ID
   const allRanges: { start: number; end: number; sectionId: number }[] = [];
+  const inlineContextSections = new Set<number>();
 
   for (const section of allModifiedSections) {
     const allOps = parseDiffOps(section.diff_ops_json);
     const targetSegments = allOps.filter(d => d.op === targetOp && d.text?.trim());
-    if (targetSegments.length === 0) continue;
-
-    const sectionNorm = (section.text_content || '').replace(/\s/g, '');
-
-    // Anchor-based section finding: use diff segment context to locate the section
-    // in DOM text, then walk backward to find section start. This handles table cells
-    // where flatten_section joins cells with spaces, causing offsets to span cell
-    // boundaries that don't exist in the docx-preview DOM rendering.
-    const offsetKey = side === 'a' ? 'offsetA' : 'offsetB';
-    let sectionDomStart = -1;
-
-    if (sectionNorm.length >= 5) {
-      // Build anchor candidates from diff segments using context-window matching
-      const anchorCandidates: { pos: number; charsBefore: number }[] = [];
-
-      for (const seg of targetSegments) {
-        const segNorm = seg.text.replace(/\s/g, '');
-        if (segNorm.length < 2) continue;
-
-        const segIdx = allOps.indexOf(seg);
-        const winStart = Math.max(0, segIdx - 3);
-        const winEnd = Math.min(allOps.length - 1, segIdx + 3);
-
-        let contextStr = '';
-        let segStartInCtx = -1;
-        for (let k = winStart; k <= winEnd; k++) {
-          const opText = allOps[k].text ? allOps[k].text.replace(/\s/g, '') : '';
-          if (!opText) continue;
-          if (k === segIdx) segStartInCtx = contextStr.length;
-          contextStr += opText;
-        }
-
-        if (segStartInCtx === -1 || contextStr.length < 6) continue;
-
-        let searchFrom = 0;
-        while (searchFrom < fullText.length) {
-          const idx = fullText.indexOf(contextStr, searchFrom);
-          if (idx === -1) break;
-          anchorCandidates.push({ pos: idx + segStartInCtx, charsBefore: (seg as any)[offsetKey] ?? 0 });
-          searchFrom = idx + 1;
+    if (targetSegments.length === 0) {
+      if (side === 'b') {
+        const contextRange = locateDeletionContextRange(allOps, fullText);
+        if (contextRange) {
+          allRanges.push({ ...contextRange, sectionId: section.id });
+          inlineContextSections.add(section.id);
         }
       }
-
-      // Choose best anchor and walk backward to find section start
-      if (anchorCandidates.length > 0) {
-        anchorCandidates.sort((a, b) => a.pos - b.pos);
-        const anchor = anchorCandidates[0]!;
-
-        // Walk backward from anchor to find section start prefix
-        const searchBack = Math.min(anchor.pos, Math.max(sectionNorm.length, anchor.charsBefore) + 50);
-        const sectionKey = sectionNorm.substring(0, Math.min(40, sectionNorm.length));
-
-        for (let back = 0; back <= searchBack; back++) {
-          const candidateStart = anchor.pos - back;
-          if (candidateStart < 0) break;
-          if (candidateStart + sectionKey.length > fullText.length) continue;
-          if (fullText.substring(candidateStart, candidateStart + sectionKey.length) === sectionKey) {
-            sectionDomStart = candidateStart;
-            break;
-          }
-        }
-      }
-
-      // Fallback: prefix-based search (original method)
-      if (sectionDomStart < 0) {
-        const keys = [
-          sectionNorm.substring(0, Math.min(40, sectionNorm.length)),
-          sectionNorm.substring(0, Math.min(20, sectionNorm.length)),
-          sectionNorm.substring(0, Math.min(10, sectionNorm.length)),
-        ];
-        if (sectionNorm.length > 20) {
-          keys.push(sectionNorm.substring(Math.floor(sectionNorm.length / 2), Math.floor(sectionNorm.length / 2) + 20));
-          keys.push(sectionNorm.substring(sectionNorm.length - Math.min(30, sectionNorm.length)));
-        }
-        for (const key of keys) {
-          if (key.length < 5) continue;
-          const idx = fullText.indexOf(key);
-          if (idx !== -1) { sectionDomStart = idx; break; }
-        }
-      }
+      continue;
     }
 
+    // Find this section's position in the DOM text using text_content
+    // Try progressively shorter keys and different parts of the text
+    const sectionNorm = (section.text_content || '').replace(/\s/g, '');
+    let sectionDomStart = -1;
+    if (sectionNorm.length >= 5) {
+      // Try multiple search keys from different parts of the section text
+      const keys = [
+        sectionNorm.substring(0, Math.min(40, sectionNorm.length)),
+        sectionNorm.substring(0, Math.min(20, sectionNorm.length)),
+        sectionNorm.substring(0, Math.min(10, sectionNorm.length)),
+      ];
+      // Also try from the middle and end (useful for tables where start differs)
+      if (sectionNorm.length > 20) {
+        keys.push(sectionNorm.substring(Math.floor(sectionNorm.length / 2), Math.floor(sectionNorm.length / 2) + 20));
+        keys.push(sectionNorm.substring(sectionNorm.length - Math.min(30, sectionNorm.length)));
+      }
+      for (const key of keys) {
+        if (key.length < 5) continue;
+        const idx = fullText.indexOf(key);
+        if (idx !== -1) { sectionDomStart = idx; break; }
+      }
+    }
     console.log('[DocxDiff] section', section.id, 'role:', section.role, 'title:', section.title,
-      'sectionNormLen:', sectionNorm.length, 'sectionDomStart:', sectionDomStart);
+      'sectionNormLen:', sectionNorm.length, 'sectionDomStart:', sectionDomStart,
+      'first20:', JSON.stringify(sectionNorm.substring(0, 20)));
 
     for (const seg of targetSegments) {
       const segNorm = seg.text.replace(/\s/g, '');
       if (!segNorm) continue;
 
+      const opIdx = allOps.indexOf(seg);
+      const contextMatch = locateDiffOpRange(allOps, opIdx, fullText);
+
+      if (contextMatch) {
+        console.log('[DocxDiff] context scored match:', segNorm.substring(0, 20), 'at', contextMatch.start);
+        allRanges.push({ ...contextMatch, sectionId: section.id });
+        continue;
+      }
+
+      const offsetKey = side === 'a' ? 'offsetA' : 'offsetB';
       const rawOffset = (seg as any)[offsetKey] ?? 0;
 
       // Strategy 1: Direct offset mapping (offsetA/offsetB relative to section start)
@@ -459,47 +473,36 @@ function highlightSide(container: HTMLElement, sections: SectionItem[], side: 'a
       }
     }
 
-    // Apply: process each node's ranges left-to-right, splitting the text node progressively
+    // Apply: build replacement DOM for each text node from its original content and all ranges at once
     const sortedNodes = Array.from(nodeHighlightRanges.entries()).sort((a, b) => a[0] - b[0]);
     for (const [nodeIdx, rangeEntries] of sortedNodes) {
-      let textNode = textNodes[nodeIdx];
+      const textNode = textNodes[nodeIdx];
       if (!textNode || !textNode.textContent || !textNode.parentNode) continue;
 
+      const originalText = textNode.textContent;
+      const parent = textNode.parentNode;
+      const fragment = document.createDocumentFragment();
+
       const sortedRanges = rangeEntries.map(e => ({ ...e })).sort((a, b) => a.range[0] - b.range[0]);
+      let pos = 0;
 
       for (const { range: [start, end], sectionId } of sortedRanges) {
-        // Node may have been detached from a previous split — skip
-        if (!textNode.parentNode) break;
-
-        const remaining = textNode.textContent;
-        const highlightText = remaining.substring(start, end + 1);
-        if (!highlightText) continue;
-
-        const matchIdx = remaining.indexOf(highlightText);
-        if (matchIdx === -1) continue;
-
-        const beforeText = remaining.substring(0, matchIdx);
-        const afterText = remaining.substring(matchIdx + highlightText.length);
-        const parent = textNode.parentNode;
-
+        if (start > pos) {
+          fragment.appendChild(document.createTextNode(originalText.substring(pos, start)));
+        }
         const span = document.createElement('span');
         span.className = cssClass;
         span.setAttribute('data-section-id', String(sectionId));
-        span.textContent = highlightText;
-
-        if (beforeText) {
-          const beforeNode = document.createTextNode(beforeText);
-          parent.insertBefore(beforeNode, textNode);
-        }
-        parent.insertBefore(span, textNode);
-
-        if (afterText) {
-          textNode.textContent = afterText;
-        } else {
-          parent.removeChild(textNode);
-          break;
-        }
+        span.textContent = originalText.substring(start, end + 1);
+        fragment.appendChild(span);
+        pos = end + 1;
       }
+
+      if (pos < originalText.length) {
+        fragment.appendChild(document.createTextNode(originalText.substring(pos)));
+      }
+
+      parent.replaceChild(fragment, textNode);
     }
   }
 
@@ -516,67 +519,26 @@ function highlightSide(container: HTMLElement, sections: SectionItem[], side: 'a
     if (deletionOnlySections.length > 0) {
       console.log('[DocxDiff] marking', deletionOnlySections.length, 'deletion-only sections on side B');
       for (const section of deletionOnlySections) {
+        if (inlineContextSections.has(section.id)) continue;
         const ops = parseDiffOps(section.diff_ops_json);
         const sectionNorm = (section.text_content || '').replace(/\s/g, '');
         if (sectionNorm.length < 5) continue;
 
-        // Find section start using anchor-based approach
+        // Find section start in DOM text (reuse same key strategy)
         let sectionDomStart = -1;
-
-        // Build anchor from first non-equal op's context window
-        const firstDiff = ops.find(o => o.op !== 0 && o.text?.trim());
-        if (firstDiff) {
-          const firstDiffIdx = ops.indexOf(firstDiff);
-          const winStart = Math.max(0, firstDiffIdx - 3);
-          const winEnd = Math.min(ops.length - 1, firstDiffIdx + 3);
-          let ctxStr = '';
-          let segStartInCtx = -1;
-          for (let k = winStart; k <= winEnd; k++) {
-            const opText = ops[k]?.text ? ops[k].text.replace(/\s/g, '') : '';
-            if (!opText) continue;
-            if (k === firstDiffIdx) segStartInCtx = ctxStr.length;
-            ctxStr += opText;
-          }
-          if (segStartInCtx !== -1 && ctxStr.length >= 6) {
-            let searchFrom = 0;
-            while (searchFrom < fullText.length) {
-              const anchorPos = fullText.indexOf(ctxStr, searchFrom);
-              if (anchorPos === -1) break;
-              const anchorSegPos = anchorPos + segStartInCtx;
-              const charsBefore = firstDiff.offsetB ?? 0;
-              const searchBack = Math.min(anchorSegPos, Math.max(sectionNorm.length, charsBefore) + 50);
-              const sectionKey = sectionNorm.substring(0, Math.min(40, sectionNorm.length));
-              for (let back = 0; back <= searchBack; back++) {
-                const cs = anchorSegPos - back;
-                if (cs < 0) break;
-                if (cs + sectionKey.length > fullText.length) continue;
-                if (fullText.substring(cs, cs + sectionKey.length) === sectionKey) {
-                  sectionDomStart = cs;
-                  break;
-                }
-              }
-              if (sectionDomStart >= 0) break;
-              searchFrom = anchorPos + 1;
-            }
-          }
+        const keys = [
+          sectionNorm.substring(0, Math.min(40, sectionNorm.length)),
+          sectionNorm.substring(0, Math.min(20, sectionNorm.length)),
+          sectionNorm.substring(0, Math.min(10, sectionNorm.length)),
+        ];
+        if (sectionNorm.length > 20) {
+          keys.push(sectionNorm.substring(Math.floor(sectionNorm.length / 2), Math.floor(sectionNorm.length / 2) + 20));
+          keys.push(sectionNorm.substring(sectionNorm.length - Math.min(30, sectionNorm.length)));
         }
-
-        // Fallback: prefix-based search
-        if (sectionDomStart < 0) {
-          const keys = [
-            sectionNorm.substring(0, Math.min(40, sectionNorm.length)),
-            sectionNorm.substring(0, Math.min(20, sectionNorm.length)),
-            sectionNorm.substring(0, Math.min(10, sectionNorm.length)),
-          ];
-          if (sectionNorm.length > 20) {
-            keys.push(sectionNorm.substring(Math.floor(sectionNorm.length / 2), Math.floor(sectionNorm.length / 2) + 20));
-            keys.push(sectionNorm.substring(sectionNorm.length - Math.min(30, sectionNorm.length)));
-          }
-          for (const key of keys) {
-            if (key.length < 5) continue;
-            const idx = fullText.indexOf(key);
-            if (idx !== -1) { sectionDomStart = idx; break; }
-          }
+        for (const key of keys) {
+          if (key.length < 5) continue;
+          const idx = fullText.indexOf(key);
+          if (idx !== -1) { sectionDomStart = idx; break; }
         }
         if (sectionDomStart === -1) continue;
 
@@ -635,11 +597,15 @@ async function render() {
       loadDocx('b', containerB.value),
     ]);
 
-    // Apply highlights after rendering
-    // Use sectionsA for both sides since diff_ops_json is only stored on doc_type='a' sections
+    // Apply highlights after rendering. Modified/deleted sections are carried by A;
+    // added sections are carried by B so newly inserted DOCX blocks are visible.
     await nextTick();
-    highlightSide(containerA.value!, props.sectionsA, 'a');
-    highlightSide(containerB.value!, props.sectionsA, 'b');
+    const diffCarrierSections = [
+      ...props.sectionsA.filter(s => s.diff_type && s.diff_type !== 'equal' && s.diff_type !== 'added'),
+      ...props.sectionsB.filter(s => s.diff_type === 'added'),
+    ];
+    highlightSide(containerA.value!, diffCarrierSections, 'a');
+    highlightSide(containerB.value!, diffCarrierSections, 'b');
   } catch (e) {
     console.error('Failed to render DOCX:', e);
   }
@@ -706,7 +672,7 @@ function scrollToElement(container: HTMLElement, target: HTMLElement) {
 }
 
 // Scroll to a section's diff position in the rendered DOM
-function scrollToSection(section: { id: number; title: string; diff_type: string; diff_ops_json: string | null; text_content: string }) {
+function scrollToSection(section: { id: number; title: string; diff_type: string; diff_ops_json: string | null; text_content: string; doc_type?: 'a' | 'b' }) {
   console.log('[DocxDiff] scrollToSection:', section.title, 'id:', section.id);
 
   const containers = [
@@ -745,51 +711,19 @@ function scrollToSection(section: { id: number; title: string; diff_type: string
     if (sectionNorm.length < 5) continue;
 
     const { fullText, charNodeMap } = buildBodyTextIndex(el);
-
-    // Use anchor-based section finding (same approach as highlightSide)
-    const offsetKey = label === 'A' ? 'offsetA' : 'offsetB';
-    let sectionStart = -1;
-
-    // Build anchor from first diff op's context window
-    const diffOps = ops.filter(o => o.op !== 0 && o.text?.trim());
-    if (diffOps.length > 0) {
-      const firstDiff = diffOps[0]!;
-      const firstDiffIdx = ops.indexOf(firstDiff);
-      const winStart = Math.max(0, firstDiffIdx - 3);
-      const winEnd = Math.min(ops.length - 1, firstDiffIdx + 3);
-      let ctxStr = '';
-      let segStartInCtx = -1;
-      for (let k = winStart; k <= winEnd; k++) {
-        const opText = ops[k]?.text ? ops[k].text.replace(/\s/g, '') : '';
-        if (!opText) continue;
-        if (k === firstDiffIdx) segStartInCtx = ctxStr.length;
-        ctxStr += opText;
-      }
-      if (segStartInCtx !== -1 && ctxStr.length >= 6) {
-        const anchorPos = fullText.indexOf(ctxStr);
-        if (anchorPos !== -1) {
-          const anchorSegPos = anchorPos + segStartInCtx;
-          const charsBefore = (firstDiff as any)[offsetKey] ?? 0;
-          const searchBack = Math.min(anchorSegPos, Math.max(sectionNorm.length, charsBefore) + 50);
-          const sectionKey = sectionNorm.substring(0, Math.min(40, sectionNorm.length));
-          for (let back = 0; back <= searchBack; back++) {
-            const cs = anchorSegPos - back;
-            if (cs < 0) break;
-            if (cs + sectionKey.length > fullText.length) continue;
-            if (fullText.substring(cs, cs + sectionKey.length) === sectionKey) {
-              sectionStart = cs;
-              break;
-            }
-          }
+    if (label === 'B' && ops.some(op => op.op === -1) && !ops.some(op => op.op === 1)) {
+      const contextRange = locateDeletionContextRange(ops, fullText);
+      if (contextRange) {
+        const target = getElementAtCharIndex(charNodeMap, contextRange.start);
+        if (target) {
+          console.log('[DocxDiff] scroll', label, 'via deletion context range');
+          scrollToElement(el, target);
+          continue;
         }
       }
     }
 
-    // Fallback to prefix search
-    if (sectionStart < 0) {
-      sectionStart = findSectionStartInText(fullText, sectionNorm);
-    }
-
+    const sectionStart = findSectionStartInText(fullText, sectionNorm);
     if (sectionStart === -1) {
       console.warn('[DocxDiff] section text not found in', label);
       continue;
@@ -799,6 +733,7 @@ function scrollToSection(section: { id: number; title: string; diff_type: string
     // For deletion ops on side B (or insertion on side A), offset may point past
     // section text in that doc — clamp to section bounds
     let diffOffset = 0;
+    const offsetKey = label === 'A' ? 'offsetA' : 'offsetB';
     for (const op of ops) {
       if (op.op !== 0) {
         diffOffset = (op as any)[offsetKey] ?? 0;

@@ -31,7 +31,7 @@ const isDocxNative = computed(() => props.comparisonMode === 'docx_native');
 // Ref for DocxDiffRenderer component
 const docxRenderer = ref<InstanceType<typeof DocxDiffRenderer> | null>(null);
 
-function handleSectionClick(section: { id: number; title: string; diff_type: string; diff_ops_json: string | null; text_content: string }) {
+function handleSectionClick(section: { id: number; title: string; diff_type: string; diff_ops_json: string | null; text_content: string; doc_type?: 'a' | 'b' }) {
   console.log('[ResultView] handleSectionClick:', section.title, 'docxRenderer:', !!docxRenderer.value);
   if (!docxRenderer.value) {
     console.error('[ResultView] docxRenderer ref is null!');
@@ -61,13 +61,36 @@ const highlightB = ref<HTMLDivElement | null>(null);
 const sectionsA = computed(() => props.sections.filter(s => s.doc_type === 'a'));
 const sectionsB = computed(() => props.sections.filter(s => s.doc_type === 'b'));
 
+const flatSectionsForSidebar = computed(() => {
+  const changedFromA = sectionsA.value.filter(
+    s => s.diff_type && s.diff_type !== 'equal' && s.diff_type !== 'added',
+  );
+  const addedFromB = sectionsB.value.filter(s => s.diff_type === 'added');
+
+  return [...changedFromA, ...addedFromB]
+    .map(s => ({
+      id: s.id,
+      doc_type: s.doc_type,
+      role: s.role,
+      title: s.title || (s.role === 'table' ? '[表格]' : '[正文]'),
+      diff_type: s.diff_type!,
+      diff_ops_json: s.diff_ops_json,
+      text_content: s.text_content,
+      parent_id: s.parent_id,
+      order_index: s.order_index,
+    }))
+    .sort((a, b) => {
+      if (a.doc_type !== b.doc_type) return a.doc_type === 'a' ? -1 : 1;
+      return a.order_index - b.order_index;
+    });
+});
+
 const sectionStats = computed(() => {
-  const a = sectionsA.value;
-  const all = a.length;
-  const modified = a.filter(s => s.diff_type === 'modified').length;
-  const added = a.filter(s => s.diff_type === 'added').length;
-  const deleted = a.filter(s => s.diff_type === 'deleted').length;
-  const equal = a.filter(s => s.diff_type === 'equal').length;
+  const all = sectionsA.value.length + sectionsB.value.filter(s => s.diff_type === 'added').length;
+  const modified = flatSectionsForSidebar.value.filter(s => s.diff_type === 'modified').length;
+  const added = flatSectionsForSidebar.value.filter(s => s.diff_type === 'added').length;
+  const deleted = flatSectionsForSidebar.value.filter(s => s.diff_type === 'deleted').length;
+  const equal = sectionsA.value.filter(s => s.diff_type === 'equal').length;
   return { all, modified, added, deleted, equal };
 });
 
@@ -430,21 +453,6 @@ const roleLabel: Record<string, string> = {
   table: '表格',
   toc_item: '目录',
 };
-
-// Flatten sections into a list for sidebar display (top-level + one level deep)
-const flatSectionsForSidebar = computed(() => {
-  return sectionsA.value
-    .filter(s => s.diff_type && s.diff_type !== 'equal')
-    .map(s => ({
-      id: s.id,
-      role: s.role,
-      title: s.title || (s.role === 'table' ? '[表格]' : '[正文]'),
-      diff_type: s.diff_type!,
-      diff_ops_json: s.diff_ops_json,
-      text_content: s.text_content,
-      parent_id: s.parent_id,
-    }));
-});
 
 // Filtered section list for sidebar
 const sectionFilter = ref('all');

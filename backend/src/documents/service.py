@@ -882,21 +882,42 @@ async def _compare_legacy(task, db, loop, start_time):
 
 # ---- Plan B: DOCX 结构化比对 ----
 
+def _section_own_text(section) -> str:
+    """返回 section 自身文本，不包含子 section。"""
+    parts = []
+    if section.title:
+        parts.append(section.title)
+    for line in section.content:
+        if line.is_table and line.table_rows:
+            for row in line.table_rows:
+                parts.append(" ".join(c for c in row if c))
+        else:
+            parts.append(line.text)
+    return "\n".join(p for p in parts if p.strip())
+
+
 def _section_signature(section) -> str:
     """生成 SectionBlock 的匹配签名。"""
     from src.documents.structuring import _strip_ws, _normalize_text
     parts = []
+    if section.role:
+        parts.append(section.role)
     if section.title:
         parts.append(_strip_ws(_normalize_text(section.title)))
-    if section.text_content:
-        sig = _strip_ws(_normalize_text(section.text_content))[:200]
+    own_text = _section_own_text(section)
+    if own_text:
+        sig = _strip_ws(_normalize_text(own_text))[:200]
+        if sig:
+            parts.append(sig)
+    elif section.text_content:
+        sig = _strip_ws(_normalize_text(section.text_content))[:120]
         if sig:
             parts.append(sig)
     return " ".join(parts)
 
 
 def _align_and_diff_sections(sections_a, sections_b):
-    """Section 级对齐 + diff。"""
+    """递归 Section 级对齐 + diff。"""
     from src.documents.structuring import SectionDiffResult
 
     sigs_a = [_section_signature(s) for s in sections_a]
@@ -908,39 +929,70 @@ def _align_and_diff_sections(sections_a, sections_b):
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == "equal":
             for i, j in zip(range(i1, i2), range(j1, j2)):
-                results.append(_diff_section_pair(sections_a[i], sections_b[j]))
+                results.extend(_diff_section_tree_pair(sections_a[i], sections_b[j]))
         elif tag == "replace":
             pairs = min(i2 - i1, j2 - j1)
             for k in range(pairs):
-                results.append(_diff_section_pair(sections_a[i1 + k], sections_b[j1 + k]))
+                results.extend(_diff_section_tree_pair(sections_a[i1 + k], sections_b[j1 + k]))
             for k in range(pairs, i2 - i1):
-                results.append(SectionDiffResult(section_a=sections_a[i1 + k], section_b=None, diff_type="deleted"))
+                results.extend(_collect_unpaired_sections(sections_a[i1 + k], "deleted"))
             for k in range(pairs, j2 - j1):
-                results.append(SectionDiffResult(section_a=None, section_b=sections_b[j1 + k], diff_type="added"))
+                results.extend(_collect_unpaired_sections(sections_b[j1 + k], "added"))
         elif tag == "delete":
             for i in range(i1, i2):
-                results.append(SectionDiffResult(section_a=sections_a[i], section_b=None, diff_type="deleted"))
+                results.extend(_collect_unpaired_sections(sections_a[i], "deleted"))
         elif tag == "insert":
             for j in range(j1, j2):
-                results.append(SectionDiffResult(section_a=None, section_b=sections_b[j], diff_type="added"))
+                results.extend(_collect_unpaired_sections(sections_b[j], "added"))
 
     return results
+
+
+def _diff_section_tree_pair(sa, sb):
+    """比对一对 section，并递归比对子 section。"""
+    results = [_diff_section_pair(sa, sb)]
+    results.extend(_align_and_diff_sections(sa.children, sb.children))
+    return results
+
+
+def _collect_unpaired_sections(section, diff_type: str):
+    """收集新增/删除 section 根节点，避免与子节点重复高亮。"""
+    from src.documents.structuring import SectionDiffResult
+
+    if diff_type == "added":
+        result = SectionDiffResult(
+            section_a=None,
+            section_b=section,
+            diff_type="added",
+            diff_ops=[[1, _strip_all_whitespace(_normalize_text(section.text_content)), 0, 0]],
+        )
+    else:
+        result = SectionDiffResult(
+            section_a=section,
+            section_b=None,
+            diff_type="deleted",
+            diff_ops=[[-1, _strip_all_whitespace(_normalize_text(section.text_content)), 0, 0]],
+        )
+
+    return [result]
 
 
 def _diff_section_pair(sa, sb):
     """比对两个配对的 SectionBlock。"""
     from src.documents.structuring import SectionDiffResult
 
-    text_a = _strip_all_whitespace(_normalize_text(sa.text_content))
-    text_b = _strip_all_whitespace(_normalize_text(sb.text_content))
+    own_text_a = _section_own_text(sa)
+    own_text_b = _section_own_text(sb)
+    text_a = _strip_all_whitespace(_normalize_text(own_text_a))
+    text_b = _strip_all_whitespace(_normalize_text(own_text_b))
 
     if text_a == text_b:
         return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
 
-    if _is_content_identical(sa.text_content, sb.text_content):
+    if _is_content_identical(own_text_a, own_text_b):
         return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
 
-    ops = compute_text_diff(sa.text_content, sb.text_content)
+    ops = compute_text_diff(own_text_a, own_text_b)
 
     if all(op == 0 for op, *_ in ops):
         return SectionDiffResult(section_a=sa, section_b=sb, diff_type="equal")
@@ -1035,16 +1087,21 @@ async def _save_sections(db, task_id, user_id, struct_a, struct_b, section_diffs
     import json
     from src.documents.models import DocumentSection
 
-    # 构建 section_a → (diff_type, diff_ops) 映射
-    diff_type_map = {}
-    diff_ops_map = {}
+    # 构建两侧 section → (diff_type, diff_ops) 映射。
+    # modified 的 ops 同时保存到 A/B，added 仅保存到 B，deleted 仅保存到 A。
+    diff_type_map_a = {}
+    diff_type_map_b = {}
+    diff_ops_map_a = {}
+    diff_ops_map_b = {}
     for sd in section_diffs:
         if sd.section_a is not None:
-            diff_type_map[id(sd.section_a)] = sd.diff_type
-            if sd.diff_type == "modified" and sd.diff_ops:
-                diff_ops_map[id(sd.section_a)] = json.dumps(
-                    sd.diff_ops, ensure_ascii=False
-                )
+            diff_type_map_a[id(sd.section_a)] = sd.diff_type
+            if sd.diff_ops:
+                diff_ops_map_a[id(sd.section_a)] = json.dumps(sd.diff_ops, ensure_ascii=False)
+        if sd.section_b is not None:
+            diff_type_map_b[id(sd.section_b)] = sd.diff_type
+            if sd.diff_ops:
+                diff_ops_map_b[id(sd.section_b)] = json.dumps(sd.diff_ops, ensure_ascii=False)
 
     # 扁平化收集所有 section，两遍写入：第一遍写顶层（parent_id=None），第二遍写子层
     order = [0]
@@ -1064,8 +1121,8 @@ async def _save_sections(db, task_id, user_id, struct_a, struct_b, section_diffs
                 source_indices=source_indices,
                 parent_id=None,
                 order_index=order[0],
-                diff_type=diff_type_map.get(id(block)) if doc_type == 'a' else None,
-                diff_ops_json=diff_ops_map.get(id(block)) if doc_type == 'a' else None,
+                diff_type=(diff_type_map_a if doc_type == 'a' else diff_type_map_b).get(id(block)),
+                diff_ops_json=(diff_ops_map_a if doc_type == 'a' else diff_ops_map_b).get(id(block)),
             )
             db.add(row)
             block_to_row[id(block)] = (row, parent_block)
@@ -1134,4 +1191,3 @@ async def _compare_docx_plan_b(task, db, loop, start_time):
     task.status = "done"
     db.add(task)
     await db.commit()
-

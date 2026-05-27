@@ -63,8 +63,8 @@ class DocumentSection(SQLModel, table=True):
     source_indices: Optional[str] = Field(default=None, description="JSON array of InputLine source_index")
     parent_id: Optional[int] = Field(default=None, foreign_key="document_sections.id")
     order_index: int = Field(default=0)
-    diff_type: Optional[str] = Field(default=None, description="equal/modified/added/deleted（仅 doc_type=a 填充）")
-    diff_ops_json: Optional[str] = Field(default=None, description="文本级 diff 操作 JSON（仅 modified）")
+    diff_type: Optional[str] = Field(default=None, description="equal/modified/added/deleted")
+    diff_ops_json: Optional[str] = Field(default=None, description="文本级 diff 操作 JSON")
     page_number: Optional[int] = Field(default=None, description="映射到的 PDF 页码")
     created_at: datetime = Field(default_factory=datetime.now)
 

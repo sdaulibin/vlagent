@@ -59,7 +59,7 @@ def _strip_ws(text: str) -> str:
 
 # ---- 行分类器 ----
 
-_H1_RE = re.compile(r'^第[一二三四五六七八九十百〇零]+[节節]\s*')
+_H1_RE = re.compile(r'^第[一二三四五六七八九十百〇零]+[节節条]\s*')
 _H2_RE = re.compile(r'^([一二三四五六七八九十百〇零]+)[、．.]\s*')
 _H4_RE = re.compile(r'^(\d+)[\.．、]\s*(?!\d)')
 _H3_RE = re.compile(r'^(\d+)[\.．](\d+)\s*')
@@ -333,10 +333,10 @@ def _handle_heading_with_gates(
         if not any(_stack_level_at(stack, i) <= 2 for i in range(len(stack))):
             return False
 
-    # H4 上下文门控：stack top 需为 3 或 4
+    # H4 上下文门控：stack top 需为 1-4（允许跳级，如合同中 H1 条下直接跟 H4 子项）
     if level == "H4":
         top = _stack_level(stack)
-        if top not in (3, 4):
+        if top not in (1, 2, 3, 4):
             return False
 
     _handle_heading(level, line, doc, stack)
@@ -508,8 +508,13 @@ def flatten_section(block: SectionBlock) -> str:
 
 
 def flatten_document(doc: StructuredDocument) -> None:
-    for block in doc.main:
+    def _fill(block: SectionBlock) -> None:
         block.text_content = flatten_section(block)
+        for child in block.children:
+            _fill(child)
+
+    for block in doc.main:
+        _fill(block)
 
 
 # ---- python-docx 提取 ----
@@ -757,4 +762,3 @@ def _collect_pages(block, idx_to_page: dict[int, int], pages: set[int]) -> None:
             pages.add(idx_to_page[line.source_index])
     for child in block.children:
         _collect_pages(child, idx_to_page, pages)
-
