@@ -13,7 +13,7 @@ from PIL import Image
 from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
-from src.credentials.prompts import PROMPT_MAPPING
+from src.credentials.prompts import PROMPT_MAPPING, SEAL_CODE_VERIFY_PROMPT
 
 
 def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
@@ -56,66 +56,6 @@ def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
     return data
 
 
-def _verify_symbols_with_secondary_check(image_paths: List[str], item_names: List[str]) -> Dict[str, bool]:
-    """
-    使用专门的符号识别 prompt 进行二次验证
-
-    Args:
-        image_paths: 图片路径列表
-        item_names: 需要验证的项目名称列表
-
-    Returns:
-        dict: {项目名称: is_checkmark}
-    """
-    from src.credentials.prompts import SYMBOL_RECOGNITION_PROMPT
-
-    # 构造验证 prompt，明确指定需要验证的项目
-    items_text = "\n".join([f"- {name}" for name in item_names])
-    verification_prompt = f"{SYMBOL_RECOGNITION_PROMPT}\n\n需要验证的项目：\n{items_text}"
-
-    print(f"[DEBUG] 启动二次验证，验证 {len(item_names)} 个项目")
-
-    try:
-        # 调用 AI 进行二次验证
-        response = request_qwen35(
-            question=verification_prompt,
-            file_base=image_paths[0],
-            show_request=False
-        ).strip()
-
-        data = json.loads(fix_json(response))
-
-        # 提取验证结果（新格式包含推理过程）
-        result = {}
-        symbols = data.get("symbols", [])
-
-        print(f"[DEBUG] 二次验证详细结果:")
-        for symbol_info in symbols:
-            name = symbol_info.get("item_name", "")
-            is_checkmark = symbol_info.get("is_checkmark", False)
-
-            # 打印推理过程
-            has_ink = symbol_info.get("has_ink", "未知")
-            intersection_analysis = symbol_info.get("intersection_analysis", "")
-            symbol_description = symbol_info.get("symbol_description", "")
-
-            print(f"  [{name}]")
-            print(f"    - 有墨迹: {has_ink}")
-            print(f"    - 交叉点分析: {intersection_analysis}")
-            print(f"    - 符号描述: {symbol_description}")
-            print(f"    - 最终判断: {'√' if is_checkmark else '×'}")
-
-            result[name] = is_checkmark
-
-        print(f"[DEBUG] 二次验证最终结果: {result}")
-        return result
-
-    except Exception as e:
-        print(f"[ERROR] 二次验证失败: {e}")
-        import traceback
-        traceback.print_exc()
-        # 返回空字典，表示验证失败，保持原始结果
-        return {}
 
 
 def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
@@ -256,6 +196,18 @@ def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
                 "checked": name in checked_names
             })
 
+    # 【类别边界一致性检查】
+    # 模型在类别边界处易将最后一项的方框与下一类首项方框混淆，导致结果反转。
+    # 特征：某类别仅最后一项被勾选，其余全部未勾选——这几乎不可能是真实填写模式。
+    for category in ["opening", "change", "cancellation"]:
+        items = result[category]
+        if len(items) < 2:
+            continue
+        checked_count = sum(1 for it in items if it.get("checked", False))
+        if checked_count == 1 and items[-1].get("checked", False):
+            items[-1]["checked"] = False
+            print(f"[DEBUG] 边界一致性修正: {category} 最后一项 '{items[-1]['name']}' 由 checked→unchecked (类别内仅末项被勾选，疑似边界错配)")
+
     # 处理"其他业务"（按分隔符拆分，包括空格）
     raw_other = raw_categories.get("other", [])
     if not isinstance(raw_other, list):
@@ -348,6 +300,33 @@ def _grid_split_image(image_path: str, output_dir: str, rows=2, cols=2) -> List[
         print(f"[WARNING] Grid split failed: {e}")
     return [image_path]
 
+def _auto_rotate_if_needed(img: Image.Image) -> Image.Image:
+    """检测印章编码是否倒立，如果是则旋转180度。
+    通过检测印章周围的关键文字方向来判断：如果"业务受理章"等文字是倒立的，说明印章是倒的。
+    简化方案：对每个切片生成一个正向和180度旋转版本，都用一次快速AI调用判断哪个方向正确。
+    """
+    import numpy as np
+    try:
+        # 简单启发式：印章编码通常在图片下半部分
+        # 如果下半部分有大量深色像素（印章本身是红色/深色），
+        # 说明印章可能是正的；如果上半部分有，可能需要旋转
+        w, h = img.size
+        arr = np.array(img.convert('L'))
+        
+        # 计算上半和下半的深色像素密度
+        mid = h // 2
+        top_density = np.mean(arr[:mid, :] < 128)
+        bottom_density = np.mean(arr[mid:, :] < 128)
+        
+        # 如果顶部深色密度远大于底部，图片可能需要旋转
+        if top_density > bottom_density * 1.5:
+            print(f"  [自动旋转] 检测到印章可能倒立 (top={top_density:.3f}, bot={bottom_density:.3f})，旋转180度")
+            return img.rotate(180, expand=True)
+    except Exception as e:
+        print(f"  [自动旋转] 检测失败: {e}")
+    return img
+
+
 def _split_multi_form_image(image_path: str, output_dir: str) -> List[str]:
     """Split electronic seal documents (multi-part forms) for higher precision."""
     try:
@@ -357,11 +336,11 @@ def _split_multi_form_image(image_path: str, output_dir: str) -> List[str]:
                 print(f"[DEBUG] Image ratio (H/W={h/w:.2f}) suggests multi-part form, spliting horizontally...")
 
                 # Split in half horizontally
-                top_part = img.crop((0, 0, w, h // 2))
+                top_part = _auto_rotate_if_needed(img.crop((0, 0, w, h // 2)))
                 top_path = os.path.join(output_dir, "part_top.jpg")
                 top_part.convert("RGB").save(top_path, "JPEG", quality=95)
 
-                bottom_part = img.crop((0, h // 2, w, h))
+                bottom_part = _auto_rotate_if_needed(img.crop((0, h // 2, w, h)))
                 bottom_path = os.path.join(output_dir, "part_bottom.jpg")
                 bottom_part.convert("RGB").save(bottom_path, "JPEG", quality=95)
 
@@ -394,20 +373,66 @@ def _merge_json_results(results: List[dict]) -> dict:
                         final_data[k] = v
     return final_data
 
+
+def _verify_seal_codes(data: dict, credential_type: str, image_path: str | None) -> dict:
+    """对电子印章编码进行二次逐字符核验。"""
+    if credential_type != "electronic_seal" or not image_path:
+        return data
+    seal_codes = data.get("seal_codes", [])
+    if not seal_codes:
+        return data
+
+    # Clean dashes from seal codes (model sometimes adds separators)
+    cleaned = [c.replace("-", "").replace(" ", "") for c in seal_codes]
+    if cleaned != seal_codes:
+        print(f"  [印章核验] 清理分隔符: {seal_codes} -> {cleaned}")
+        data["seal_codes"] = cleaned
+        seal_codes = cleaned
+
+    codes_text = ", ".join(seal_codes)
+    verify_prompt = SEAL_CODE_VERIFY_PROMPT + f"\n\n待验证编码: {codes_text}"
+
+    try:
+        resp = request_qwen35(
+            question=verify_prompt,
+            file_base=image_path,
+            show_request=False,
+        ).strip()
+        verify_data = json.loads(fix_json(resp))
+        verified = verify_data.get("verified_codes", [])
+        if verified and len(verified) == len(seal_codes):
+            for i, (orig, v) in enumerate(zip(seal_codes, verified)):
+                if orig != v:
+                    print(f"  [印章核验] 编码修正: {orig} -> {v}")
+            data["seal_codes"] = verified
+        elif verified:
+            # 验证结果数量不匹配，按字符数更接近10位的优先
+            final = []
+            for i in range(len(seal_codes)):
+                if i < len(verified) and len(verified[i]) >= len(seal_codes[i]):
+                    final.append(verified[i])
+                else:
+                    final.append(seal_codes[i])
+            data["seal_codes"] = final
+    except Exception as e:
+        print(f"[印章核验] 二次验证失败: {e}")
+
+    return data
+
+
 def extract_fields_from_images(image_paths: List[str], credential_type: str) -> dict:
     """Call AI to extract fields from document images."""
     with tempfile.TemporaryDirectory(prefix="cred_work_") as work_dir:
         final_image_paths = []
 
-        # Strategy 1: Grid split for dense A4 forms (Account Opening only - NOT Power of Attorney)
-        DENSE_TYPES = ["account_opening_app"]
-        if credential_type in DENSE_TYPES and len(image_paths) == 1:
-            final_image_paths = _grid_split_image(image_paths[0], work_dir, rows=2, cols=2)
-            max_size = 2048
+        # Strategy 1: Account Opening - full image at high resolution (grid splitting caused field mixing/truncation)
+        if credential_type == "account_opening_app" and len(image_paths) == 1:
+            final_image_paths = image_paths
+            max_size = 3072
         # Strategy 2: Simple horizontal split for Electronic Seal
         elif credential_type == "electronic_seal" and len(image_paths) == 1:
             final_image_paths = _split_multi_form_image(image_paths[0], work_dir)
-            max_size = 1600
+            max_size = 2048
         # Strategy 3: Power of Attorney - higher resolution to preserve small checkbox symbols
         elif credential_type == "power_of_attorney" and len(image_paths) == 1:
             final_image_paths = image_paths
@@ -419,7 +444,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         # 根据凭证类型调整压缩质量
         compress_dir = os.path.join(work_dir, "compressed")
         os.makedirs(compress_dir, exist_ok=True)
-        if credential_type == "power_of_attorney":
+        if credential_type in ("power_of_attorney", "account_opening_app"):
             compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size, quality=95)
         else:
             compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size)
@@ -439,6 +464,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                 data = json.loads(fix_json(response))
                 data = _post_process_boolean_fields(data, credential_type)
                 data = _post_process_authorized_items(data, credential_type)
+                data = _verify_seal_codes(data, credential_type, compressed_paths[0])
                 return data
             except Exception as e:
                 print(f"[{credential_type}] JSON parse failed: {e}")
@@ -460,6 +486,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             merged = _merge_json_results(part_results)
             merged = _post_process_boolean_fields(merged, credential_type)
             merged = _post_process_authorized_items(merged, credential_type)
+            merged = _verify_seal_codes(merged, credential_type, compressed_paths[0] if compressed_paths else None)
             return merged
 
 def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:

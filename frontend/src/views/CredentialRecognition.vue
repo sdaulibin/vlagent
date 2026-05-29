@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ArrowLeft, Upload, Loader2, FileCheck2, Trash2, Eye } from 'lucide-vue-next';
 import {
@@ -44,6 +44,11 @@ const selectedRecordId = ref<number | null>(null);
 const previewUrl = ref('');
 
 const records = ref<CredentialRecordItem[]>([]);
+const pollTimer = ref<ReturnType<typeof setInterval> | null>(null);
+
+const hasProcessingRecords = computed(() =>
+  records.value.some(r => r.status === 'pending' || r.status === 'processing')
+);
 
 const FIELD_LABELS: Record<string, string> = {
   is_front_side: '是否为正面(人像面)',
@@ -69,6 +74,7 @@ const FIELD_LABELS: Record<string, string> = {
   card_number: '银行卡号',
   payer_name: '付款人',
   payer_account: '付款人账号',
+  customer_number: '客户号',
   payee_name: '收款人',
   payee_account: '收款人账号',
   amount: '交易金额',
@@ -237,13 +243,10 @@ const handleFileUpload = async (event: Event) => {
 
   try {
     const data = await extractCredential(file, selectedType.value);
-    resultData.value = data.result;
-    errorMsg.value = data.error_msg || '';
     selectedRecordId.value = data.id;
-    if (data.id) {
-      previewUrl.value = await getCredentialFileUrl(data.id);
-    }
     await loadRecords();
+    // 上传后后台异步处理，启动轮询等待完成
+    startPolling();
   } catch (e: any) {
     console.error("提取失败", e);
     errorMsg.value = e.response?.data?.detail || e.message || "由于网络或服务异常，提取失败";
@@ -258,8 +261,40 @@ const isImageFile = (filename: string) => {
   return ext === 'jpg' || ext === 'jpeg' || ext === 'png';
 };
 
-onMounted(() => {
-  loadRecords();
+const startPolling = () => {
+  if (pollTimer.value) return;
+  pollTimer.value = setInterval(async () => {
+    await loadRecords();
+    // 如果当前选中的记录已完成，刷新详情
+    if (selectedRecordId.value) {
+      const current = records.value.find(r => r.id === selectedRecordId.value);
+      if (current && (current.status === 'done' || current.status === 'failed')) {
+        await selectRecord(selectedRecordId.value);
+      }
+    }
+    // 没有正在处理的记录时停止轮询
+    if (!hasProcessingRecords.value) {
+      stopPolling();
+    }
+  }, 3000);
+};
+
+const stopPolling = () => {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value);
+    pollTimer.value = null;
+  }
+};
+
+onMounted(async () => {
+  await loadRecords();
+  if (hasProcessingRecords.value) {
+    startPolling();
+  }
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
