@@ -77,3 +77,4 @@ download/
 
 uv.lock
 uv.toml
+vlagent.db

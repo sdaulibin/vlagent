@@ -1,0 +1,132 @@
+/* PDF viewer */
+.document-pdf-content {
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+}
+
+.document-pdf-page {
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.pdf-highlight-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pdf-highlight-layer .pdf-highlight-del {
+  position: absolute;
+  background-color: rgba(254, 202, 202, 0.5);
+  border-radius: 2px;
+}
+
+.pdf-highlight-layer .pdf-highlight-ins {
+  position: absolute;
+  background-color: rgba(187, 247, 208, 0.5);
+  border-radius: 2px;
+}
+
+/* Sidebar diff text */
+.diff-text-del {
+  background: #fca5a5;
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.diff-text-ins {
+  background: #86efac;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* TOC Modal */
+.toc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.toc-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.toc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.toc-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.toc-item--child {
+  padding-left: 24px;
+}
+
+.toc-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toc-badge--heading {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.toc-badge--table {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.toc-badge--body {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.toc-title {
+  font-size: 13px;
+  color: #334155;
+}

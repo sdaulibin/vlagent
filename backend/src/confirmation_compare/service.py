@@ -117,6 +117,7 @@ Task: 分析这份银行询证函图片，完成以下两项任务：
 【重要】函件可能有多页图片，请综合所有图片内容提取，不要遗漏。
 【重要】必须保持原文中的标点符号不变，特别是中文括号（）不要转换为英文括号()。
 【重要】某些节次的标题可能出现在一页的底部，而其表格出现在下一页的顶部（跨页分割）。请务必将它们合并为同一个 section，并完整提取该 section 的 table_headers。例如"附表"的标题在第3页底部，其表格在第4页顶部，应合并为一个完整的 section。
+【重要】表格的表头也可能跨页分割：前一页显示了前几列的表头，后一页继续显示剩余列的表头。请仔细检查每页的表头行，将跨页的表头合并为完整的列名。例如前页显示"银行结算账号/借据编号"，后页显示"/贷款账号"，应合并为"银行结算账号/借据编号/贷款账号"。特别注意合并后每个表头是否完整，不要遗漏前缀或后缀。如果某个表头在两页分别显示了部分文字（如前页显示"资金"，后页显示"借出方"），应拼接为完整文字"资金借出方"，而不是丢弃前页的部分。
 【重要】"附表"是一个独立的 section，与编号节次（如"14. 其他"）无关，即使它们出现在同一页上也必须分为两个不同的 section。不要将附表的 table_headers 放到其他编号节次下。
 仅输出 JSON，不要解释。
 """
@@ -233,12 +234,76 @@ def _extract_content_from_images(image_paths: list[str]) -> dict:
             data["highlighted_content"] = _post_process_sections(
                 data.get("highlighted_content", [])
             )
+            # 后处理：修复跨页截断的表头
+            fmt = data.get("format_type", "")
+            if fmt:
+                data["highlighted_content"] = _fix_cross_page_headers(
+                    data["highlighted_content"], fmt
+                )
             return data
         return {}
     except Exception as e:
         print(f"[FormatCompare] JSON 解析失败: {e}, 原始响应: {response[:300]}")
         return {}
 
+
+
+
+def _fix_cross_page_headers(sections: list[dict], format_type: str) -> list[dict]:
+    """
+    后处理：修复跨页截断的表头。
+    当表头文字被分在两页（如前页"资金"，后页"借出方"），
+    AI 可能只提取了后页的部分。通过对比模板，将截断的表头补全。
+    仅在以下条件同时满足时才修正，避免误判：
+    1. 提取的表头数量与模板一致（说明列数没错，只是文字被截断）
+    2. 按位置逐个对比，提取的表头是对应模板表头的后缀
+    """
+    template = _load_template(format_type)
+    if not template:
+        return sections
+    template_sections = template.get("highlighted_content", [])
+
+    for s in sections:
+        sec_name = s.get("section", "")
+        tpl = None
+        for ts in template_sections:
+            if ts.get("section", "") == sec_name:
+                tpl = ts
+                break
+        if not tpl or "table_headers" not in s:
+            continue
+
+        act_headers = s["table_headers"]
+        tpl_headers = tpl.get("table_headers", [])
+
+        if not act_headers or not tpl_headers:
+            continue
+
+        # 必须列数一致才修正（列数不同说明表头结构真有差异，不是跨页问题）
+        if len(act_headers) != len(tpl_headers):
+            continue
+
+        # 按位置逐个检查：提取的表头是否是对应模板表头的后缀
+        fixed = []
+        any_fixed = False
+        for ah, th in zip(act_headers, tpl_headers):
+            norm_ah = _normalize_text(ah)
+            norm_th = _normalize_text(th)
+            if norm_ah == norm_th:
+                fixed.append(ah)
+            elif norm_th.endswith(norm_ah) and len(norm_ah) < len(norm_th):
+                fixed.append(th)
+                any_fixed = True
+            else:
+                fixed.append(ah)
+
+        if any_fixed:
+            for i, (ah, th) in enumerate(zip(act_headers, tpl_headers)):
+                if fixed[i] != ah:
+                    print(f'  [跨页修正] "{sec_name}" 表头: "{ah}" -> "{fixed[i]}"')
+            s["table_headers"] = fixed
+
+    return sections
 
 def _post_process_sections(sections: list[dict]) -> list[dict]:
     """

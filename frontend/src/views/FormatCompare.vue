@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import {
   ArrowLeft,
   Upload,
@@ -31,6 +31,30 @@ const isUploading = ref(false);
 const isComparing = ref(false);
 const taskFileUrl = ref<string>('');
 const templateFileUrl = ref<string>('');
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+const startPolling = () => {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    await loadTasks();
+    if (selectedTask.value) {
+      const current = tasks.value.find(t => t.id === selectedTask.value!.id);
+      if (current && (current.status === 'done' || current.status === 'failed')) {
+        await selectTask(current.id);
+      }
+    }
+    if (!tasks.value.some(t => t.status === 'processing')) {
+      stopPolling();
+    }
+  }, 10000);
+};
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
 
 const formatTypeLabels: Record<string, string> = {
   format_1: "格式一（银行询证函）",
@@ -110,6 +134,7 @@ const handleCompare = async () => {
       templateFileUrl.value = await getFormatCompareTemplateUrl(selectedTask.value.format_type);
     }
     await loadTasks();
+    startPolling();
   } catch (e) {
     console.error("比对失败", e);
     // 失败时刷新真实状态
@@ -229,9 +254,16 @@ const headerHasMismatch = (
   );
 };
 
-onMounted(() => {
-  loadTasks();
+onMounted(async () => {
+  await loadTasks();
   loadTemplates();
+  if (tasks.value.some(t => t.status === 'processing')) {
+    startPolling();
+  }
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
@@ -503,7 +535,7 @@ onMounted(() => {
                   v-else
                   class="flex items-center justify-center h-full text-slate-400 text-sm"
                 >
-                  未能识别格式类型，无法显示模板
+                  {{ selectedTask.status === 'processing' ? '比对中，模板识别后将自动显示' : '未能识别格式类型，无法显示模板' }}
                 </div>
               </div>
             </div>

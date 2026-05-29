@@ -519,6 +519,15 @@ def flatten_document(doc: StructuredDocument) -> None:
 
 # ---- python-docx 提取 ----
 
+def _extract_cell_text(cell) -> str:
+    """提取单元格文本，递归处理嵌套表格。"""
+    from docx.oxml.ns import qn
+    tc_element = cell._tc if hasattr(cell, '_tc') else cell._element
+    t_elements = tc_element.findall('.//' + qn('w:t'))
+    text = ''.join(t.text or '' for t in t_elements)
+    return text.replace('\n', ' ').strip()
+
+
 def extract_input_lines(docx_path: str) -> list[InputLine]:
     """从 DOCX 文件提取 InputLine 列表，保留样式信息和文档顺序。"""
     from docx import Document
@@ -534,7 +543,7 @@ def extract_input_lines(docx_path: str) -> list[InputLine]:
         if item_type == 'Table':
             rows: list[list[str]] = []
             for row in item.rows:
-                cells = [cell.text.replace('\n', ' ').strip() for cell in row.cells]
+                cells = [_extract_cell_text(cell) for cell in row.cells]
                 rows.append(cells)
             lines.append(InputLine(
                 text="",

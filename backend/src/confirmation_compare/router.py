@@ -258,12 +258,9 @@ async def delete_task(
     """删除比对任务"""
     file_obj, _ = await _get_file_with_result(file_id, session, user_id)
 
-    # 删除比对结果
-    res_stmt = select(FormatCompareResult).where(FormatCompareResult.file_id == file_id)
-    res_result = await session.execute(res_stmt)
-    result_obj = res_result.scalar_one_or_none()
-    if result_obj:
-        await session.delete(result_obj)
+    # 直接删除关联的比对结果
+    from sqlalchemy import delete as sa_delete
+    await session.execute(sa_delete(FormatCompareResult).where(FormatCompareResult.file_id == file_id))
 
     # 删除文件
     if os.path.exists(file_obj.file_path):

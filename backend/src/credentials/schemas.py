@@ -43,6 +43,7 @@ class BankCardResponse(BaseModel):
 class ElectronicCredentialResponse(BaseModel):
     payer_name: Optional[str] = Field("", description="付款人姓名/名称")
     payer_account: Optional[str] = Field("", description="付款人账号")
+    customer_number: Optional[str] = Field("", description="客户号")
     payee_name: Optional[str] = Field("", description="收款人姓名/名称")
     payee_account: Optional[str] = Field("", description="收款人账号")
     amount: Optional[str] = Field("", description="交易金额")

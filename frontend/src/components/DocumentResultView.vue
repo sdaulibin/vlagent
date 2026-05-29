@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, ArrowLeft, X } from 'lucide-vue-next';
 import { api } from '../api';
 import type { PageDiff, SectionItem } from '../types';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -93,6 +93,28 @@ const sectionStats = computed(() => {
   const equal = sectionsA.value.filter(s => s.diff_type === 'equal').length;
   return { all, modified, added, deleted, equal };
 });
+
+// ---- TOC modal ----
+const tocModalVisible = ref(false);
+const tocModalTitle = ref('');
+const tocModalItems = ref<{ role: string; label: string; title: string; depth: number }[]>([]);
+
+function buildTocItems(sections: SectionItem[]) {
+  const sorted = [...sections].sort((a, b) => a.order_index - b.order_index);
+  return sorted.map(s => {
+    const label = s.role.startsWith('h') ? s.role.toUpperCase() : (s.role === 'table' ? '表格' : '正文');
+    const depth = s.parent_id ? 1 : 0;
+    return { role: s.role, label, title: s.title || `[${label}]`, depth };
+  });
+}
+
+function showTocModal(side: 'a' | 'b') {
+  const sections = side === 'a' ? sectionsA.value : sectionsB.value;
+  const fileName = side === 'a' ? props.fileAName : props.fileBName;
+  tocModalTitle.value = side === 'a' ? `原文档目录 - ${fileName}` : `比对文档目录 - ${fileName}`;
+  tocModalItems.value = buildTocItems(sections);
+  tocModalVisible.value = true;
+}
 
 // ---- PDF mode computed ----
 const filteredPages = computed(() => {
@@ -535,13 +557,27 @@ const filteredSections = computed(() => {
           <div class="p-4 border-b border-slate-100">
             <h3 class="text-sm font-semibold text-slate-700 mb-3">比对结果</h3>
             <div class="grid grid-cols-2 gap-2 text-center">
-              <div class="bg-slate-50 rounded-lg p-2">
-                <div class="text-lg font-bold text-slate-700">{{ sectionStats.all }}</div>
-                <div class="text-xs text-slate-400">总节数</div>
+              <div class="bg-slate-50 rounded-lg p-2 cursor-pointer hover:bg-slate-100 transition-colors" @click="showTocModal('a')">
+                <div class="text-lg font-bold text-slate-700">{{ sectionsA.length }}</div>
+                <div class="text-xs text-slate-400">原文档节数</div>
               </div>
+              <div class="bg-slate-50 rounded-lg p-2 cursor-pointer hover:bg-slate-100 transition-colors" @click="showTocModal('b')">
+                <div class="text-lg font-bold text-slate-700">{{ sectionsB.length }}</div>
+                <div class="text-xs text-slate-400">比对文档节数</div>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center mt-2">
               <div class="bg-orange-50 rounded-lg p-2">
                 <div class="text-lg font-bold text-orange-600">{{ sectionStats.modified }}</div>
                 <div class="text-xs text-orange-400">有差异</div>
+              </div>
+              <div class="bg-green-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-green-600">{{ sectionStats.added }}</div>
+                <div class="text-xs text-green-400">新增</div>
+              </div>
+              <div class="bg-red-50 rounded-lg p-2">
+                <div class="text-lg font-bold text-red-600">{{ sectionStats.deleted }}</div>
+                <div class="text-xs text-red-400">删除</div>
               </div>
             </div>
           </div>
@@ -578,6 +614,33 @@ const filteredSections = computed(() => {
                   </template>
                 </div>
               </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOC Modal -->
+        <div v-if="tocModalVisible" class="toc-modal-overlay" @click.self="tocModalVisible = false">
+          <div class="toc-modal">
+            <div class="toc-modal-header">
+              <h3 class="text-sm font-semibold text-slate-700">{{ tocModalTitle }}</h3>
+              <button @click="tocModalVisible = false" class="p-1 rounded hover:bg-slate-100">
+                <X class="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div class="toc-modal-body">
+              <div v-if="tocModalItems.length === 0" class="text-center text-slate-400 text-sm py-8">无章节</div>
+              <ul class="toc-list">
+                <li
+                  v-for="(item, idx) in tocModalItems"
+                  :key="idx"
+                  :class="['toc-item', item.depth > 0 ? 'toc-item--child' : '']"
+                >
+                  <span :class="['toc-badge', item.role.startsWith('h') ? 'toc-badge--heading' : item.role === 'table' ? 'toc-badge--table' : 'toc-badge--body']">
+                    {{ item.label }}
+                  </span>
+                  <span class="toc-title">{{ item.title }}</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -725,55 +788,3 @@ const filteredSections = computed(() => {
   </div>
 </template>
 
-<style>
-/* PDF viewer */
-.document-pdf-content {
-  overflow-y: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 16px;
-}
-
-.document-pdf-page {
-  position: relative;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
-  border-radius: 2px;
-  line-height: 1;
-}
-
-.pdf-highlight-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.pdf-highlight-layer .pdf-highlight-del {
-  position: absolute;
-  background-color: rgba(254, 202, 202, 0.5);
-  border-radius: 2px;
-}
-
-.pdf-highlight-layer .pdf-highlight-ins {
-  position: absolute;
-  background-color: rgba(187, 247, 208, 0.5);
-  border-radius: 2px;
-}
-
-/* Sidebar diff text */
-.diff-text-del {
-  background: #fca5a5;
-  text-decoration: line-through;
-  text-decoration-color: #dc2626;
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
-.diff-text-ins {
-  background: #86efac;
-  border-radius: 2px;
-  padding: 0 1px;
-}
-</style>

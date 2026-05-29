@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { FileText, ArrowLeft, Play, Trash2, Upload, RefreshCcw } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import {
@@ -18,6 +18,30 @@ const selectedLetter = ref<ConfirmationLetterItem | null>(null);
 const previewUrl = ref('');
 const isUploading = ref(false);
 const isRecognizing = ref(false);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+const startPolling = () => {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    await loadLetters();
+    if (selectedLetter.value) {
+      const current = letters.value.find(l => l.id === selectedLetter.value!.id);
+      if (current && (current.status === 'done' || current.status === 'failed')) {
+        await selectLetter(current.id);
+      }
+    }
+    if (!letters.value.some(l => l.status === 'processing' || l.status === 'pending')) {
+      stopPolling();
+    }
+  }, 10000);
+};
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
 
 // 字段定义（用于展示）
 const displayFields = [
@@ -47,8 +71,14 @@ const loadLetters = async () => {
 
 const selectLetter = async (id: number) => {
   try {
-    selectedLetter.value = await getConfirmationLetter(id);
+    const detail = await getConfirmationLetter(id);
+    selectedLetter.value = detail;
     previewUrl.value = await getConfirmationPreviewUrl(id);
+    // Sync latest status back to the list
+    const idx = letters.value.findIndex(l => l.id === id);
+    if (idx !== -1) {
+      letters.value[idx] = { ...letters.value[idx], status: detail.status, recognition: detail.recognition };
+    }
   } catch (e) {
     console.error("加载询证函详情失败", e);
   }
@@ -91,10 +121,10 @@ const handleStartRecognition = async () => {
       await recognizeConfirmationLetter(letter.id);
     }
     await loadLetters();
-    const doneLetter = letters.value.find(l => l.status === 'done');
-    if (doneLetter) {
-      await selectLetter(doneLetter.id);
+    if (selectedLetter.value) {
+      await selectLetter(selectedLetter.value.id);
     }
+    startPolling();
   } catch (e) {
     console.error("识别失败", e);
     await loadLetters();
@@ -111,6 +141,7 @@ const handleRecognizeOne = async (id: number) => {
   try {
     await recognizeConfirmationLetter(id);
     await loadLetters();
+    startPolling();
     if (selectedLetter.value?.id === id) {
       await selectLetter(id);
     }
@@ -165,8 +196,15 @@ const getFieldValue = (key: string): string => {
   return (recognition as any)[key] || '-';
 };
 
-onMounted(() => {
-  loadLetters();
+onMounted(async () => {
+  await loadLetters();
+  if (letters.value.some(l => l.status === 'processing' || l.status === 'pending')) {
+    startPolling();
+  }
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
