@@ -343,7 +343,7 @@ onUnmounted(() => {
             </template>
             <template v-else>
               <Upload class="w-8 h-8 text-slate-400" />
-              <span class="text-slate-600 mt-2 text-center text-sm">点击或拖拽上传<br/>(PDF / JPG / PNG)</span>
+              <span class="text-slate-600 mt-2 text-center text-sm">点击上传<br/>(PDF / JPG / PNG)</span>
             </template>
             <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="hidden" @change="handleFileUpload" :disabled="isUploading" />
           </label>
@@ -445,7 +445,7 @@ onUnmounted(() => {
             <template v-else>
               <div class="result-grid">
                 <template v-for="(val, key) in resultData" :key="key">
-                  <div v-if="String(key) !== 'operators' && String(key) !== 'authorized_items_by_category' && val !== null" class="result-field">
+                  <div v-if="String(key) !== 'operators' && String(key) !== 'linked_accounts' && String(key) !== 'authorized_items_by_category' && val !== null" class="result-field">
                     <p class="result-field-label font-mono">{{ FIELD_LABELS[key] || key }}</p>
                     <p class="result-field-value break-words">
                       <template v-if="Array.isArray(val)">
@@ -467,20 +467,95 @@ onUnmounted(() => {
                 </template>
               </div>
 
-              <!-- Operators Array Display for Online Banking App -->
+              <!-- Linked Accounts Table for Online Banking App -->
+              <div v-if="resultData.linked_accounts && resultData.linked_accounts.length > 0" class="mt-6">
+                <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">企业需关联的账户</h4>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm border-collapse">
+                    <thead>
+                      <tr class="bg-slate-100">
+                        <th class="border border-slate-300 px-3 py-2 text-left font-medium text-slate-600" rowspan="2">账号</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600" colspan="2">企业网银</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600" colspan="2">手机银行</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600" rowspan="2">单笔限额</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600" rowspan="2">日累计限额</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600" rowspan="2">日转账笔数</th>
+                      </tr>
+                      <tr class="bg-slate-100">
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-500">查询</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-500">转账</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-500">查询</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-500">转账</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(acc, idx) in resultData.linked_accounts" :key="idx" class="hover:bg-slate-50">
+                        <td class="border border-slate-300 px-3 py-2 font-mono">{{ acc.account_number || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="acc.ebank_query ? 'text-green-600 font-bold' : 'text-slate-300'">{{ acc.ebank_query ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="acc.ebank_transfer ? 'text-green-600 font-bold' : 'text-slate-300'">{{ acc.ebank_transfer ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="acc.mbank_query ? 'text-green-600 font-bold' : 'text-slate-300'">{{ acc.mbank_query ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="acc.mbank_transfer ? 'text-green-600 font-bold' : 'text-slate-300'">{{ acc.mbank_transfer ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">{{ acc.single_limit || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">{{ acc.daily_limit || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">{{ acc.daily_transfer_count || '-' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Operators Table for Online Banking App -->
               <div v-if="resultData.operators && resultData.operators.length > 0" class="mt-6">
-                <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作人员列表</h4>
-                <div class="space-y-3">
-                  <div v-for="(op, idx) in resultData.operators" :key="idx" class="bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between">
-                    <div>
-                      <p class="text-xs text-blue-400 mb-1">姓名: <span class="text-sm font-medium text-slate-800">{{ op.name || '-' }}</span></p>
-                      <p class="text-xs text-blue-400">身份证: <span class="font-mono text-slate-800">{{ op.id_number || '-' }}</span></p>
-                    </div>
-                    <div class="text-right">
-                      <p class="text-xs text-blue-400 mb-1">手机:</p>
-                      <p class="text-sm font-medium text-slate-800">{{ op.phone || '-' }}</p>
-                    </div>
-                  </div>
+                <h4 class="font-medium text-slate-700 mb-3 border-b pb-2">操作户信息</h4>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm border-collapse">
+                    <thead>
+                      <tr class="bg-slate-100">
+                        <th class="border border-slate-300 px-3 py-2 text-left font-medium text-slate-600">姓名</th>
+                        <th class="border border-slate-300 px-3 py-2 text-left font-medium text-slate-600">身份证号码</th>
+                        <th class="border border-slate-300 px-3 py-2 text-left font-medium text-slate-600">手机号码</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">网银</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">手机银行</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">录入</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">审核</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">管理</th>
+                        <th class="border border-slate-300 px-3 py-2 text-center font-medium text-slate-600">其他</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(op, idx) in resultData.operators" :key="idx" class="hover:bg-slate-50">
+                        <td class="border border-slate-300 px-3 py-2 font-medium">{{ op.name || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2 font-mono text-xs">{{ op.id_number || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2">{{ op.phone || '-' }}</td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.ebank_channel ? 'text-green-600 font-bold' : 'text-slate-300'">{{ op.ebank_channel ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.mbank_channel ? 'text-green-600 font-bold' : 'text-slate-300'">{{ op.mbank_channel ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.entry_permission ? 'text-green-600' : 'text-slate-300'">{{ op.entry_permission ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.audit_permission ? 'text-green-600' : 'text-slate-300'">{{ op.audit_permission ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.manage_permission ? 'text-green-600' : 'text-slate-300'">{{ op.manage_permission ? '✓' : '×' }}</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-center">
+                          <span :class="op.other_permission ? 'text-green-600' : 'text-slate-300'">{{ op.other_permission ? '✓' : '×' }}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </template>

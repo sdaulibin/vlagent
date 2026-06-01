@@ -13,7 +13,7 @@ from PIL import Image
 from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
-from src.credentials.prompts import PROMPT_MAPPING, SEAL_CODE_VERIFY_PROMPT
+from src.credentials.prompts import PROMPT_MAPPING, SEAL_CODE_VERIFY_PROMPT, ELECTRONIC_SEAL_PROMPT
 
 
 def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
@@ -374,49 +374,79 @@ def _merge_json_results(results: List[dict]) -> dict:
     return final_data
 
 
-def _verify_seal_codes(data: dict, credential_type: str, image_path: str | None) -> dict:
-    """对电子印章编码进行二次逐字符核验。"""
-    if credential_type != "electronic_seal" or not image_path:
+def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] | str | None) -> dict:
+    """对电子印章编码进行核验：清理分隔符，并对每个tile旋转180度重新提取以改善识别。"""
+    if credential_type != "electronic_seal":
         return data
+    
+    # Normalize to list
+    if image_paths is None:
+        return data
+    if isinstance(image_paths, str):
+        image_paths = [image_paths]
+    
     seal_codes = data.get("seal_codes", [])
     if not seal_codes:
         return data
 
-    # Clean dashes from seal codes (model sometimes adds separators)
-    cleaned = [c.replace("-", "").replace(" ", "") for c in seal_codes]
-    if cleaned != seal_codes:
-        print(f"  [印章核验] 清理分隔符: {seal_codes} -> {cleaned}")
-        data["seal_codes"] = cleaned
-        seal_codes = cleaned
+    # Step 1: Clean dashes/spaces
+    seal_codes = [c.replace("-", "").replace(" ", "") for c in seal_codes]
+    print(f"  [印章核验] 原始编码(清理后): {seal_codes}")
 
-    codes_text = ", ".join(seal_codes)
-    verify_prompt = SEAL_CODE_VERIFY_PROMPT + f"\n\n待验证编码: {codes_text}"
+    # Step 2: 对每个tile旋转180度重新提取
+    from PIL import Image
+    rotated_results = []
+    for tile_path in image_paths:
+        try:
+            img = Image.open(tile_path)
+            rotated_img = img.rotate(180, expand=True)
+            rotated_path = tile_path.rsplit(".", 1)[0] + "_rotated.jpg"
+            rotated_img.save(rotated_path, "JPEG", quality=95)
 
-    try:
-        resp = request_qwen35(
-            question=verify_prompt,
-            file_base=image_path,
-            show_request=False,
-        ).strip()
-        verify_data = json.loads(fix_json(resp))
-        verified = verify_data.get("verified_codes", [])
-        if verified and len(verified) == len(seal_codes):
-            for i, (orig, v) in enumerate(zip(seal_codes, verified)):
-                if orig != v:
-                    print(f"  [印章核验] 编码修正: {orig} -> {v}")
-            data["seal_codes"] = verified
-        elif verified:
-            # 验证结果数量不匹配，按字符数更接近10位的优先
-            final = []
-            for i in range(len(seal_codes)):
-                if i < len(verified) and len(verified[i]) >= len(seal_codes[i]):
-                    final.append(verified[i])
-                else:
-                    final.append(seal_codes[i])
-            data["seal_codes"] = final
-    except Exception as e:
-        print(f"[印章核验] 二次验证失败: {e}")
+            resp = request_qwen35(
+                question=ELECTRONIC_SEAL_PROMPT,
+                file_base=rotated_path,
+                show_request=False,
+            ).strip()
+            rotated_data = json.loads(fix_json(resp))
+            codes = rotated_data.get("seal_codes", [])
+            codes = [c.replace("-", "").replace(" ", "") for c in codes]
+            print(f"  [印章核验] tile {tile_path} 旋转提取: {codes}")
+            rotated_results.extend(codes)
 
+            try:
+                os.unlink(rotated_path)
+            except:
+                pass
+        except Exception as e:
+            print(f"  [印章核验] tile旋转提取失败: {e}")
+
+    # Step 3: 合并 - 对每个位置取原始和旋转中最长的
+    if not rotated_results:
+        data["seal_codes"] = seal_codes
+        return data
+
+    n = len(seal_codes)
+    # 如果旋转结果数量匹配，一一对应取最长
+    if len(rotated_results) >= n:
+        final = []
+        for i in range(n):
+            orig = seal_codes[i] if i < len(seal_codes) else ""
+            rot = rotated_results[i] if i < len(rotated_results) else ""
+            best = rot if len(rot) >= len(orig) else orig  # 优先旋转结果（旋转提取通常更准确）
+            print(f"  [印章核验] 位置{i}: 原始={orig}({len(orig)}字符) vs 旋转={rot}({len(rot)}字符) -> {best}")
+            final.append(best)
+        data["seal_codes"] = final
+    else:
+        # 旋转结果不够，用全局策略：收集所有候选，按长度排序取前N
+        all_codes = list(seal_codes) + rotated_results
+        unique = list(dict.fromkeys(all_codes))
+        by_length = sorted(unique, key=lambda c: len(c), reverse=True)
+        final = by_length[:n]
+        print(f"  [印章核验] 全局候选: {all_codes}, 选取: {final}")
+        data["seal_codes"] = final
+
+    print(f"  [印章核验] 最终结果: {data['seal_codes']}")
     return data
 
 
@@ -429,10 +459,10 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         if credential_type == "account_opening_app" and len(image_paths) == 1:
             final_image_paths = image_paths
             max_size = 3072
-        # Strategy 2: Simple horizontal split for Electronic Seal
+        # Strategy 2: Electronic Seal - split + high resolution for small seal code text
         elif credential_type == "electronic_seal" and len(image_paths) == 1:
             final_image_paths = _split_multi_form_image(image_paths[0], work_dir)
-            max_size = 2048
+            max_size = 3072
         # Strategy 3: Power of Attorney - higher resolution to preserve small checkbox symbols
         elif credential_type == "power_of_attorney" and len(image_paths) == 1:
             final_image_paths = image_paths
@@ -444,7 +474,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         # 根据凭证类型调整压缩质量
         compress_dir = os.path.join(work_dir, "compressed")
         os.makedirs(compress_dir, exist_ok=True)
-        if credential_type in ("power_of_attorney", "account_opening_app"):
+        if credential_type in ("power_of_attorney", "account_opening_app", "electronic_seal"):
             compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size, quality=95)
         else:
             compressed_paths = _compress_images_for_ai(final_image_paths, compress_dir, max_size=max_size)
@@ -464,7 +494,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                 data = json.loads(fix_json(response))
                 data = _post_process_boolean_fields(data, credential_type)
                 data = _post_process_authorized_items(data, credential_type)
-                data = _verify_seal_codes(data, credential_type, compressed_paths[0])
+                data = _verify_seal_codes(data, credential_type, compressed_paths)
                 return data
             except Exception as e:
                 print(f"[{credential_type}] JSON parse failed: {e}")
@@ -486,7 +516,7 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             merged = _merge_json_results(part_results)
             merged = _post_process_boolean_fields(merged, credential_type)
             merged = _post_process_authorized_items(merged, credential_type)
-            merged = _verify_seal_codes(merged, credential_type, compressed_paths[0] if compressed_paths else None)
+            merged = _verify_seal_codes(merged, credential_type, compressed_paths)
             return merged
 
 def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:

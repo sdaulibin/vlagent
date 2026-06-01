@@ -95,21 +95,29 @@ Role: 印章编码逐字符核验专家
 
 Task: 影像中有一枚或多枚电子印章，每枚印章底部有一行防伪编码。请对以下待验证编码进行逐字符核验。
 
+## 旋转印章处理（极度重要）：
+影像中的印章可能是**旋转180度倒置**的。对于倒置的印章：
+1. 先在脑中将印章旋转180度，以正向视角读取
+2. 旋转后字符顺序会**反转**（从右到左变成从左到右）
+3. 旋转后部分字符形状变化：6旋转后变成9，9旋转后变成6，其他字母旋转后形状基本不变
+4. 必须以旋转后的正向视角逐个字符读取，不要在倒置状态下直接识别
+
 ## 核验步骤：
 1. 在影像中找到每枚印章的编码位置（通常在"业务受理章"字样正下方）
-2. **先数清楚编码一共有几个字符**，记录字符数量
-3. 逐个字符与影像中的实际字符对照，注意字符数量必须一致
-4. 特别注意以下易混淆字符：
-   - A vs N：A 顶部是尖角封闭三角，N 是两条竖线加一条斜线
-   - D vs O vs 0：D 右侧是直线，O/0 是圆弧
-   - E vs 6 vs B：E 中间有三条横线，6 是闭合圆弧带尾巴，B 右侧是两个弧
-   - F vs E vs 5：F 只有两条横线，E 有三条，5 上方是水平横线
+2. 判断该印章是否倒置，如果倒置则先在脑中旋转180度
+3. **先数清楚编码一共有几个字符**，记录字符数量
+4. 逐个字符与影像中的实际字符对照，注意字符数量必须一致
+5. 特别注意以下易混淆字符：
+   - E vs 6 vs B vs 5：E 中间有三条横线，6 是闭合圆弧带尾巴，B 右侧是两个弧，5 上方是水平横线
+   - F vs E：F 只有两条横线，E 有三条
+   - P vs F vs B：P 右侧是上半部弧线，F 无弧线
+   - G vs 6 vs C：G 有右侧横杠/开口，6 是闭合圆弧，C 无右侧结构
    - U vs V vs W：U 底部是圆弧，V 底部是尖角，W 是两个 V 连接
-   - G vs 6 vs C：G 有右侧横杠，6 是闭合圆弧，C 无右侧结构
+   - A vs N：A 顶部是尖角封闭三角，N 是两条竖线加一条斜线
    - I vs 1 vs L：I 是无装饰的竖线，1 顶部有短斜线，L 是直角
    - 9 vs 8 vs 0：9 上部封闭下部开口，8 上下都封闭，0 完整圆环
-5. 核对修正后的编码字符数量是否与影像中一致
-6. 如果发现不一致，输出修正后的编码
+6. 核对修正后的编码字符数量是否与影像中一致
+7. 如果发现不一致，输出修正后的编码
 
 ## 输出格式 (严格 JSON):
 {
@@ -196,20 +204,7 @@ Task: 处理复杂的网银申请书，准确提取企业、经办人、操作�
    - 企业名称 (enterprise_name)、营业执照号 (business_license)、其他证件号码 (other_id_number)。
    - 法定代表人姓名 (legal_rep_name)、法定代表人身份证号 (legal_rep_id)、手机号码 (legal_rep_phone)。
    - 经办人姓名 (handler_name)、经办人身份证号 (handler_id)、手机号码 (handler_phone)。
-   - 业务详情：账号 (account_number)、权限 (permissions)、单笔限额 (single_limit)、日累计限额 (daily_limit)、日转账笔数 (daily_transfer_count)、扣费账户账号 (deduction_account)。
-   - 功能勾选：渠道(如企业网银/手机银行)(channel)、录入(entry_permission)、审核(audit_permission)、管理(manage_permission)、其他(other_permission)。
-   【重要】勾选判断规则：只有打勾(√)或涂黑(■)的项目才是"选中"，打叉(×)或画X的项目是"未选中/不办理"。叉号×表示"不选择"，绝对不能将叉号当作选中。
-   - channel(渠道)：逐个检查"企业网银"和"手机银行"渠道旁的勾选框。只有勾选框中是√勾号的渠道才写入 channel。叉号(×)的渠道不写入。
-     判断方法：√是一条连续弧线，×是两条交叉直线。如果不确定是勾还是叉，按叉号处理（不列入）。
-   - permissions(业务权限)提取步骤（必须严格按此流程）：
-     步骤1：在影像中找到"企业网银"和"手机银行"两个渠道区域
-     步骤2：对每个渠道下的每个功能项（查询、转账、录入、审核、管理等），观察其勾选框中的标记
-     步骤3：判断标记类型：
-       - 如果是 √ 勾号（一条从左下到右上再向右下的连续曲线）→ 该功能已开通，记入 permissions
-       - 如果是 × 叉号（两条直线交叉形成X形）→ 该功能未开通，**不要记入 permissions**
-     步骤4：permissions 字段只包含勾号(√)对应的功能，叉号(×)对应的功能完全排除
-     示例：如果企业网银下"录入"是√勾号，手机银行下"查询"和"转账"都是×叉号，
-     则 permissions 应为："企业网银：录入"，不包含任何手机银行的权限项。
+   - 扣费账户账号 (deduction_account)。
    - 审核与签字：
      - 审核方式 (audit_method)
      - 法定代表人(授权代理人)签字 (legal_rep_signature)：若能识别出签字或印章内容请提取。
@@ -218,7 +213,45 @@ Task: 处理复杂的网银申请书，准确提取企业、经办人、操作�
      - 银行审核人(签字/盖章) (bank_auditor_signature)
      - 银行业务日期 (bank_sign_date)
 
-3. 操作人员列表 (operators)：提取表格中列出的操作员记录。每条记录包含：姓名 (name)、身份证号 (id_number)、手机号 (phone)。
+3. 企业需关联的账户列表 (linked_accounts)：提取"企业需关联的账户"表格中的每一行数据。每条记录包含：
+   - account_number (账号)
+   - ebank_query (企业网银-查询)：true/false
+   - ebank_transfer (企业网银-转账)：true/false
+   - mbank_query (手机银行-查询)：true/false
+   - mbank_transfer (手机银行-转账)：true/false
+   - single_limit (单笔限额)
+   - daily_limit (日累计限额)
+   - daily_transfer_count (日转账笔数)
+
+4. 操作户信息列表 (operators)：提取"操作户信息"表格中的每一行数据。每条记录包含：
+   - name (姓名)
+   - id_number (身份证号码)
+   - phone (手机号码)
+   - ebank_channel (网银渠道)：true/false
+   - mbank_channel (手机银行渠道)：true/false
+   - entry_permission (录入)：true/false
+   - audit_permission (审核)：true/false
+   - manage_permission (管理)：true/false
+   - other_permission (其他)：true/false
+
+   **操作户表格列对齐规则（极度重要 — 易错）**：
+   表格中"录入""审核""管理""其他"四列紧密排列，每列各有一个方框，从左到右依次对应。
+   提取每一行时，必须用列标题（"录入""审核""管理""其他"）作为锚点，**从上到下沿列标题对齐**，找到该列对应的方框。
+   禁止凭视觉印象跳配列。具体步骤：
+   1. 先在表头找到"录入"二字的准确位置
+   2. 从"录入"垂直向下对齐到当前数据行，读取该位置的方框 → entry_permission
+   3. 再找到"审核"二字的准确位置，垂直向下对齐 → audit_permission
+   4. 再找到"管理"二字的准确位置，垂直向下对齐 → manage_permission
+   5. 再找到"其他"二字的准确位置，垂直向下对齐 → other_permission
+   每列独立定位，禁止将相邻列的方框当作当前列的方框。
+
+**手写符号判定规则（极度重要 — 每个字段必须逐框独立判断）**：
+表单中所有方框内的符号均为**手写**，必须对每个方框逐一独立判定，禁止根据相邻项推测。
+判定方法：只看单个方框内部，问：**方框内有两条独立线条交叉形成一个中心交叉点吗？**
+- 有两条线交叉（×形）→ 手写叉号 → false
+- 没有交叉点，只有一条连续勾线（√形）→ 手写对号 → true
+- 方框完全空白 → false
+**严禁"有墨迹就选 true"**：手写叉号×同样有墨迹，但表示不授权，必须判为 false。
 
 ## 输出规则：
 - 严格遵循以下的 JSON Schema，不输出除 JSON 外的任何多余字符。
@@ -234,24 +267,32 @@ Task: 处理复杂的网银申请书，准确提取企业、经办人、操作�
     "handler_name": "",
     "handler_id": "",
     "handler_phone": "",
-    "account_number": "",
-    "permissions": "",
-    "single_limit": "",
-    "daily_limit": "",
-    "daily_transfer_count": "",
     "deduction_account": "",
+    "linked_accounts": [
+        {
+            "account_number": "",
+            "ebank_query": false,
+            "ebank_transfer": false,
+            "mbank_query": false,
+            "mbank_transfer": false,
+            "single_limit": "",
+            "daily_limit": "",
+            "daily_transfer_count": ""
+        }
+    ],
     "operators": [
         {
             "name": "",
             "id_number": "",
-            "phone": ""
+            "phone": "",
+            "ebank_channel": false,
+            "mbank_channel": false,
+            "entry_permission": false,
+            "audit_permission": false,
+            "manage_permission": false,
+            "other_permission": false
         }
     ],
-    "channel": "",
-    "entry_permission": "",
-    "audit_permission": "",
-    "manage_permission": "",
-    "other_permission": "",
     "audit_method": "",
     "legal_rep_signature": "",
     "legal_rep_sign_date": "",
@@ -355,7 +396,10 @@ Task: 识别《开立单位银行账户申请书》中的所有要素。请遵�
 - registered_address (注册地址)：请**完整提取**地址全文，不要截断。
 - business_scope (经营范围)：请**完整提取**全文，从第一个字到最后一个字，不要遗漏开头部分。
 - bottom_line_content (底部文字内容)：这是表单最底部的一整行文字，通常格式为"本存款人已经于 XXXX年 X月 X日收到:开立单位银行账户申请 存人查询密码、☑其他：XXXXX"。请**从行首第一个字开始完整提取到行尾**，包括日期、冒号、空格、勾选标记(☑/√)和所有文字，不要只提取最后几个字。
-- sign_date (签章日期)：仔细辨认年份中的数字，特别注意 **6** 和 **0** 的区分（6有弯钩，0是闭合椭圆）。年份"2026"不要误识为"2020"。
+- sign_date (签章日期) 和 open_date (开户日期)：仔细辨认年份中的每个数字，特别注意以下易混淆数字对：
+  - **2 vs 6**：2的底部是水平横线或向左弯的尾巴；6的底部有向右的闭合圆圈。不要把2误识为6。
+  - **6 vs 0**：6有弯钩，0是闭合椭圆。
+  - 如实读取表单上的年份，不要预设年份。
 
 **勾选字段特殊说明**：
 - fixed_term_account (定期账户类型)：如果该行的所有选项（整存整取、零存整取等）都被打叉(×)或留空，该字段应为空字符串 ""。只有某个选项被勾选(√)时才填入对应类型名称。
