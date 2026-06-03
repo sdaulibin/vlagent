@@ -95,16 +95,24 @@ async def upload_pdf_extract(
     await db.commit()
     await db.refresh(task)
 
-    # 提交后台任务
-    background_tasks.add_task(process_pdf_extract, db, task)
-
-    return PdfExtractTaskResponse(
+    # 提前捕获返回值，关闭 session 后 ORM 对象不可用
+    resp = PdfExtractTaskResponse(
         id=task.id,
         filename=task.filename,
         status=task.status,
         output_format=task.output_format,
         fields=fields_data,
     )
+
+    # 关闭请求级 session，释放连接回池。
+    # 必须在 add_task 之前关闭，否则 BackgroundTask 执行期间请求级 session
+    # 仍持有连接，并发时每请求占 2 条连接导致连接池耗尽。
+    await db.close()
+
+    # 提交后台任务（不再传递请求级 session，避免生命周期问题）
+    background_tasks.add_task(process_pdf_extract, task.id)
+
+    return resp
 
 
 @router.get("/list", response_model=List[PdfExtractTaskListItem])

@@ -93,15 +93,23 @@ async def extract_credential(
     await session.commit()
     await session.refresh(record)
 
-    # 提交后台任务处理
-    background_tasks.add_task(process_credential_async, record.id)
-
-    return CredentialRecordResponse(
+    # 提前捕获返回值，关闭 session 后 ORM 对象不可用
+    resp = CredentialRecordResponse(
         id=record.id,
         filename=record.filename,
         credential_type=record.credential_type,
         status=record.status,
     )
+
+    # 关闭请求级 session，释放连接回池。
+    # 必须在 add_task 之前关闭，否则 BackgroundTask 执行期间请求级 session
+    # 仍持有连接，并发时每请求占 2 条连接导致连接池耗尽。
+    await session.close()
+
+    # 提交后台任务处理
+    background_tasks.add_task(process_credential_async, record.id)
+
+    return resp
 
 
 @router.get("/list", response_model=list[CredentialRecordListItem])

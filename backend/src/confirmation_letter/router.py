@@ -239,9 +239,14 @@ async def recognize_confirmation_file(
         if conf_file.status == "processing":
             return {"status": "processing", "message": "正在识别中"}
 
-        # 更新状态为处理中，提交后台任务
+        # 更新状态为处理中
         conf_file.status = "processing"
         await session.commit()
+
+        # 关闭请求级 session，释放连接回池。
+        # 必须在 add_task 之前关闭，否则 BackgroundTask 执行期间请求级 session
+        # 仍持有连接，并发时每请求占 2 条连接导致连接池耗尽。
+        await session.close()
 
         background_tasks.add_task(process_confirmation_letter_async, file_id)
 

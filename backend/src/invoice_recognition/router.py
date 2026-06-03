@@ -73,13 +73,22 @@ async def upload_invoice_pdf(
     await db.commit()
     await db.refresh(db_file)
 
-    # 3. 提交后台任务处理识别（传 ID 而非 session+object，后台任务使用独立 session）
-    background_tasks.add_task(process_invoice_recognitions, db_file.id)
+    # 提前捕获返回值，关闭 session 后 ORM 对象不可用
+    resp_file_id = db_file.id
+    resp_filename = db_file.filename
+
+    # 关闭请求级 session，释放连接回池。
+    # 必须在 add_task 之前关闭，否则 BackgroundTask 执行期间请求级 session
+    # 仍持有连接，并发时每请求占 2 条连接导致连接池耗尽。
+    await db.close()
+
+    # 3. 提交后台任务处理识别（传 ID，后台任务使用独立 session）
+    background_tasks.add_task(process_invoice_recognitions, resp_file_id)
 
     return InvoiceRecognitionResponse(
-        file_id=db_file.id,
-        filename=db_file.filename,
-        status=db_file.status,
+        file_id=resp_file_id,
+        filename=resp_filename,
+        status="pending",
         results=[]
     )
 

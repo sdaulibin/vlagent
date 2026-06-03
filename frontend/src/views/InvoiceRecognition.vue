@@ -171,7 +171,7 @@ onUnmounted(() => {
         <!-- Upload -->
         <label class="upload-zone">
           <Upload class="w-5 h-5 text-slate-400" />
-          <span class="text-slate-600">{{ isUploading ? '上传中...' : '点击上传发票（PDF / JPG / PNG）' }}</span>
+          <span class="text-slate-600">{{ isUploading ? '上传中...' : '点击上传发票（PDF/JPG）' }}</span>
           <input type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="hidden" @change="handleFileUpload" :disabled="isUploading" />
         </label>
 

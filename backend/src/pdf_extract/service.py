@@ -14,7 +14,6 @@ from typing import Any, Dict, List
 from services.pdf.pdf_utils import split_pdf_to_images
 from services.core.request_ai import request_qwen35
 from src.json_repair import fix_json
-from sqlmodel.ext.asyncio.session import AsyncSession
 from src.pdf_extract.models import PdfExtractTask, PdfExtractResult
 
 
@@ -114,49 +113,69 @@ def _extract_with_ai(image_paths: List[str], fields: List[Dict[str, Any]]) -> Di
     return json.loads(fix_json(response))
 
 
-async def process_pdf_extract(db: AsyncSession, task: PdfExtractTask):
-    """后台任务：处理通用 PDF 提取"""
+async def process_pdf_extract(task_id: int):
+    """后台任务：处理通用 PDF 提取。
+
+    三段式：AI 调用期间不持有 DB 连接，避免连接池耗尽。
+    同时不再从 router 接收请求级 session（生命周期不可靠）。
+    """
+    from src.database import SessionLocal
+
     tmp_dir = tempfile.mkdtemp(prefix="pdf_extract_")
     start_time = datetime.utcnow()
 
-    try:
+    # 阶段 1：标记 processing，立刻释放连接
+    async with SessionLocal() as db:
+        task = await db.get(PdfExtractTask, task_id)
+        if not task:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return
+        file_path = task.file_path
+        fields_json = task.fields_json
+        user_id = task.user_id
         task.status = "processing"
-        db.add(task)
+        task.error_msg = None
         await db.commit()
 
-        # PDF 转图片
-        image_paths = split_pdf_to_images(task.file_path, tmp_dir, dpi=200)
+    final_status = "done"
+    error_msg = None
+    extracted_data = None
+    page_count = None
+
+    # 阶段 2：纯外部 IO，不持有任何 DB 连接
+    try:
+        image_paths = split_pdf_to_images(file_path, tmp_dir, dpi=200)
         if not image_paths:
             raise ValueError("PDF 转换图片失败，未产生文件。")
+        page_count = len(image_paths)
 
-        task.page_count = len(image_paths)
-
-        # 解析字段定义
-        fields = json.loads(task.fields_json)
-
-        # 调用 AI 提取（在线程池中执行，避免同步 HTTP 调用阻塞事件循环）
+        fields = json.loads(fields_json)
         loop = asyncio.get_event_loop()
         extracted_data = await loop.run_in_executor(None, _extract_with_ai, image_paths, fields)
 
-        # 保存结果
-        result = PdfExtractResult(
-            task_id=task.id,
-            user_id=task.user_id,
-            extracted_data=json.dumps(extracted_data, ensure_ascii=False)
-        )
-        db.add(result)
-        task.status = "done"
-
     except Exception as e:
         print(f"PDF Extract Error: {e}")
-        task.status = "failed"
-        task.error_msg = str(e)
+        final_status = "failed"
+        error_msg = str(e)
 
+    # 阶段 3：回写结果
     finally:
-        end_time = datetime.utcnow()
-        task.processing_duration = (end_time - start_time).total_seconds()
-        db.add(task)
-        await db.commit()
+        async with SessionLocal() as db:
+            task = await db.get(PdfExtractTask, task_id)
+            if task:
+                task.status = final_status
+                if error_msg is not None:
+                    task.error_msg = error_msg
+                if page_count is not None:
+                    task.page_count = page_count
+                task.processing_duration = (datetime.utcnow() - start_time).total_seconds()
+                if extracted_data is not None:
+                    db.add(PdfExtractResult(
+                        task_id=task_id,
+                        user_id=user_id,
+                        extracted_data=json.dumps(extracted_data, ensure_ascii=False),
+                    ))
+                await db.commit()
 
         if os.path.exists(tmp_dir):
             shutil.rmtree(tmp_dir, ignore_errors=True)

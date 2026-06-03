@@ -144,9 +144,17 @@ async def compare_documents(
     await db.commit()
     await db.refresh(task)
 
-    background_tasks.add_task(process_document_comparison, task.id)
+    # 提前捕获返回值，关闭 session 后 ORM 对象不可用
+    resp_task_id = task.id
 
-    return {"task_id": task.id, "status": "pending"}
+    # 关闭请求级 session，释放连接回池。
+    # 必须在 add_task 之前关闭，否则 BackgroundTask 执行期间请求级 session
+    # 仍持有连接，并发时每请求占 2 条连接导致连接池耗尽。
+    await db.close()
+
+    background_tasks.add_task(process_document_comparison, resp_task_id)
+
+    return {"task_id": resp_task_id, "status": "pending"}
 
 
 @router.get("/list", response_model=list[DocumentTaskListItem])

@@ -216,7 +216,7 @@ def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
                     show_request=True, file_ary=None,
                     temperature=0.7, top_p=0.8):
     """
-    调用 Qwen3.5-122B 模型（非思考模式）
+    调用 Qwen3.5-35B 模型（非思考模式）
 
     参数与 request_stream 完全一致，但使用 Qwen3.5 的 API 地址和密钥。
     """

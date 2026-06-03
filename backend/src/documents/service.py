@@ -780,57 +780,68 @@ async def process_document_comparison(task_id: int):
 
     DOCX+DOCX → Plan B（python-docx 结构化提取 + section 级 diff）
     其他情况  → Legacy（pdfplumber 页级 diff）
+
+    三段式：阶段1 置 processing 后立即释放连接；子管线内部自管短 session。
     """
     start_time = time.time()
 
+    # 阶段 1：标记 processing，立刻释放连接
     async with SessionLocal() as db:
         task = await db.get(DocumentCompareTask, task_id)
         if not task:
             logger.error("文档比对任务不存在 task=%d", task_id)
             return
+        task_id_local = task.id
+        user_id = task.user_id
+        file_a_path = task.file_a_path
+        file_b_path = task.file_b_path
+        task.status = "processing"
+        task.error_msg = None
+        await db.commit()
 
-        try:
-            task.status = "processing"
-            db.add(task)
-            await db.commit()
+    loop = asyncio.get_event_loop()
+    is_a_docx = file_a_path.lower().endswith('.docx')
+    is_b_docx = file_b_path.lower().endswith('.docx')
 
-            is_a_docx = task.file_a_path.lower().endswith('.docx')
-            is_b_docx = task.file_b_path.lower().endswith('.docx')
-            loop = asyncio.get_event_loop()
-
-            if is_a_docx and is_b_docx:
-                await _compare_docx_plan_b(task, db, loop, start_time)
-            else:
-                await _compare_legacy(task, db, loop, start_time)
-
-        except Exception as e:
-            logger.exception("文档比对失败 task=%d", task.id)
-            task.status = "failed"
-            task.error_msg = str(e)
-            task.comparison_duration = round(time.time() - start_time, 2)
-            db.add(task)
-            await db.commit()
+    try:
+        if is_a_docx and is_b_docx:
+            await _compare_docx_plan_b(task_id_local, user_id, file_a_path, file_b_path, loop, start_time)
+        else:
+            await _compare_legacy(task_id_local, user_id, file_a_path, file_b_path, loop, start_time)
+    except Exception as e:
+        logger.exception("文档比对失败 task=%d", task_id_local)
+        async with SessionLocal() as db:
+            task = await db.get(DocumentCompareTask, task_id_local)
+            if task:
+                task.status = "failed"
+                task.error_msg = str(e)
+                task.comparison_duration = round(time.time() - start_time, 2)
+                await db.commit()
 
 
-async def _compare_legacy(task, db, loop, start_time):
-    """现有管线：PDF → pdfplumber → 页级对齐 → diff"""
-    # 1. 统一转 PDF
-    pdf_a = await loop.run_in_executor(None, _ensure_pdf, task.file_a_path)
-    pdf_b = await loop.run_in_executor(None, _ensure_pdf, task.file_b_path)
+async def _compare_legacy(task_id, user_id, file_a_path, file_b_path, loop, start_time):
+    """现有管线：PDF → pdfplumber → 页级对齐 → diff
 
-    # 2. 提取纯文本和结构化块
-    text_a_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_a_path, pdf_a)
-    text_b_pages, _ = await loop.run_in_executor(None, extract_pages, task.file_b_path, pdf_b)
-    blocks_a = await loop.run_in_executor(None, extract_pages_structured, task.file_a_path, pdf_a)
-    blocks_b = await loop.run_in_executor(None, extract_pages_structured, task.file_b_path, pdf_b)
+    所有重 IO 在不持有 DB 连接的状态下执行，最后短 session 批量写入。
+    """
+    # 1. 统一转 PDF（重 IO）
+    pdf_a = await loop.run_in_executor(None, _ensure_pdf, file_a_path)
+    pdf_b = await loop.run_in_executor(None, _ensure_pdf, file_b_path)
 
-    task.file_a_page_count = len(text_a_pages)
-    task.file_b_page_count = len(text_b_pages)
+    # 2. 提取纯文本和结构化块（重 IO）
+    text_a_pages, _ = await loop.run_in_executor(None, extract_pages, file_a_path, pdf_a)
+    text_b_pages, _ = await loop.run_in_executor(None, extract_pages, file_b_path, pdf_b)
+    blocks_a = await loop.run_in_executor(None, extract_pages_structured, file_a_path, pdf_a)
+    blocks_b = await loop.run_in_executor(None, extract_pages_structured, file_b_path, pdf_b)
 
-    # 3. 页级对齐
+    file_a_page_count = len(text_a_pages)
+    file_b_page_count = len(text_b_pages)
+
+    # 3. 页级对齐（纯 CPU）
     aligned = align_pages(text_a_pages, text_b_pages)
 
-    # 4. 逐页计算 diff
+    # 4. 逐页计算 diff（纯 CPU）
+    page_diffs = []
     for page_a_idx, page_b_idx, diff_type in aligned:
         text_a = text_a_pages[page_a_idx] if page_a_idx is not None else None
         text_b = text_b_pages[page_b_idx] if page_b_idx is not None else None
@@ -861,23 +872,29 @@ async def _compare_legacy(task, db, loop, start_time):
                 else:
                     diff_ops = json.dumps(ops, ensure_ascii=False)
 
-        page_diff = DocumentPageDiff(
-            task_id=task.id,
-            user_id=task.user_id,
+        page_diffs.append(DocumentPageDiff(
+            task_id=task_id,
+            user_id=user_id,
             page_a=(page_a_idx + 1) if page_a_idx is not None else None,
             page_b=(page_b_idx + 1) if page_b_idx is not None else None,
             diff_type=diff_type,
             text_a=text_a,
             text_b=text_b,
             diff_ops_json=diff_ops,
-        )
-        db.add(page_diff)
+        ))
 
-    task.comparison_mode = "page"
-    task.comparison_duration = round(time.time() - start_time, 2)
-    task.status = "done"
-    db.add(task)
-    await db.commit()
+    # 5. 短 session：批量写入
+    async with SessionLocal() as db:
+        for page_diff in page_diffs:
+            db.add(page_diff)
+        task = await db.get(DocumentCompareTask, task_id)
+        if task:
+            task.file_a_page_count = file_a_page_count
+            task.file_b_page_count = file_b_page_count
+            task.comparison_mode = "page"
+            task.comparison_duration = round(time.time() - start_time, 2)
+            task.status = "done"
+        await db.commit()
 
 
 # ---- Plan B: DOCX 结构化比对 ----
@@ -1157,37 +1174,43 @@ def _build_virtual_page_map(input_lines: list) -> dict[int, list[int]]:
     return page_map
 
 
-async def _compare_docx_plan_b(task, db, loop, start_time):
-    """DOCX 原生比对管线：python-docx 结构化提取 → section 级 diff。不依赖 PDF 转换。"""
+async def _compare_docx_plan_b(task_id, user_id, file_a_path, file_b_path, loop, start_time):
+    """DOCX 原生比对管线：python-docx 结构化提取 → section 级 diff。不依赖 PDF 转换。
+
+    所有重 IO 在不持有 DB 连接的状态下执行，最后短 session 批量写入。
+    """
     from src.documents.structuring import (
         extract_input_lines, build_structured_document, flatten_document,
     )
 
-    # Step 1: python-docx 提取（并行）
+    # Step 1: python-docx 提取（并行，重 IO）
     lines_a, lines_b = await asyncio.gather(
-        loop.run_in_executor(None, extract_input_lines, task.file_a_path),
-        loop.run_in_executor(None, extract_input_lines, task.file_b_path),
+        loop.run_in_executor(None, extract_input_lines, file_a_path),
+        loop.run_in_executor(None, extract_input_lines, file_b_path),
     )
 
-    # Step 2: 构建结构化文档
+    # Step 2: 构建结构化文档（重 CPU）
     struct_a = await loop.run_in_executor(None, build_structured_document, lines_a)
     struct_b = await loop.run_in_executor(None, build_structured_document, lines_b)
     flatten_document(struct_a)
     flatten_document(struct_b)
 
-    # Step 3: Section 级对齐 + diff
+    # Step 3: Section 级对齐 + diff（纯 CPU）
     section_diffs = _align_and_diff_sections(struct_a.main, struct_b.main)
 
-    # Step 4: 持久化 section 数据（含 diff_ops_json）到 document_sections 表
-    await _save_sections(db, task.id, task.user_id, struct_a, struct_b, section_diffs)
-
-    # Step 5: 完成（不写 DocumentPageDiff，不转 PDF）
-    task.comparison_mode = "docx_native"
-    task.comparison_duration = round(time.time() - start_time, 2)
     diff_map_a = {id(sd.section_a): sd.diff_type for sd in section_diffs if sd.section_a}
     diff_map_b = {id(sd.section_b): sd.diff_type for sd in section_diffs if sd.section_b}
-    task.section_summary_a = _build_section_md(struct_a, diff_map_a, "a")
-    task.section_summary_b = _build_section_md(struct_b, diff_map_b, "b")
-    task.status = "done"
-    db.add(task)
-    await db.commit()
+    section_summary_a = _build_section_md(struct_a, diff_map_a, "a")
+    section_summary_b = _build_section_md(struct_b, diff_map_b, "b")
+
+    # Step 4: 短 session：批量持久化
+    async with SessionLocal() as db:
+        await _save_sections(db, task_id, user_id, struct_a, struct_b, section_diffs)
+        task = await db.get(DocumentCompareTask, task_id)
+        if task:
+            task.comparison_mode = "docx_native"
+            task.comparison_duration = round(time.time() - start_time, 2)
+            task.section_summary_a = section_summary_a
+            task.section_summary_b = section_summary_b
+            task.status = "done"
+        await db.commit()

@@ -35,10 +35,10 @@ securityContext:
 # ==============================================================================
 
 server:
-  replicaCount: 1
+  replicaCount: 2
 
   command: ["python", "-m", "uvicorn", "main:app"]
-  args: ["--host", "0.0.0.0", "--port", "8000"]
+  args: ["--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
 
   ports:
     - name: http
@@ -87,8 +87,8 @@ server:
 
   resources:
     limits:
-      cpu: 2
-      memory: 4Gi
+      cpu: 4
+      memory: 8Gi
     requests:
       cpu: 500m
       memory: 1Gi

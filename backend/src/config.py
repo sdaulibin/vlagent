@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # AI Model Configuration (Qwen3.5 - 纯文本模型)
     QWEN35_KEY: str = Field(default="", description="Qwen3.5 API Key")
     QWEN35_URL: str = "http://10.1.84.77/v1"
-    QWEN35_MODEL: str = "Qwen3.5-122B"
+    QWEN35_MODEL: str = "Qwen3.5-35B"
     
     # App Configuration
     UPLOAD_DIR: str = "upload"

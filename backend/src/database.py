@@ -11,7 +11,7 @@ engine = create_async_engine(
     future=True,
     pool_pre_ping=True,
     pool_size=5,
-    max_overflow=10,
+    max_overflow=5,
     pool_recycle=300,
     pool_timeout=30,
 )
@@ -30,8 +30,8 @@ if settings.DATABASE_UPSTREAM_URL:
         echo=settings.DATABASE_ECHO,
         future=True,
         pool_pre_ping=True,
-        pool_size=2,
-        max_overflow=3,
+        pool_size=1,
+        max_overflow=1,
         pool_recycle=300,
         pool_timeout=30,
     )

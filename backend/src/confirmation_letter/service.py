@@ -743,67 +743,85 @@ def process_confirmation_letter(pdf_path: str, output_dir: str = None) -> dict:
 
 async def process_confirmation_letter_async(file_id: int):
     """
-    后台任务处理询证函识别，使用独立 session。
+    后台任务处理询证函识别。
+
+    采用三段式避免在 AI 调用期间持有 DB 连接（曾导致连接池耗尽）：
+        1) 短 session：读取记录并置 processing，立即释放连接
+        2) 不持连接：调用 AI（最长 10 分钟）
+        3) 短 session：回写识别结果与状态
     """
     import asyncio
     from datetime import datetime as _dt
     from src.database import SessionLocal
     from src.confirmation_letter.models import ConfirmationFile, ConfirmationResult
 
+    # 阶段 1：标记 processing，立刻释放连接
+    async with SessionLocal() as db:
+        conf_file = await db.get(ConfirmationFile, file_id)
+        if not conf_file:
+            return
+        file_path = conf_file.file_path
+        conf_file.status = "processing"
+        conf_file.error_msg = None
+        await db.commit()
+
+    start_time = time.time()
+
+    # 阶段 2：纯外部 IO，不持有任何 DB 连接
+    try:
+        result = await asyncio.to_thread(process_confirmation_letter, file_path)
+    except Exception as e:
+        print(f"Confirmation Letter Process Error: {e}")
+        async with SessionLocal() as db:
+            conf_file = await db.get(ConfirmationFile, file_id)
+            if conf_file:
+                conf_file.status = "failed"
+                conf_file.error_msg = str(e)
+                conf_file.recognition_duration = round((time.time() - start_time) * 1000, 2)
+                conf_file.updated_at = _dt.utcnow()
+                await db.commit()
+        return
+
+    # 阶段 3：回写结果
     async with SessionLocal() as db:
         conf_file = await db.get(ConfirmationFile, file_id)
         if not conf_file:
             return
 
-        start_time = time.time()
+        old_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
+        old_result = await db.execute(old_stmt)
+        old = old_result.scalar_one_or_none()
+        if old:
+            await db.delete(old)
 
-        try:
-            conf_file.status = "processing"
-            await db.commit()
+        conf_result = ConfirmationResult(
+            file_id=file_id,
+            user_id=conf_file.user_id,
+            confirmation_no=result.get("confirmation_no", ""),
+            recipient_bank=result.get("recipient_bank", ""),
+            accounting_firm=result.get("accounting_firm", ""),
+            reply_address=result.get("reply_address", ""),
+            contact_person=result.get("contact_person", ""),
+            phone=result.get("phone", ""),
+            postal_code=result.get("postal_code", ""),
+            debit_account=result.get("debit_account", ""),
+            cutoff_date=result.get("cutoff_date", ""),
+            start_date=result.get("start_date", ""),
+            end_date=result.get("end_date", ""),
+            seal_date=result.get("seal_date", ""),
+            signature_name=result.get("signature_name", ""),
+            format_type=result.get("format_type", "unknown"),
+            format_check_passed=result.get("format_check_passed", False),
+            format_mismatches_json=json.dumps(
+                result.get("format_mismatches", []), ensure_ascii=False
+            ),
+        )
+        db.add(conf_result)
 
-            result = await asyncio.to_thread(process_confirmation_letter, conf_file.file_path)
-
-            # 删除旧的识别结果（如果有）
-            old_stmt = select(ConfirmationResult).where(ConfirmationResult.file_id == file_id)
-            old_result = await db.execute(old_stmt)
-            old = old_result.scalar_one_or_none()
-            if old:
-                await db.delete(old)
-
-            conf_result = ConfirmationResult(
-                file_id=file_id,
-                user_id=conf_file.user_id,
-                confirmation_no=result.get("confirmation_no", ""),
-                recipient_bank=result.get("recipient_bank", ""),
-                accounting_firm=result.get("accounting_firm", ""),
-                reply_address=result.get("reply_address", ""),
-                contact_person=result.get("contact_person", ""),
-                phone=result.get("phone", ""),
-                postal_code=result.get("postal_code", ""),
-                debit_account=result.get("debit_account", ""),
-                cutoff_date=result.get("cutoff_date", ""),
-                start_date=result.get("start_date", ""),
-                end_date=result.get("end_date", ""),
-                seal_date=result.get("seal_date", ""),
-                signature_name=result.get("signature_name", ""),
-                format_type=result.get("format_type", "unknown"),
-                format_check_passed=result.get("format_check_passed", False),
-                format_mismatches_json=json.dumps(
-                    result.get("format_mismatches", []), ensure_ascii=False
-                ),
-            )
-            db.add(conf_result)
-
-            conf_file.status = "done"
-            conf_file.recognition_duration = round((time.time() - start_time) * 1000, 2)
-            conf_file.updated_at = _dt.utcnow()
-            await db.commit()
-
-        except Exception as e:
-            print(f"Confirmation Letter Process Error: {e}")
-            conf_file.status = "failed"
-            conf_file.error_msg = str(e)
-            await db.commit()
+        conf_file.status = "done"
+        conf_file.recognition_duration = round((time.time() - start_time) * 1000, 2)
+        conf_file.updated_at = _dt.utcnow()
+        await db.commit()
 
 
 

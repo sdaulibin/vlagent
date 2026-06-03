@@ -156,48 +156,73 @@ async def run_compare(
     session.add(file_obj)
     await session.commit()
 
+    # 提前构建返回值，关闭 session 后 ORM 对象不可用
+    result_dto = _to_dto(file_obj, None)
+
+    # 关闭请求级 session，释放连接回池。
+    await session.close()
+
     background_tasks.add_task(_run_compare_async, file_id)
 
-    return _to_dto(file_obj, None)
+    return result_dto
 
 
 async def _run_compare_async(file_id: int):
-    """后台比对任务，使用独立 session"""
+    """后台比对任务。
+
+    三段式：比对（含 AI 调用）期间不持有 DB 连接，避免连接池耗尽。
+    """
     from src.database import SessionLocal
 
+    # 阶段 1：标记 processing，立刻释放连接
+    async with SessionLocal() as db:
+        file_obj = await db.get(FormatCompareFile, file_id)
+        if not file_obj:
+            return
+        file_path = file_obj.file_path
+        file_obj.status = "processing"
+        file_obj.error_msg = None
+        await db.commit()
+
+    start_time = time.time()
+
+    # 阶段 2：纯外部 IO，不持有任何 DB 连接
+    try:
+        result = await asyncio.to_thread(compare_with_template, file_path)
+    except Exception as e:
+        async with SessionLocal() as db:
+            file_obj = await db.get(FormatCompareFile, file_id)
+            if file_obj:
+                file_obj.status = "failed"
+                file_obj.error_msg = str(e)
+                file_obj.duration_ms = round((time.time() - start_time) * 1000, 1)
+                await db.commit()
+        return
+
+    # 阶段 3：回写结果
     async with SessionLocal() as db:
         file_obj = await db.get(FormatCompareFile, file_id)
         if not file_obj:
             return
 
-        start_time = time.time()
-        try:
-            result = await asyncio.to_thread(compare_with_template, file_obj.file_path)
+        old_stmt = select(FormatCompareResult).where(FormatCompareResult.file_id == file_id)
+        old_res = await db.execute(old_stmt)
+        old = old_res.scalar_one_or_none()
+        if old:
+            await db.delete(old)
 
-            # 删除旧结果
-            old_stmt = select(FormatCompareResult).where(FormatCompareResult.file_id == file_id)
-            old_res = await db.execute(old_stmt)
-            old = old_res.scalar_one_or_none()
-            if old:
-                await db.delete(old)
+        compare_result = FormatCompareResult(
+            file_id=file_id,
+            user_id=file_obj.user_id,
+            format_type=result.get("format_type", "unknown"),
+            passed=result.get("passed", False),
+            mismatches_json=json.dumps(result.get("mismatches", []), ensure_ascii=False),
+            extracted_content_json=json.dumps(result.get("extracted_content", []), ensure_ascii=False),
+        )
+        db.add(compare_result)
 
-            compare_result = FormatCompareResult(
-                file_id=file_id,
-                user_id=file_obj.user_id,
-                format_type=result.get("format_type", "unknown"),
-                passed=result.get("passed", False),
-                mismatches_json=json.dumps(result.get("mismatches", []), ensure_ascii=False),
-                extracted_content_json=json.dumps(result.get("extracted_content", []), ensure_ascii=False),
-            )
-            db.add(compare_result)
-
-            file_obj.status = "done"
-        except Exception as e:
-            file_obj.status = "failed"
-            file_obj.error_msg = str(e)
-
+        file_obj.status = "done"
         file_obj.duration_ms = round((time.time() - start_time) * 1000, 1)
-        db.add(file_obj)
         await db.commit()
 
 

@@ -542,39 +542,57 @@ def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:
 
 async def process_credential_async(record_id: int):
     """
-    后台任务处理凭证提取，使用独立 session。
+    后台任务处理凭证提取。
+
+    三段式：在调用 AI 期间不持有 DB 连接，避免压测时连接池耗尽。
     """
     import asyncio
     import time
     from src.database import SessionLocal
     from src.credentials.models import CredentialRecord, CredentialResult
 
+    # 阶段 1：标记 processing，立刻释放连接
+    async with SessionLocal() as db:
+        record = await db.get(CredentialRecord, record_id)
+        if not record:
+            return
+        file_path = record.file_path
+        credential_type = record.credential_type
+        record.status = "processing"
+        record.error_msg = None
+        await db.commit()
+
+    start_time = time.time()
+
+    # 阶段 2：纯外部 IO，不持有任何 DB 连接
+    try:
+        result = await asyncio.to_thread(process_credential, file_path, credential_type)
+    except Exception as e:
+        duration = time.time() - start_time
+        async with SessionLocal() as db:
+            record = await db.get(CredentialRecord, record_id)
+            if record:
+                record.status = "failed"
+                record.error_msg = str(e)
+                record.processing_duration = round(duration, 2)
+                await db.commit()
+        return
+
+    # 阶段 3：回写结果
+    duration = time.time() - start_time
     async with SessionLocal() as db:
         record = await db.get(CredentialRecord, record_id)
         if not record:
             return
 
-        start_time = time.time()
+        cred_result = CredentialResult(
+            record_id=record.id,
+            user_id=record.user_id,
+            credential_type=result["credential_type"],
+            extracted_data=json.dumps(result["extracted_data"], ensure_ascii=False),
+        )
+        db.add(cred_result)
 
-        try:
-            result = await asyncio.to_thread(process_credential, record.file_path, record.credential_type)
-            duration = time.time() - start_time
-
-            cred_result = CredentialResult(
-                record_id=record.id,
-                user_id=record.user_id,
-                credential_type=result["credential_type"],
-                extracted_data=json.dumps(result["extracted_data"], ensure_ascii=False),
-            )
-            db.add(cred_result)
-
-            record.status = "done"
-            record.processing_duration = round(duration, 2)
-            await db.commit()
-
-        except Exception as e:
-            duration = time.time() - start_time
-            record.status = "failed"
-            record.error_msg = str(e)
-            record.processing_duration = round(duration, 2)
-            await db.commit()
+        record.status = "done"
+        record.processing_duration = round(duration, 2)
+        await db.commit()
