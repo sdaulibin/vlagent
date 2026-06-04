@@ -1,11 +1,48 @@
 import base64
-
+import threading
 import time
 
+import httpx
 from openai import OpenAI
 from openai.types.chat import ChatCompletionStreamOptionsParam
 
 from src.config import *
+
+# ========== 全局单例 OpenAI client + 并发限流 ==========
+
+_QWEN35_LOCK = threading.Lock()
+_QWEN35_CLIENT = None
+
+# 单 worker 同时最多 2 个 AI 请求在飞
+# 2 副本 × 4 workers = 8 workers，8 × 2 = 16 并发（AI 网关上限 20）
+_AI_CONCURRENCY = threading.Semaphore(2)
+
+
+def _get_qwen35_client() -> OpenAI:
+    """全局共享的 Qwen3.5 client（线程安全懒初始化，复用 TCP 连接）"""
+    global _QWEN35_CLIENT
+    if _QWEN35_CLIENT is None:
+        with _QWEN35_LOCK:
+            if _QWEN35_CLIENT is None:
+                _QWEN35_CLIENT = OpenAI(
+                    api_key=QWEN35_KEY,
+                    base_url=QWEN35_URL,
+                    timeout=600.0,
+                    max_retries=3,
+                    http_client=httpx.Client(
+                        limits=httpx.Limits(
+                            max_connections=20,
+                            max_keepalive_connections=10,
+                        ),
+                        timeout=httpx.Timeout(
+                            connect=10.0,
+                            read=600.0,
+                            write=30.0,
+                            pool=10.0,
+                        ),
+                    ),
+                )
+    return _QWEN35_CLIENT
 
 
 def encode_image(image_path):
@@ -219,13 +256,32 @@ def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
     调用 Qwen3.5-35B 模型（非思考模式）
 
     参数与 request_stream 完全一致，但使用 Qwen3.5 的 API 地址和密钥。
+
+    使用全局单例 client 复用 TCP 连接，threading.Semaphore 限制并发。
     """
+    _AI_CONCURRENCY.acquire()
+    try:
+        return _request_qwen35_impl(
+            question=question, file_base=file_base, model=model,
+            multi_pic=multi_pic, video=video, video_list=video_list,
+            system_content=system_content, show_filename=show_filename,
+            show_cost=show_cost, is_stream=is_stream, pic_tip=pic_tip,
+            show_request=show_request, file_ary=file_ary,
+            temperature=temperature, top_p=top_p,
+        )
+    finally:
+        _AI_CONCURRENCY.release()
+
+
+def _request_qwen35_impl(question="", file_base="", model=QWEN35_MODEL,
+                         multi_pic=None, video="", video_list="",
+                         system_content=None, show_filename=False,
+                         show_cost=False, is_stream=True, pic_tip=False,
+                         show_request=True, file_ary=None,
+                         temperature=0.7, top_p=0.8):
+    """实际 AI 调用逻辑（由 request_qwen35 包装信号量后调用）"""
     t1 = time.time()
-    client = OpenAI(
-        api_key=QWEN35_KEY,
-        base_url=QWEN35_URL,
-        timeout=600.0,  # 10分钟超时，处理多页图片
-    )
+    client = _get_qwen35_client()
     message = []
     if system_content is not None:
         message.append({"role": "system",

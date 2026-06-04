@@ -352,6 +352,57 @@ def _post_process_sections(sections: list[dict]) -> list[dict]:
 
 # ========== 比对引擎 ==========
 
+def _compare_description(exp: dict, act: dict, mismatches: list, parent_section: str = ""):
+    """比对两个 section/subsection 的 description（补充描述文字）。
+
+    比对规则：
+    - 模板有 description，实际也有 → 比对内容是否一致（忽略空格差异）
+    - 模板有 description，实际缺失 → 报 high
+    - 模板无 description，实际有 → 报 low（多余）
+    - 两者都无 → 不报
+    """
+    section_label = parent_section or exp.get("section", act.get("section", ""))
+    exp_desc = (exp.get("description") or "").strip()
+    act_desc = (act.get("description") or "").strip()
+    norm_exp = _normalize_text(exp_desc)
+    norm_act = _normalize_text(act_desc)
+
+    if not exp_desc and not act_desc:
+        return
+
+    if exp_desc and not act_desc:
+        mismatches.append({
+            "section": section_label,
+            "item": f"{section_label} - 补充描述",
+            "location": "description",
+            "expected": exp_desc,
+            "actual": "缺失",
+            "severity": "high",
+        })
+        return
+
+    if not exp_desc and act_desc:
+        mismatches.append({
+            "section": section_label,
+            "item": f"{section_label} - 补充描述",
+            "location": "description",
+            "expected": "模板中无补充描述",
+            "actual": act_desc,
+            "severity": "low",
+        })
+        return
+
+    if norm_exp != norm_act:
+        mismatches.append({
+            "section": section_label,
+            "item": f"{section_label} - 补充描述",
+            "location": "description",
+            "expected": exp_desc,
+            "actual": act_desc,
+            "severity": "medium",
+        })
+
+
 def _compare_with_template(
     format_type: str, actual_content: list[dict],
 ) -> list[dict]:
@@ -421,19 +472,31 @@ def _compare_with_template(
                 "severity": "high",
             })
 
-        # 比较 table_headers
-        exp_headers = _collect_headers(exp)
-        act_headers = _collect_headers(act)
+        # 比较 table_headers（仅当前层级，subsections 的 headers 在下面单独比对）
+        exp_headers = exp.get("table_headers", [])
+        act_headers = act.get("table_headers", [])
 
         if exp_headers or act_headers:
             section_label = exp.get("section", act.get("section", ""))
-            
-            # 使用 normalize_text 对表头进行标准化（忽略空格换行和全半角括号差异）
-            norm_exp_headers = [_normalize_text(h) for h in exp_headers]
-            norm_act_headers = [_normalize_text(h) for h in act_headers]
+
+            # 展开 headers（支持嵌套 dict 格式的多级表头）
+            def _flatten_headers(hdrs):
+                flat = []
+                for h in hdrs:
+                    if isinstance(h, str):
+                        flat.append(h.replace("#[", "").replace("]", ""))
+                    elif isinstance(h, dict):
+                        for k in h:
+                            flat.append(k)
+                return flat
+
+            flat_exp = _flatten_headers(exp_headers)
+            flat_act = _flatten_headers(act_headers)
+            norm_exp_headers = [_normalize_text(h) for h in flat_exp]
+            norm_act_headers = [_normalize_text(h) for h in flat_act]
             
             # 缺少的表头
-            for orig_eh, norm_eh in zip(exp_headers, norm_exp_headers):
+            for orig_eh, norm_eh in zip(flat_exp, norm_exp_headers):
                 if norm_eh not in norm_act_headers:
                     mismatches.append({
                         "section": section_label,
@@ -443,9 +506,9 @@ def _compare_with_template(
                         "actual": "缺失",
                         "severity": "high",
                     })
-            
+
             # 多余的表头
-            for orig_ah, norm_ah in zip(act_headers, norm_act_headers):
+            for orig_ah, norm_ah in zip(flat_act, norm_act_headers):
                 if norm_ah not in norm_exp_headers:
                     mismatches.append({
                         "section": section_label,
@@ -455,6 +518,80 @@ def _compare_with_template(
                         "actual": orig_ah,
                         "severity": "low",
                     })
+
+        # 比较 description（补充描述文字）
+        _compare_description(exp, act, mismatches)
+
+        # 比较 subsections 的 table_headers 和 description
+        exp_subs = exp.get("subsections", [])
+        act_subs = act.get("subsections", [])
+        sub_max = max(len(exp_subs), len(act_subs)) if exp_subs or act_subs else 0
+        for j in range(sub_max):
+            es = exp_subs[j] if j < len(exp_subs) else None
+            as_ = act_subs[j] if j < len(act_subs) else None
+
+            if es and not as_:
+                mismatches.append({
+                    "section": exp.get("section", ""),
+                    "item": f"{es.get('subsection', '')} - 子节次",
+                    "location": "section",
+                    "expected": "应存在",
+                    "actual": "缺失",
+                    "severity": "high",
+                })
+                continue
+            if as_ and not es:
+                mismatches.append({
+                    "section": act.get("section", ""),
+                    "item": f"{as_.get('subsection', '')} - 子节次",
+                    "location": "section",
+                    "expected": "不应存在",
+                    "actual": "多余子节次",
+                    "severity": "medium",
+                })
+                continue
+
+            # 子节次名称比对
+            es_name = _normalize_text(es.get("subsection", ""))
+            as_name = _normalize_text(as_.get("subsection", ""))
+            if es_name != as_name:
+                mismatches.append({
+                    "section": exp.get("section", ""),
+                    "item": f"{es.get('subsection', '')} - 子节次名称",
+                    "location": "section",
+                    "expected": es.get("subsection", ""),
+                    "actual": as_.get("subsection", ""),
+                    "severity": "medium",
+                })
+
+            # 子节次 table_headers 比对
+            es_hdrs = es.get("table_headers", [])
+            as_hdrs = as_.get("table_headers", [])
+            norm_es = [_normalize_text(h) for h in es_hdrs]
+            norm_as = [_normalize_text(h) for h in as_hdrs]
+            for orig_eh, neh in zip(es_hdrs, norm_es):
+                if neh not in norm_as:
+                    mismatches.append({
+                        "section": exp.get("section", ""),
+                        "item": f"{es.get('subsection', '')} - 表头",
+                        "location": "table_field",
+                        "expected": orig_eh,
+                        "actual": "缺失",
+                        "severity": "high",
+                    })
+            for orig_ah, nah in zip(as_hdrs, norm_as):
+                if nah not in norm_es:
+                    mismatches.append({
+                        "section": exp.get("section", ""),
+                        "item": f"{as_.get('subsection', '')} - 表头",
+                        "location": "table_field",
+                        "expected": "模板中无此字段",
+                        "actual": orig_ah,
+                        "severity": "low",
+                    })
+
+            # 子节次 description 比对
+            _compare_description(es, as_, mismatches, parent_section=exp.get("section", ""))
 
     return mismatches
 
