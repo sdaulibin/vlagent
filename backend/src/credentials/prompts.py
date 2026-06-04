@@ -23,8 +23,9 @@ Task: 请仔细识别并提取影像中的中华人民共和国居民身份证�
    - document_type (证件类型): 如"居民身份证"。
    - id_number (证件号码): 18位数字/字母。
    - issuing_authority (签发机关): 发证公安局名称。
-   - issue_date (签发日期): 格式如 YYYY.MM.DD。
-   - expiry_date (证件到期日): 格式如 YYYY.MM.DD 或"长期"。
+   - issue_date (签发日期): 从反面"有效期限"字段的起始日期提取，格式如 YYYY.MM.DD。
+     例如"2020.12.01-2040.12.01"→ issue_date 为"2020.12.01"。
+   - expiry_date (有效期限): 完整提取反面"有效期限"字段的原文，如"2020.12.01-2040.12.01"或"2020.12.01-长期"。
 
 ## 输出规则：
 - 返回严格的 JSON 对象。
@@ -202,16 +203,22 @@ Task: 处理复杂的网银申请书，准确提取企业、经办人、操作�
 2. 字段提取（根据给定字段尽量完整提取，无数据返回 ""）：
    【重要】人名中可能包含罕见字，请逐笔仔细辨别每个字的笔画结构，不要替换为形近常见字。例如：熇(火+高)不要误识为煊(火+宣)，烨不要误识为华。
    - 企业名称 (enterprise_name)、营业执照号 (business_license)、其他证件号码 (other_id_number)。
-   - 法定代表人姓名 (legal_rep_name)、法定代表人身份证号 (legal_rep_id)、手机号码 (legal_rep_phone)。
-   - 经办人姓名 (handler_name)、经办人身份证号 (handler_id)、手机号码 (handler_phone)。
+   - 法定代表人姓名 (legal_rep_name)：必须从表单中明确标注"法定代表人"标签旁提取姓名。
+     **严禁混淆不同角色**：表单中可能同时出现法定代表人、经办人、操作员等多个人的姓名，
+     legal_rep_name 只能取"法定代表人"标签对应的那个人，绝不能填入经办人或操作员的姓名。
+   - 法定代表人身份证号 (legal_rep_id)、手机号码 (legal_rep_phone)。
+   - 经办人姓名 (handler_name)：从"经办人"标签旁提取，不要与法定代表人混淆。
+   - 经办人身份证号 (handler_id)、手机号码 (handler_phone)。
    - 扣费账户账号 (deduction_account)。
-   - 审核与签字：
+   - 审核与签字（位于表单底部两个栏）：
      - 审核方式 (audit_method)
-     - 法定代表人(授权代理人)签字 (legal_rep_signature)：若能识别出签字或印章内容请提取。
-     - 法定代表人签字日期 (legal_rep_sign_date)
-     - 银行经办人(签字/盖章) (bank_handler_signature)
-     - 银行审核人(签字/盖章) (bank_auditor_signature)
-     - 银行业务日期 (bank_sign_date)
+     - 申请人声明栏：
+       - 法定代表人(授权代理人)签字 (legal_rep_signature)：从底部左侧"申请人声明"栏中提取签字或印章内容。
+       - 法定代表人签字日期 (legal_rep_sign_date)：申请人声明栏中的日期。
+     - 银行（业务公章）栏：
+       - 银行经办人(签字/盖章) (bank_handler_signature)：从底部右侧"银行（业务公章）"栏中提取"经办人"后的签字或印章内容。
+       - 银行审核人(签字/盖章) (bank_auditor_signature)：从底部右侧"银行（业务公章）"栏中提取"审核人"后的签字或印章内容。
+       - 银行业务日期 (bank_sign_date)：银行（业务公章）栏中的日期。
 
 3. 企业需关联的账户列表 (linked_accounts)：提取"企业需关联的账户"表格中的每一行数据。每条记录包含：
    - account_number (账号)

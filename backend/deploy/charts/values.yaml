@@ -146,6 +146,7 @@ envConfig:
   APP_ENV: "production"
   UPLOAD_DIR: "/app/upload"
   DOWNLOAD_DIR: "/app/download"
+  LOG_DIR: "/app/logs"
   RECOGNITION_TIMEOUT: "1800"
   # OPENAI_URL: "http://10.1.82.113:30208/v1"
   # MODEL_LOCAL: "d3vcf7gre7tl90toeog0"
@@ -184,3 +185,4 @@ persistence:
   accessMode: ReadWriteOnce
   uploadSize: 10Gi
   downloadSize: 10Gi
+  logsSize: 5Gi

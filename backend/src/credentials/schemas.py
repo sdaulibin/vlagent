@@ -17,7 +17,7 @@ class IdCardResponse(BaseModel):
     id_number: Optional[str] = Field("", description="证件号码")
     issuing_authority: Optional[str] = Field("", description="签发机关")
     issue_date: Optional[str] = Field("", description="签发日期")
-    expiry_date: Optional[str] = Field("", description="证件到期日")
+    expiry_date: Optional[str] = Field("", description="有效期限（完整，如2020.12.01-2040.12.01）")
 
 
 # -----------------------

@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import time
+from logging.handlers import RotatingFileHandler
 
 import jwt
 
@@ -17,10 +18,43 @@ from api import api_router
 
 logger = logging.getLogger(__name__)
 
-# 配置日志
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logging.getLogger("src.auth").setLevel(logging.INFO)
-logging.getLogger("src.auth").addHandler(logging.StreamHandler())
+# ── 日志配置：同时输出到控制台和文件 ──
+LOG_FORMAT = f"%(asctime)s [PID={os.getpid()}] %(levelname)s %(name)s: %(message)s"
+LOG_DIR = os.getenv("LOG_DIR", "/app/logs")
+LOG_FILE = os.path.join(LOG_DIR, "vlagent.log")
+
+# 容器环境写文件，本地环境无法创建目录则只输出到控制台
+_file_handler = None
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    _file_handler = RotatingFileHandler(
+        LOG_FILE, maxBytes=50 * 1024 * 1024, backupCount=5, encoding="utf-8",
+    )
+    _file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+except OSError:
+    pass  # 本地开发环境，只输出到控制台
+
+_formatter = logging.Formatter(LOG_FORMAT)
+
+# 控制台 handler
+_console = logging.StreamHandler()
+_console.setFormatter(_formatter)
+
+# 应用到 root logger，所有子 logger 自动继承
+_root = logging.getLogger()
+_root.setLevel(logging.INFO)
+_root.addHandler(_console)
+if _file_handler:
+    _root.addHandler(_file_handler)
+
+# 确保 uvicorn 的 access/error 日志也写入文件
+for _name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+    _uv = logging.getLogger(_name)
+    _uv.handlers.clear()
+    _uv.setLevel(logging.INFO)
+    _uv.addHandler(_console)
+    if _file_handler:
+        _uv.addHandler(_file_handler)
 
 
 def _run_alembic_upgrade():
@@ -94,6 +128,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# 请求日志中间件：记录每个请求落到哪个 worker（PID）+ 耗时
+@app.middleware("http")
+async def log_request_with_pid(request, call_next):
+    import os as _os
+    pid = _os.getpid()
+    t0 = time.monotonic()
+    response = await call_next(request)
+    elapsed = (time.monotonic() - t0) * 1000
+    logger.info(
+        f"[PID={pid}] {request.method} {request.url.path} "
+        f"{response.status_code} {elapsed:.0f}ms"
+    )
+    return response
 
 # Include API Router
 _api_prefix = os.getenv("API_PREFIX", "/api")
