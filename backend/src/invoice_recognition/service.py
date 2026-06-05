@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, List
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_qwen35
+from services.core.request_ai import request_qwen35, ai_semaphore
 from src.json_repair import fix_json
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.invoice_recognition.models import InvoiceFile, InvoiceResult
@@ -166,7 +166,8 @@ async def process_invoice_recognitions(file_record_id: int):
         loop = asyncio.get_event_loop()
         for i, img_path in enumerate(image_paths):
             print(f"  后台任务: 正在分析第 {i + 1}/{len(image_paths)} 页发票...")
-            page_data = await loop.run_in_executor(None, _extract_invoice_info, img_path)
+            async with ai_semaphore():
+                page_data = await loop.run_in_executor(None, _extract_invoice_info, img_path)
 
             print(f"  后台任务 => [第 {i + 1} 页] 类型: {page_data.get('invoice_type')}, 金额: {page_data.get('invoice_amount')}, 耗时: {page_data.get('duration')}s")
 

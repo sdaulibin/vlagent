@@ -11,7 +11,7 @@ from typing import List, Dict, Any
 
 from PIL import Image
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_qwen35
+from services.core.request_ai import request_qwen35, ai_semaphore
 from src.json_repair import fix_json
 from src.credentials.prompts import PROMPT_MAPPING, SEAL_CODE_VERIFY_PROMPT, ELECTRONIC_SEAL_PROMPT
 
@@ -566,7 +566,8 @@ async def process_credential_async(record_id: int):
 
     # 阶段 2：纯外部 IO，不持有任何 DB 连接
     try:
-        result = await asyncio.to_thread(process_credential, file_path, credential_type)
+        async with ai_semaphore():
+            result = await asyncio.to_thread(process_credential, file_path, credential_type)
     except Exception as e:
         duration = time.time() - start_time
         async with SessionLocal() as db:

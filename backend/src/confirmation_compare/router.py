@@ -24,6 +24,7 @@ router = APIRouter(prefix="/format-compare", tags=["格式比对"])
 
 # 从统一配置读取上传目录
 from src.config import UPLOAD_DIR_FORMAT_COMPARE
+from services.core.request_ai import ai_semaphore
 UPLOAD_DIR = UPLOAD_DIR_FORMAT_COMPARE
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -188,7 +189,8 @@ async def _run_compare_async(file_id: int):
 
     # 阶段 2：纯外部 IO，不持有任何 DB 连接
     try:
-        result = await asyncio.to_thread(compare_with_template, file_path)
+        async with ai_semaphore():
+            result = await asyncio.to_thread(compare_with_template, file_path)
     except Exception as e:
         async with SessionLocal() as db:
             file_obj = await db.get(FormatCompareFile, file_id)

@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlmodel import select
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_qwen35
+from services.core.request_ai import request_qwen35, ai_semaphore
 from src.json_repair import fix_json
 from src.confirmation_letter.prompts import FIELD_EXTRACTION_PROMPT
 
@@ -769,7 +769,8 @@ async def process_confirmation_letter_async(file_id: int):
 
     # 阶段 2：纯外部 IO，不持有任何 DB 连接
     try:
-        result = await asyncio.to_thread(process_confirmation_letter, file_path)
+        async with ai_semaphore():
+            result = await asyncio.to_thread(process_confirmation_letter, file_path)
     except Exception as e:
         print(f"Confirmation Letter Process Error: {e}")
         async with SessionLocal() as db:

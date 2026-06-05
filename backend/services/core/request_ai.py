@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import threading
 import time
@@ -13,9 +14,20 @@ from src.config import *
 _QWEN35_LOCK = threading.Lock()
 _QWEN35_CLIENT = None
 
+# asyncio.Semaphore：在 async 层限流，不占线程池线程
 # 单 worker 同时最多 2 个 AI 请求在飞
 # 2 副本 × 4 workers = 8 workers，8 × 2 = 16 并发（AI 网关上限 20）
-_AI_CONCURRENCY = threading.Semaphore(2)
+_AI_SEMAPHORE = asyncio.Semaphore(2)
+
+
+def ai_semaphore():
+    """返回全局 AI 并发信号量，供各 service 模块的 Phase 2 使用。
+
+    用法：
+        async with ai_semaphore():
+            result = await asyncio.to_thread(sync_ai_function, ...)
+    """
+    return _AI_SEMAPHORE
 
 
 def _get_qwen35_client() -> OpenAI:
@@ -256,21 +268,17 @@ def request_qwen35(question="", file_base="", model=QWEN35_MODEL,
     调用 Qwen3.5-35B 模型（非思考模式）
 
     参数与 request_stream 完全一致，但使用 Qwen3.5 的 API 地址和密钥。
-
-    使用全局单例 client 复用 TCP 连接，threading.Semaphore 限制并发。
+    注意：并发限流已移至 async 层（ai_semaphore），调用方应在 Phase 2 使用
+    async with ai_semaphore() 包裹 asyncio.to_thread。
     """
-    _AI_CONCURRENCY.acquire()
-    try:
-        return _request_qwen35_impl(
-            question=question, file_base=file_base, model=model,
-            multi_pic=multi_pic, video=video, video_list=video_list,
-            system_content=system_content, show_filename=show_filename,
-            show_cost=show_cost, is_stream=is_stream, pic_tip=pic_tip,
-            show_request=show_request, file_ary=file_ary,
-            temperature=temperature, top_p=top_p,
-        )
-    finally:
-        _AI_CONCURRENCY.release()
+    return _request_qwen35_impl(
+        question=question, file_base=file_base, model=model,
+        multi_pic=multi_pic, video=video, video_list=video_list,
+        system_content=system_content, show_filename=show_filename,
+        show_cost=show_cost, is_stream=is_stream, pic_tip=pic_tip,
+        show_request=show_request, file_ary=file_ary,
+        temperature=temperature, top_p=top_p,
+    )
 
 
 def _request_qwen35_impl(question="", file_base="", model=QWEN35_MODEL,
@@ -279,7 +287,7 @@ def _request_qwen35_impl(question="", file_base="", model=QWEN35_MODEL,
                          show_cost=False, is_stream=True, pic_tip=False,
                          show_request=True, file_ary=None,
                          temperature=0.7, top_p=0.8):
-    """实际 AI 调用逻辑（由 request_qwen35 包装信号量后调用）"""
+    """实际 AI 调用逻辑"""
     t1 = time.time()
     client = _get_qwen35_client()
     message = []

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from services.pdf.pdf_utils import split_pdf_to_images
-from services.core.request_ai import request_qwen35
+from services.core.request_ai import request_qwen35, ai_semaphore
 from src.json_repair import fix_json
 from src.pdf_extract.models import PdfExtractTask, PdfExtractResult
 
@@ -151,7 +151,8 @@ async def process_pdf_extract(task_id: int):
 
         fields = json.loads(fields_json)
         loop = asyncio.get_event_loop()
-        extracted_data = await loop.run_in_executor(None, _extract_with_ai, image_paths, fields)
+        async with ai_semaphore():
+            extracted_data = await loop.run_in_executor(None, _extract_with_ai, image_paths, fields)
 
     except Exception as e:
         print(f"PDF Extract Error: {e}")
