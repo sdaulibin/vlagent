@@ -18,7 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('document_compare_tasks', sa.Column('comparison_mode', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
+    op.execute("ALTER TABLE document_compare_tasks ADD COLUMN IF NOT EXISTS comparison_mode VARCHAR")
 
 
 def downgrade() -> None:

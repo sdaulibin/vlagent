@@ -367,7 +367,21 @@ function highlightSide(container: HTMLElement, sections: SectionItem[], side: 'a
     // which includes children and isn't contiguous in the rendered DOM.
     const sectionNorm = (section.text_content || '').replace(/\s/g, '');
     const sectionAnchor = getSectionAnchor(section, getParentText(section));
-    const sectionDomStart = findBlockByAnchor(container, fullText, sectionAnchor, section);
+    let sectionDomStart = findBlockByAnchor(container, fullText, sectionAnchor, section);
+
+    // For non-heading sections (body/table), the anchor may match the parent heading
+    // instead of the section content itself. Adjust by searching for the actual
+    // section text_content starting from the heading position.
+    if (sectionDomStart >= 0 && !section.title && sectionNorm.length >= 5) {
+      const firstChunk = sectionNorm.substring(0, Math.min(20, sectionNorm.length));
+      if (firstChunk.length >= 5) {
+        const actualPos = fullText.indexOf(firstChunk, sectionDomStart);
+        if (actualPos >= 0 && actualPos !== sectionDomStart) {
+          sectionDomStart = actualPos;
+        }
+      }
+    }
+
     console.log('[DocxDiff] section', section.id, 'role:', section.role, 'title:', section.title,
       'anchor:', sectionAnchor.substring(0, 20), 'sectionDomStart:', sectionDomStart);
 
@@ -692,12 +706,21 @@ function findSectionAnchorInText(fullText: string, anchor: string): number {
   return -1;
 }
 
+// Strip common auto-numbering prefixes from block text for matching.
+// Word auto-numbering adds prefixes like "1", "3.", "4.2", "（一）" etc.
+function _stripAutoNumber(text: string): string {
+  let stripped = text.replace(/^\d+(?:[\.\．]\d+)*[\.\．、)\）\s]+\s*/, '');
+  if (stripped !== text) return stripped;
+  stripped = text.replace(/^\d+(?=[一-鿿])/, '');
+  if (stripped !== text) return stripped;
+  stripped = text.replace(/^[（\(][一二三四五六七八九十百〇零]+[）\)]\s*/, '');
+  if (stripped !== text) return stripped;
+  stripped = text.replace(/^[一二三四五六七八九十百〇零]+[、．.]\s*/, '');
+  return stripped;
+}
+
 // Find the block-level element matching the section anchor.
-// For heading sections: match block that starts with the title.
-// For body/table sections: match the parent heading block (anchor = parentHeading + firstLine,
-// but heading and table are in different blocks, so only match the parentHeading part).
-// When nearTarget is provided, returns the MATCHING block closest to that position
-// (handles multi-page sections with repeated headings like "(续)").
+// Handles Word auto-numbering: tries direct match, stripped-number match, and substring fallback.
 // Returns the char index in fullText, or -1.
 function findBlockByAnchor(
   container: HTMLElement,
@@ -710,7 +733,6 @@ function findBlockByAnchor(
   const key = anchor.substring(0, Math.min(20, anchor.length));
   if (key.length < 3) return -1;
 
-  // For non-heading sections, also extract just the parent heading part
   const headingKey = !section.title && anchor.length > 20
     ? anchor.substring(0, 20)
     : null;
@@ -721,21 +743,38 @@ function findBlockByAnchor(
   let bestDist = Infinity;
   const hasTarget = nearTarget !== undefined && nearTarget >= 0;
 
+  function tryMatch(blockNorm: string): number | null {
+    if (blockNorm.startsWith(key) || (headingKey && blockNorm.startsWith(headingKey))) {
+      const idx = fullText.indexOf(blockNorm.substring(0, Math.min(10, blockNorm.length)));
+      if (idx !== -1) return idx;
+    }
+    const stripped = _stripAutoNumber(blockNorm);
+    if (stripped && stripped !== blockNorm) {
+      if (stripped.startsWith(key) || (headingKey && stripped.startsWith(headingKey))) {
+        const idx = fullText.indexOf(stripped.substring(0, Math.min(10, stripped.length)));
+        if (idx !== -1) return idx;
+      }
+    }
+    const includeIdx = blockNorm.indexOf(key);
+    if (includeIdx !== -1 && key.length >= 3) {
+      const idx = fullText.indexOf(key.substring(0, Math.min(10, key.length)));
+      if (idx !== -1) return idx;
+    }
+    return null;
+  }
+
   for (const block of Array.from(blocks)) {
     if (!(block as HTMLElement).innerText) continue;
     const blockNorm = (block as HTMLElement).innerText.replace(/\s/g, '');
     if (blockNorm.length < 3) continue;
 
-    if (blockNorm.startsWith(key) || (headingKey && blockNorm.startsWith(headingKey))) {
-      const idx = fullText.indexOf(blockNorm.substring(0, Math.min(10, blockNorm.length)));
-      if (idx === -1) continue;
-
-      if (!hasTarget) return idx; // No target — return first match
-
-      const dist = Math.abs(idx - nearTarget!);
+    const matchIdx = tryMatch(blockNorm);
+    if (matchIdx !== null) {
+      if (!hasTarget) return matchIdx;
+      const dist = Math.abs(matchIdx - nearTarget!);
       if (dist < bestDist) {
         bestDist = dist;
-        bestIdx = idx;
+        bestIdx = matchIdx;
       }
     }
   }
@@ -855,11 +894,31 @@ function scrollToSection(section: { id: number; title: string; diff_type: string
   for (const { el, cssClass, label } of containers) {
     if (!el) continue;
 
+    // Strategy 1 (preferred): use the highlight span placed by highlightSide.
+    // highlightSide already correctly locates diff text in the DOM and wraps it
+    // in a <span data-section-id="...">. This is the most reliable scroll target.
+    const selector = `.${cssClass}[data-section-id="${section.id}"]`;
+    const highlight = el.querySelector(selector) as HTMLElement | null;
+    if (highlight) {
+      console.log('[DocxDiff] scroll', label, 'via highlight span');
+      scrollToElement(el, highlight);
+      continue;
+    }
+
+    // Strategy 1b: for side B, also check deletion context block marker
+    if (label === 'B') {
+      const contextEl = el.querySelector(`.diff-del-context[data-section-id="${section.id}"]`) as HTMLElement | null;
+      if (contextEl) {
+        console.log('[DocxDiff] scroll', label, 'via deletion context block');
+        scrollToElement(el, contextEl);
+        continue;
+      }
+    }
+
+    // Strategy 2 (fallback): offset-based positioning using section anchor
+    // in DOM + diff offset from diff_ops.
     const sectionNorm = (section.text_content || '').replace(/\s/g, '');
     const { fullText, charNodeMap } = buildBodyTextIndex(el);
-
-    // Strategy 1: offset-based positioning (most reliable — uses section anchor
-    // in DOM + diff offset from diff_ops to compute the exact target position)
     let scrolled = false;
     if (sectionNorm.length >= 5) {
       // Deletion-only on side B: use context range
@@ -886,13 +945,26 @@ function scrollToSection(section: { id: number; title: string; diff_type: string
           }
         }
 
-        const sectionStart = findBlockByAnchor(el, fullText, sectionAnchor, section, diffOffset);
+        let sectionStart = findBlockByAnchor(el, fullText, sectionAnchor, section, diffOffset);
+
+        // Same adjustment as highlightSide: for non-heading sections, correct
+        // sectionStart from parent heading to actual section content position
+        if (sectionStart >= 0 && !section.title && sectionNorm.length >= 5) {
+          const firstChunk = sectionNorm.substring(0, Math.min(20, sectionNorm.length));
+          if (firstChunk.length >= 5) {
+            const actualPos = fullText.indexOf(firstChunk, sectionStart);
+            if (actualPos >= 0 && actualPos !== sectionStart) {
+              sectionStart = actualPos;
+            }
+          }
+        }
+
         if (sectionStart !== -1) {
           const sectionEnd = Math.min(sectionStart + sectionNorm.length, charNodeMap.length) - 1;
           const targetIdx = Math.min(Math.max(sectionStart, sectionStart + diffOffset), sectionEnd);
           const target = getElementAtCharIndex(charNodeMap, targetIdx);
           if (target) {
-            console.log('[DocxDiff] scroll', label, 'via offset: sectionStart:', sectionStart, 'diffOffset:', diffOffset, 'targetIdx:', targetIdx);
+            console.log('[DocxDiff] scroll', label, 'via offset fallback: sectionStart:', sectionStart, 'targetIdx:', targetIdx);
             scrollToElement(el, target);
             scrolled = true;
           }
@@ -901,26 +973,6 @@ function scrollToSection(section: { id: number; title: string; diff_type: string
     }
 
     if (scrolled) continue;
-
-    // Strategy 2: find highlight span for this section (less reliable —
-    // highlightSide can misplace spans for short/generic diff text)
-    const selector = `.${cssClass}[data-section-id="${section.id}"]`;
-    const highlight = el.querySelector(selector) as HTMLElement | null;
-    if (highlight) {
-      console.log('[DocxDiff] scroll', label, 'via highlight span (fallback)');
-      scrollToElement(el, highlight);
-      continue;
-    }
-
-    // Strategy 2b: for side B, also check deletion context block marker
-    if (label === 'B') {
-      const contextEl = el.querySelector(`.diff-del-context[data-section-id="${section.id}"]`) as HTMLElement | null;
-      if (contextEl) {
-        console.log('[DocxDiff] scroll', label, 'via deletion context block');
-        scrollToElement(el, contextEl);
-        continue;
-      }
-    }
 
     // Strategy 3: ancestor chain fallback
     console.log('[DocxDiff] no match in', label, '- using ancestor fallback');

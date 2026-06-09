@@ -163,6 +163,7 @@ envConfig:
   JWT_ALGORITHM: "HS256"
   API_PREFIX: "/vlagent/api"
   CORS_ORIGINS: "https://aisit.qdccb.cn:9900"
+  PERMISSION_DEFAULT_OPEN: "false"
 
 # 敏感配置 (Secret)
 secret:

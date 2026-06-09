@@ -38,7 +38,7 @@ data:
   # ==============================================================================
   # 权限配置
   # ==============================================================================
-  PERMISSION_DEFAULT_OPEN: {{ .Values.envConfig.PERMISSION_DEFAULT_OPEN | default "true" | quote }}
+  PERMISSION_DEFAULT_OPEN: {{ .Values.envConfig.PERMISSION_DEFAULT_OPEN | default "false" | quote }}
 
   # ==============================================================================
   # 影像平台 (SunECM) 配置

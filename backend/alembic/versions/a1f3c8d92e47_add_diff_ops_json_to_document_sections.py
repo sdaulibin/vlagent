@@ -18,7 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('document_sections', sa.Column('diff_ops_json', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
+    op.execute("ALTER TABLE document_sections ADD COLUMN IF NOT EXISTS diff_ops_json VARCHAR")
 
 
 def downgrade() -> None:

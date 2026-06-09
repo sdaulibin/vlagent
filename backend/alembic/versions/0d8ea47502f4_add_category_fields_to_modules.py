@@ -72,6 +72,8 @@ def upgrade() -> None:
     """)
 
     # 权限表：确保联合唯一索引存在（幂等）
+    # 注意：asyncpg 下 DROP INDEX 不能删掉被约束依赖的索引，需要先删约束
+    op.execute("ALTER TABLE user_permissions DROP CONSTRAINT IF EXISTS uq_user_permission_module")
     op.execute("DROP INDEX IF EXISTS uq_user_permission_module")
     op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_user_permission_module ON user_permissions (user_id, module)")
 

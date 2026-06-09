@@ -22,6 +22,8 @@ class InputLine:
     has_page_break: bool = False
     outline_level: int | None = None
     source_index: int = 0
+    all_bold: bool = False          # 所有非空 run 均为粗体
+    prev_is_blank: bool = False     # 前一个段落为空
 
 
 @dataclass
@@ -69,6 +71,7 @@ _GLOSSARY_RE = re.compile(r'^(附\s*录|附\s*件|术\s*语|定\s*义|缩\s*略\
 _SENTENCE_PUNCT = set('，。；：！？;:!?')
 _MONEY_DATE_RE = re.compile(r'[0-9０-９]+\s*(元|万元|亿元|年|月|日)', re.UNICODE)
 _PURE_NUMERIC_RE = re.compile(r'^[-+()（）\s0-9０-９.,，%％]+$', re.UNICODE)
+_DATE_RE = re.compile(r'[〇零一二三四五六七八九十百\d]+年|[〇零一二三四五六七八九十百\d]+月|\d+日$')
 
 
 def _heading_weak_gate(text: str, match: re.Match, max_tail: int = 40) -> bool:
@@ -100,10 +103,11 @@ def _heading_weak_gate(text: str, match: re.Match, max_tail: int = 40) -> bool:
     return True
 
 
-def classify_line(text: str, style_hint: str = "", outline_level: int | None = None) -> str:
+def classify_line(text: str, style_hint: str = "", outline_level: int | None = None,
+                  all_bold: bool = False, prev_is_blank: bool = False) -> str:
     """分类单行文本。
 
-    优先级：内容语义（TOC/Glossary 模式）> style_hint > outline_level > 正则 + 弱门控。
+    优先级：内容语义（TOC/Glossary 模式）> style_hint > outline_level > 正则 + 弱门控 > 格式启发式。
     当文本内容完全匹配 TOC/Glossary 模式时，无论样式如何都优先识别。
     """
     norm = _normalize_text(text).strip()
@@ -144,7 +148,21 @@ def classify_line(text: str, style_hint: str = "", outline_level: int | None = N
             return "H4"
     if not norm:
         return "BLANK"
-    return _classify_by_regex(norm)
+    regex_result = _classify_by_regex(norm)
+    if regex_result != "NORMAL":
+        return regex_result
+
+    # 格式启发式：全加粗 + 前面有空段落 + 短文本 + 无句末标点 + 非日期 → H1
+    # 适用于合同类文档中无 Heading 样式但用加粗+分隔来标识章节的场景
+    if (all_bold
+            and prev_is_blank
+            and len(norm) <= 40
+            and not re.search(r'[。！？；：,，;:!?]', norm)
+            and not _DATE_RE.search(norm)
+            and not norm.startswith(('（', '(', '〔', '［'))):
+        return "H1"
+
+    return "NORMAL"
 
 
 def _classify_by_regex(text: str) -> str:
@@ -212,7 +230,8 @@ def build_structured_document(lines: list[InputLine]) -> StructuredDocument:
     idx = 0
     while idx < len(lines):
         line = lines[idx]
-        token = classify_line(line.text, line.style_hint, line.outline_level)
+        token = classify_line(line.text, line.style_hint, line.outline_level,
+                               all_bold=line.all_bold, prev_is_blank=line.prev_is_blank)
 
         if line.is_table:
             token = "Table"
@@ -535,6 +554,7 @@ def extract_input_lines(docx_path: str) -> list[InputLine]:
     doc = Document(docx_path)
     lines: list[InputLine] = []
     idx = 0
+    prev_para_blank = False  # 前一个段落是否为空
 
     for item in doc.iter_inner_content():
         # 判断是段落还是表格
@@ -553,6 +573,7 @@ def extract_input_lines(docx_path: str) -> list[InputLine]:
                 source_index=idx,
             ))
             idx += 1
+            prev_para_blank = False
         else:
             # Paragraph
             para = item
@@ -560,6 +581,15 @@ def extract_input_lines(docx_path: str) -> list[InputLine]:
             style_name = para.style.name if para.style else ""
             outline_lvl = _get_outline_level(para)
             has_break = bool(para.contains_page_break) if hasattr(para, 'contains_page_break') else False
+
+            # 检测全加粗：所有非空 run 的 bold 属性为 True
+            all_bold = False
+            runs = para.runs
+            non_empty_runs = [r for r in runs if r.text and r.text.strip()]
+            if non_empty_runs:
+                all_bold = all(r.bold is True for r in non_empty_runs)
+
+            is_blank = not text.strip()
 
             lines.append(InputLine(
                 text=text,
@@ -569,8 +599,11 @@ def extract_input_lines(docx_path: str) -> list[InputLine]:
                 has_page_break=has_break,
                 outline_level=outline_lvl,
                 source_index=idx,
+                all_bold=all_bold,
+                prev_is_blank=prev_para_blank,
             ))
             idx += 1
+            prev_para_blank = is_blank
 
     return lines
 

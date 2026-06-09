@@ -39,7 +39,7 @@ pipeline {
         string(name: 'ftpCredential', defaultValue: 'devops-test-ftp-credential', description: 'ftp credential')
         string(name: 'ftpPath', defaultValue: '', description: 'a ftp relative path')
         string(name: 'ftpAddr', defaultValue: '10.1.89.31', description: 'ftp ip address')
-        string(name: 'ingress', defaultValue: 'nginx-start-uat', description: 'ingress class name')
+        string(name: 'ingress', defaultValue: 'nginx-star-uat', description: 'ingress class name')
         string(name: 'ingressHost', defaultValue: 'ai.qdccb.cn', description: 'ingress host')
         string(name: 'serverReplicas', defaultValue: '1', description: 'Server replica count')
 
@@ -47,7 +47,7 @@ pipeline {
         // Docker 镜像配置
         // =====================================================================
         string(name: 'PYTHON_BUILDER_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-uv', description: 'Python builder image with uv')
-        string(name: 'PYTHON_RUNTIME_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/python:3.13-bullseye-slim-runtime-v2', description: 'Python runtime image')
+        string(name: 'PYTHON_RUNTIME_IMAGE', defaultValue: 'harbor.devops.qdb.com/star/vlagent-backend-runtime:1.1', description: 'Python runtime image')
 
         // =====================================================================
         // PyPI 源配置 (内网 Nexus 代理)
@@ -71,7 +71,7 @@ pipeline {
         string(name: 'DATABASE_URL', defaultValue: 'postgresql+asyncpg://ioa:ioa123456@pg-ha.postgresql-ha:5432/vlagent', description: '数据库 URL')
         string(name: 'DATABASE_UPSTREAM_URL', defaultValue: 'postgresql+asyncpg://postgres:ioauat123456@10.238.146.99:31432/ioa', description: '上游数据库 URL')
         string(name: 'SYNC_INTERVAL_MINUTES', defaultValue: '120', description: '同步间隔时间(分钟)')
-        string(name: 'PERMISSION_DEFAULT_OPEN', defaultValue: 'true', description: '无权限记录时是否默认开放所有模块(SIT环境默认开放)')
+        string(name: 'PERMISSION_DEFAULT_OPEN', defaultValue: 'false', description: '无权限记录时是否默认开放所有模块(SIT环境默认开放)')
         string(name: 'API_PREFIX', defaultValue: '/vlagent/api', description: 'API 路由前缀')
         string(name: 'CORS_ORIGINS', defaultValue: 'https://ai.qdccb.cn:9900', description: 'CORS 允许的源(逗号分隔)')
     }
