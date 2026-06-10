@@ -254,25 +254,58 @@ def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
 
     return data
 
+
 def _enhance_for_handwriting(image_path: str, output_path: str) -> bool:
     """增强手写文字图像：提高对比度、锐化边缘、灰度化。
     用于违法犯罪告知书等包含手写数字/日期的凭证类型，帮助 OCR 更准确识别。"""
     try:
         img = Image.open(image_path)
-        # 转灰度
         img = img.convert("L")
-        # 增强对比度 1.5x
         img = ImageEnhance.Contrast(img).enhance(1.5)
-        # 锐化
         img = img.filter(ImageFilter.SHARPEN)
-        # 增强亮度 1.1x
         img = ImageEnhance.Brightness(img).enhance(1.1)
-        # 保存为 RGB（OCR 模型通常需要 RGB）
         img.convert("RGB").save(output_path, "JPEG", quality=95)
         return True
     except Exception as e:
         print(f"  [图像增强] 失败: {e}")
         return False
+
+
+def _luhn_check(number: str) -> bool:
+    """Luhn 校验算法，用于验证银行卡号是否有效。"""
+    digits = [int(d) for d in number if d.isdigit()]
+    if len(digits) < 2:
+        return False
+    total = 0
+    for i, d in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def _fix_bank_account(bank_account: str) -> str:
+    """用 Luhn 校验修正手写银行卡号中常见的 OCR 错误。"""
+    digits = re.sub(r'\D', '', bank_account)
+    if not digits:
+        return bank_account
+    if _luhn_check(digits):
+        return digits
+    for i in range(len(digits)):
+        if digits[i] == '7':
+            candidate = digits[:i] + '1' + digits[i:]
+            if _luhn_check(candidate):
+                print(f"  [银行卡号修正] {bank_account} -> {candidate} (在位置{i}的7前插入1, Luhn通过)")
+                return candidate
+    for i in range(len(digits)):
+        candidate = digits[:i+1] + '1' + digits[i+1:]
+        if _luhn_check(candidate):
+            print(f"  [银行卡号修正] {bank_account} -> {candidate} (在位置{i}后插入1, Luhn通过)")
+            return candidate
+    print(f"  [银行卡号修正] 无法通过Luhn修正: {bank_account}")
+    return bank_account
 
 
 def _compress_images_for_ai(image_paths: List[str], output_dir: str, max_size=1600, quality=85) -> List[str]:
@@ -414,30 +447,6 @@ def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] 
     seal_codes = [c.replace("-", "").replace(" ", "") for c in seal_codes]
     print(f"  [印章核验] 原始编码(清理后): {seal_codes}")
 
-    # Step 1.5: 对所有编码做10位长度校正（原始和旋转结果统一处理）
-    def _fix_seal_code(code: str) -> str:
-        """修正常见OCR误识别，确保编码为10位。
-        最常见的错误：数字'1'后多识别出'I'（如 ASCVLS1IYUN → ASCVLS1YUN）"""
-        if len(code) == 10:
-            return code
-        if len(code) > 10:
-            # 优先移除"1"后面的多余"I"
-            attempt = code.replace("1I", "1")
-            if len(attempt) == 10:
-                print(f"  [印章核验] 长度修正: {code}({len(code)}位) -> {attempt}(10位), 移除1后多余I")
-                return attempt
-            # 逐个移除多余的"I"
-            while len(attempt) > 10 and "I" in attempt:
-                idx = attempt.index("I")
-                attempt = attempt[:idx] + attempt[idx+1:]
-            if len(attempt) == 10:
-                print(f"  [印章核验] 长度修正: {code}({len(code)}位) -> {attempt}(10位)")
-                return attempt
-            print(f"  [印章核验] 无法修正到10位: {code}({len(code)}位), 保留原始")
-        return code
-
-    seal_codes = [_fix_seal_code(c) for c in seal_codes]
-
     # Step 2: 对每个tile旋转180度重新提取
     from PIL import Image
     rotated_results = []
@@ -456,9 +465,7 @@ def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] 
             rotated_data = json.loads(fix_json(resp))
             codes = rotated_data.get("seal_codes", [])
             codes = [c.replace("-", "").replace(" ", "") for c in codes]
-            # 对旋转结果也做10位校正
-            codes = [_fix_seal_code(c) for c in codes]
-            print(f"  [印章核验] tile {tile_path} 旋转提取(已校正): {codes}")
+            print(f"  [印章核验] tile {tile_path} 旋转提取: {codes}")
             rotated_results.extend(codes)
 
             try:
@@ -468,30 +475,24 @@ def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] 
         except Exception as e:
             print(f"  [印章核验] tile旋转提取失败: {e}")
 
-    # Step 3: 合并 - 优先选10位编码，同为10位时选旋转结果
+    # Step 3: 合并 - 对每个位置取原始和旋转中最长的
     if not rotated_results:
         data["seal_codes"] = seal_codes
         return data
 
     n = len(seal_codes)
-    # 如果旋转结果数量匹配，一一对应
+    # 如果旋转结果数量匹配，一一对应取最长
     if len(rotated_results) >= n:
         final = []
         for i in range(n):
             orig = seal_codes[i] if i < len(seal_codes) else ""
             rot = rotated_results[i] if i < len(rotated_results) else ""
-            # 优先选10位的；都是10位或都不是10位时选旋转结果
-            if len(orig) == 10 and len(rot) != 10:
-                best = orig
-            elif len(rot) == 10 and len(orig) != 10:
-                best = rot
-            else:
-                best = rot  # 都是10位或都不是10位，默认选旋转结果
+            best = rot if len(rot) >= len(orig) else orig  # 优先旋转结果（旋转提取通常更准确）
             print(f"  [印章核验] 位置{i}: 原始={orig}({len(orig)}字符) vs 旋转={rot}({len(rot)}字符) -> {best}")
             final.append(best)
         data["seal_codes"] = final
     else:
-        # 旋转结果不够，用全局策略：收集所有候选，优先选10位的
+        # 旋转结果不够，用全局策略：收集所有候选，按长度排序取前N
         all_codes = list(seal_codes) + rotated_results
         unique = list(dict.fromkeys(all_codes))
         by_length = sorted(unique, key=lambda c: len(c), reverse=True)
@@ -524,7 +525,6 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
         elif credential_type == "notice_illegal_activity":
             final_image_paths = image_paths
             max_size = 3072
-            # 对手写文字做图像增强（提高对比度、锐化）
             enhanced_dir = os.path.join(work_dir, "enhanced")
             os.makedirs(enhanced_dir, exist_ok=True)
             enhanced_paths = []
@@ -562,6 +562,9 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                 data = json.loads(fix_json(response))
                 data = _post_process_boolean_fields(data, credential_type)
                 data = _post_process_authorized_items(data, credential_type)
+                # 银行卡号 Luhn 校验修正（手写"17"→"7"等常见OCR错误）
+                if credential_type == "notice_illegal_activity" and data.get("bank_account"):
+                    data["bank_account"] = _fix_bank_account(data["bank_account"])
                 data = _verify_seal_codes(data, credential_type, compressed_paths)
                 return data
             except Exception as e:
@@ -584,6 +587,8 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             merged = _merge_json_results(part_results)
             merged = _post_process_boolean_fields(merged, credential_type)
             merged = _post_process_authorized_items(merged, credential_type)
+            if credential_type == "notice_illegal_activity" and merged.get("bank_account"):
+                merged["bank_account"] = _fix_bank_account(merged["bank_account"])
             merged = _verify_seal_codes(merged, credential_type, compressed_paths)
             return merged
 
