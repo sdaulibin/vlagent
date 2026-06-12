@@ -151,11 +151,17 @@ pipeline {
                         sh """
                         nerdctl tag ${env.RELEASE_IMAGE}-amd64 ${env.PRODUCTION_IMAGE}-amd64
                         """
-                        env.PRODUCTION_IMAGE = "${env.PRODUCTION_IMAGE}-amd64"
-                        sh "make ci-export"
+                        // env.PRODUCTION_IMAGE = "${env.PRODUCTION_IMAGE}-amd64"
+                        sh """
+                        export PROJECT_NAME=${env.projectName}
+                        make -e ci-export
+                        """
                         helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}.tar", "${env.ftpCredential}", "${env.ftpAddr}")
 
-                        sh "make ci-chart"
+                        sh """
+                        export PROJECT_NAME=${env.projectName}
+                        make -e ci-chart
+                        """
                         helm.DeployToSmb("${env.ftpPath}", "${env.projectName}-${env.RELEASE_VERSION}-chart.tar.gz", "${env.ftpCredential}", "${env.ftpAddr}")
                     }
                 }

@@ -39,7 +39,7 @@ pipeline {
         string(name: 'ftpCredential', defaultValue: 'devops-test-ftp-credential', description: 'ftp credential')
         string(name: 'ftpPath', defaultValue: '', description: 'a ftp relative path')
         string(name: 'ftpAddr', defaultValue: '10.1.89.31', description: 'ftp ip address')
-        string(name: 'ingress', defaultValue: 'nginx-start-uat', description: 'ingress class name')
+        string(name: 'ingress', defaultValue: 'nginx-star-uat', description: 'ingress class name')
         string(name: 'ingressHost', defaultValue: 'ai.qdccb.cn', description: 'ingress host')
         string(name: 'replicas', defaultValue: '1', description: 'replica count')
         string(name: 'NPM_REGISTRY', defaultValue: 'http://10.238.145.145:4873/', description: 'npm registry proxy')

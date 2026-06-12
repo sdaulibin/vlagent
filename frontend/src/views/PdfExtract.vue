@@ -227,7 +227,7 @@ const handleDelete = async (id: number) => {
 
 const handleDownload = async (taskId: number) => {
   const url = await downloadPdfExtract(taskId);
-  window.open(url, '_blank');
+  window.open(url + '#toolbar=0', '_blank');
 };
 
 // 复制 JSON 到剪贴板

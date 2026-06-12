@@ -163,12 +163,12 @@ const goBack = () => router.push("/");
 const openUploadedFile = async () => {
   if (!selectedTask.value) return;
   const url = await getFormatCompareFileUrl(selectedTask.value.id);
-  window.open(url, "_blank");
+  window.open(url + '#toolbar=0', "_blank");
 };
 
 const openTemplateFile = async (formatKey: string) => {
   const url = await getFormatCompareTemplateUrl(formatKey);
-  window.open(url, "_blank");
+  window.open(url + '#toolbar=0', "_blank");
 };
 
 const getSeverityClass = (severity: string) => {
@@ -528,7 +528,7 @@ onUnmounted(() => {
                     selectedTask.format_type &&
                     selectedTask.format_type !== 'unknown'
                   "
-                  :src="templateFileUrl"
+                  :src="templateFileUrl + '#toolbar=0'"
                   class="w-full h-full min-h-[350px] rounded-b-xl"
                 />
                 <div
@@ -559,7 +559,7 @@ onUnmounted(() => {
               </div>
               <div class="flex-1 min-h-[350px]">
                 <iframe
-                  :src="taskFileUrl"
+                  :src="taskFileUrl + '#toolbar=0'"
                   class="w-full h-full min-h-[350px] rounded-b-xl"
                 />
               </div>

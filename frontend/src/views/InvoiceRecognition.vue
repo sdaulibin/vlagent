@@ -241,7 +241,7 @@ onUnmounted(() => {
           <div class="file-preview-container">
             <iframe
               v-if="selectedDetail.filename.toLowerCase().endsWith('.pdf')"
-              :src="invoiceFileUrl"
+              :src="invoiceFileUrl + '#toolbar=0'"
               class="file-preview-iframe"
             ></iframe>
             <img

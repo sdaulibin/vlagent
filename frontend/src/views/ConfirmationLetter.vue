@@ -307,7 +307,7 @@ onUnmounted(() => {
             <div class="p-3">
               <p class="text-xs font-medium text-slate-500 mb-2">原文预览</p>
               <div class="file-preview-container">
-                <iframe :src="previewUrl" class="file-preview-iframe" />
+                <iframe :src="previewUrl + '#toolbar=0'" class="file-preview-iframe" />
               </div>
             </div>
           </div>

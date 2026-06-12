@@ -168,7 +168,7 @@ const goBack = () => {
 };
 
 const openPreview = () => {
-  if (previewUrl.value) window.open(previewUrl.value, '_blank');
+  if (previewUrl.value) window.open(previewUrl.value + '#toolbar=0', '_blank');
 };
 
 const getStatusText = (status: string) => {
@@ -421,7 +421,7 @@ onUnmounted(() => {
                 />
                 <iframe
                   v-else
-                  :src="previewUrl"
+                  :src="previewUrl + '#toolbar=0'"
                   class="file-preview-iframe"
                 />
               </div>
