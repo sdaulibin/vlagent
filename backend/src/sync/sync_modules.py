@@ -22,7 +22,7 @@ async def sync_modules() -> dict:
 
     async with UpstreamSessionLocal() as upstream:
         rows = await upstream.execute(text(
-            "SELECT id, name, description, sorting, is_delete "
+            "SELECT id, name, description, sorting, is_delete, permissions "
             "FROM hi_agent_list WHERE pid = :pid AND is_delete = false"
         ), {"pid": VLAGENT_AGENT_ID})
         upstream_agents = rows.mappings().all()
@@ -82,20 +82,34 @@ async def sync_modules() -> dict:
             if mod.agent_id != agent_id:
                 changes.append(f"agent_id: {mod.agent_id}→{agent_id}")
                 mod.agent_id = agent_id
+            # 上游 hi_agent_list.permissions: False=公开(所有人可用) / True=需权限；
+            # NULL 按需权限处理（保守，避免误公开）
+            raw_perm = agent["permissions"]
+            upstream_perm = False if raw_perm is False else True
+            if mod.permission_required != upstream_perm:
+                changes.append(f"permission_required: {mod.permission_required}→{upstream_perm}")
+                mod.permission_required = upstream_perm
 
             if changes:
                 stats["updated"] += 1
                 logger.info("[模块同步] 更新 module key=%r (匹配方式=%s): %s",
                             mod.key, match_mode, "; ".join(changes))
 
-        # 上游已删除的模块 → 标记为不可用
-        result = await session.execute(select(Module).where(Module.agent_id.is_not(None)))
+        # 上游未配置的模块 → 标记为不可用
+        # 含两类：①曾绑定 agent_id 但上游已删除；②从未绑定 agent_id 的本地模块（上游无此配置）。
+        # 配置了上游库的环境（非开发）里，未在上游配置的模块不会展示；
+        # 开发环境不跑同步，本地模块保持可用。上游日后补配会自动恢复。
+        result = await session.execute(select(Module))
         for mod in result.scalars().all():
             if mod.agent_id not in matched_agent_ids and mod.status:
                 mod.status = False
                 stats["disabled"] += 1
-                logger.info("[模块同步] 禁用: module key=%r agent_id=%d (上游已删除)",
-                            mod.key, mod.agent_id)
+                if mod.agent_id is None:
+                    logger.info("[模块同步] 禁用: module key=%r (上游未配置，agent_id 未绑定)",
+                                mod.key)
+                else:
+                    logger.info("[模块同步] 禁用: module key=%r agent_id=%d (上游已删除)",
+                                mod.key, mod.agent_id)
 
         await session.commit()
 

@@ -21,5 +21,8 @@ class Module(SQLModel, table=True):
     name_en: str = Field(default="")
     sort_order: int = Field(default=0)
     status: bool = Field(default=True)
+    # 是否需要权限：True=需权限(仅授权用户可见)，False=公开(所有用户可见)。
+    # 由上游 hi_agent_list.permissions 同步：上游 False=公开 → 本地 False，True=需权限 → 本地 True。
+    permission_required: bool = Field(default=True)
     agent_id: Optional[int] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.now)
