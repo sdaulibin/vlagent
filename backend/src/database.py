@@ -62,6 +62,7 @@ async def init_db():
     from src.invoice_recognition.models import InvoiceFile, InvoiceResult
     from src.credentials.models import CredentialRecord, CredentialResult
     from src.pdf_extract.models import PdfExtractTask, PdfExtractResult
+    from src.financial_compare.models import FinancialCompareTask
     from src.permissions.models import UserPermission
     from src.modules.models import Module
 
@@ -116,12 +117,36 @@ async def init_db():
                   gradient="icon-gradient-cyan", hover_class="group-hover:text-cyan-700", sort_order=7,
                   category="credential", category_label="凭证提取", category_color="#7c3aed",
                   bg_color="linear-gradient(135deg, #0891b2, #06b6d4)", name_en="PDF Extract"),
+                Module(key="financial-compare", title="财务报告比对",
+                  description="比对财务报告与年度报告中的审计报告部分，支持繁简转换和逐字差异标注",
+                  icon="FileDiff", route="/financial-compare",
+                  gradient="icon-gradient-teal", hover_class="group-hover:text-teal-700", sort_order=8,
+                  category="document", category_label="文档比对", category_color="#ea580c",
+                  bg_color="linear-gradient(135deg, #0d9488, #14b8a6)", name_en="Financial Report Compare"),
             ]
             for seed in seeds:
                 session.add(seed)
             await session.commit()
         else:
-            # 已有数据：回填分类字段（幂等）
+            # 已有数据：补插新模块 + 回填分类字段（幂等）
+            result = await session.execute(select(Module))
+            existing_keys = {m.key for m in result.scalars().all()}
+
+            # 补插缺失的新模块
+            _NEW_MODULES = [
+                Module(key="financial-compare", title="财务报告比对",
+                  description="比对财务报告与年度报告中的审计报告部分，支持繁简转换和逐字差异标注",
+                  icon="FileDiff", route="/financial-compare",
+                  gradient="icon-gradient-teal", hover_class="group-hover:text-teal-700", sort_order=8,
+                  category="document", category_label="文档比对", category_color="#ea580c",
+                  bg_color="linear-gradient(135deg, #0d9488, #14b8a6)", name_en="Financial Report Compare"),
+            ]
+            for m in _NEW_MODULES:
+                if m.key not in existing_keys:
+                    session.add(m)
+            await session.commit()
+
+            # 回填分类字段（幂等）
             _CATEGORY_DATA = {
                 "bank-statement": ("bank", "银行流水", "#2563eb", "linear-gradient(135deg, #2563eb, #3b82f6)", "Bank Statement"),
                 "confirmation-letter": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #059669, #10b981)", "Confirmation Letter"),
@@ -130,6 +155,7 @@ async def init_db():
                 "invoice-recognition": ("invoice", "发票识别", "#dc2626", "linear-gradient(135deg, #dc2626, #ef4444)", "Invoice Recognition"),
                 "credential-recognition": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #7c3aed, #8b5cf6)", "Credential Recognition"),
                 "pdf-extract": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #0891b2, #06b6d4)", "PDF Extract"),
+                "financial-compare": ("document", "文档比对", "#ea580c", "linear-gradient(135deg, #0d9488, #14b8a6)", "Financial Report Compare"),
             }
             result = await session.execute(select(Module))
             for module in result.scalars().all():

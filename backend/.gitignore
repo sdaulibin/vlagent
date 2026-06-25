@@ -62,6 +62,9 @@ upload/
 download/
 *.log
 
+# Engine runtime artifacts (解析中间产物 / LLM日志 / 任务快照 / 断点续跑)
+output/
+
 # IDEs
 .idea/
 .vscode/

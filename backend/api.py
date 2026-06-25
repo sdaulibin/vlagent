@@ -11,6 +11,7 @@ from src.invoice_recognition.router import router as invoice_router
 from src.credentials.router import router as credentials_router
 from src.file_provider.router import router as file_provider_router
 from src.pdf_extract.router import router as pdf_extract_router
+from src.financial_compare.router import router as financial_compare_router
 from src.permissions.router import router as permissions_router
 from src.modules.router import router as modules_router
 
@@ -42,6 +43,9 @@ api_router.include_router(file_provider_router)
 
 # 通用 PDF 提取（独立模块）
 api_router.include_router(pdf_extract_router)
+
+# 财务报告比对（独立模块）
+api_router.include_router(financial_compare_router)
 
 # 权限管理
 api_router.include_router(permissions_router)

@@ -7,6 +7,7 @@ import FormatCompare from '../views/FormatCompare.vue'
 import InvoiceRecognition from '../views/InvoiceRecognition.vue'
 import CredentialRecognition from '../views/CredentialRecognition.vue'
 import PdfExtract from '../views/PdfExtract.vue'
+import FinancialCompare from '../views/FinancialCompare.vue'
 import AuthError from '../views/AuthError.vue'
 import { isAuthenticated } from '../composables/useAuth'
 import { useUser } from '../composables/useUser'
@@ -61,6 +62,11 @@ const routes = [
         path: '/pdf-extract',
         name: 'PdfExtract',
         component: PdfExtract
+    },
+    {
+        path: '/financial-compare',
+        name: 'FinancialCompare',
+        component: FinancialCompare
     }
 ]
 

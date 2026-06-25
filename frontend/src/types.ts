@@ -353,3 +353,78 @@ export interface PdfExtractTaskDetail {
   result: Record<string, any> | null;
   error_msg: string | null;
 }
+
+// ===== 财务报告比对（结构化 LLM 引擎 DiffRecord schema）=====
+
+export type BBox = [number, number, number, number];
+
+export interface DiffLoc {
+  stream_index?: number;
+  section_path?: string;
+  table_index?: number;
+  element_index?: number;
+  row?: number;
+  col?: number;
+  page?: number;
+  bbox?: BBox;
+  spans?: Array<{
+    text: string;
+    bbox: BBox;
+    x?: number;
+    x1?: number;
+    y?: number;
+  }>;
+}
+
+export interface DiffScope {
+  path_a: string;
+  path_b: string;
+}
+
+export interface DiffPayload {
+  diff_type: string;
+  diff_category?: string;
+  diff_reason?: string;
+  a_value?: string;
+  b_value?: string;
+  a_row_content?: string;
+  b_row_content?: string;
+  a_text?: string;
+  b_text?: string;
+  diff?: Array<{ A: string; B: string }>;
+}
+
+export interface DiffRecord {
+  diff_id: string;
+  phase: number;
+  kind: string;
+  scope: DiffScope;
+  loc_a: DiffLoc | null;
+  loc_b: DiffLoc | null;
+  payload: DiffPayload;
+}
+
+export type SupportedFileType = "pdf" | "docx" | "unknown";
+
+export type DiffHighlightKind = "only-in" | "other";
+
+/** 对照模式：两侧按 scroll 比例同步滚动；独立模式：各自滚动，连线随动并在不可见时隐藏 */
+export type ScrollLinkMode = "sync" | "independent";
+
+export interface FinancialCompareTask {
+  id: number;
+  docx_file_name: string;
+  pdf_file_name: string;
+  docx_start_page: number;
+  docx_end_page: number | null;
+  pdf_start_page: number;
+  pdf_end_page: number | null;
+  status: 'pending' | 'processing' | 'done' | 'failed';
+  error_msg: string | null;
+  duration: number | null;
+  /** 差异汇总统计 JSON 字符串 */
+  diff_stats: string | null;
+  /** 引擎 DiffRecord 列表 JSON 字符串，需 JSON.parse 后使用 */
+  diff_blocks: string | null;
+  created_at: string;
+}

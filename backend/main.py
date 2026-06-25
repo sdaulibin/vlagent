@@ -77,6 +77,14 @@ def _run_alembic_upgrade():
         logger.warning(f"[ALEMBIC] upgrade error: {e}")
 
 
+# 把 src/ 加入 sys.path，使引擎包（financial_compare.compare.xxx 等裸名风格）可导入。
+# 引擎移植自参考项目，内部 import 用 financial_compare.xxx 前缀（不带 src.），
+# 需要 src/ 在 import 搜索路径里。
+import sys as _sys
+_SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if _SRC_DIR not in _sys.path:
+    _sys.path.insert(0, _SRC_DIR)
+
 # 在模块加载时执行迁移（在 async 上下文之前）
 _run_alembic_upgrade()
 

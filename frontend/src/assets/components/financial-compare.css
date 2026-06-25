@@ -1,0 +1,367 @@
+/* ===== 财务报告比对 =====
+   结果视图的布局/高亮/连线样式直接采用参考项目(qdb_filediff_ui)的标准，
+   确保滚动、高亮、连线行为与参考项目一致。 */
+
+/* Logo（上传视图）*/
+.fc-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Upload zone（上传视图）*/
+.upload-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.upload-zone:hover {
+  border-color: #14b8a6;
+  background: #f0fdfa;
+}
+
+/* ===== 结果视图：app-shell 布局（照参考项目）===== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  background: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e8ef;
+  flex-shrink: 0;
+}
+
+.doc-header-names {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4e5969;
+}
+
+.doc-header-item {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f4f6fa;
+}
+
+.doc-header-a { color: #1677ff; }
+.doc-header-b { color: #cf1322; }
+.doc-header-sep { color: #c9cdd4; }
+
+.task-status-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scroll-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.scroll-mode-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #172b4d;
+  white-space: nowrap;
+}
+
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* ===== viewer-area：左右两列文档（照参考项目）===== */
+.viewer-area {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.viewer-col {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e5e8ef;
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* ===== diff-panel：底部差异列表横排（照参考项目）===== */
+.diff-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #e5e8ef;
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 0;
+}
+
+.diff-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.diff-panel-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* ===== PDF 渲染（照参考项目）===== */
+.pdf-page {
+  padding: 10px;
+  border: 1px solid #f0f3f8;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.pdf-page h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #4e5969;
+}
+
+.pdf-stage {
+  position: relative;
+  margin: 0 auto;
+}
+
+.pdf-canvas { display: block; }
+
+.pdf-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ===== Diff 高亮（照参考项目）===== */
+.diff-bbox {
+  position: absolute;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.diff-bbox--only-in { border: 2px solid #409eff; }
+.diff-bbox--other { border: 2px solid #f56c6c; }
+
+.diff-bbox--active {
+  box-shadow: 0 0 0 2px #73d13d, 0 0 8px rgba(82, 196, 26, 0.45);
+  z-index: 2;
+}
+
+.diff-mark { border-radius: 2px; }
+
+.diff-mark--only-in,
+td.diff-mark--only-in {
+  background-color: rgba(64, 158, 255, 0.35) !important;
+}
+
+.diff-mark--other,
+td.diff-mark--other {
+  background-color: rgba(245, 108, 108, 0.35) !important;
+}
+
+.diff-mark--active {
+  outline: 2px solid #73d13d;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(115, 209, 61, 0.35);
+}
+
+/* ===== SVG 连接线（照参考项目）===== */
+.diff-connector {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+}
+
+.diff-connector-line {
+  fill: none;
+  stroke: #73d13d;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+  opacity: 0.95;
+}
+
+.diff-connector-dot {
+  fill: #fff;
+  stroke-width: 2;
+}
+
+.diff-connector-dot--a { stroke: #409eff; }
+.diff-connector-dot--b { stroke: #f56c6c; }
+
+/* ===== 差异列表（照参考项目）===== */
+.diff-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.diff-list-wrap--horizontal {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.diff-list-wrap--horizontal .diff-toolbar {
+  flex: 0 0 auto;
+  grid-template-columns: 100px 140px;
+  align-self: center;
+}
+
+.diff-list-wrap--horizontal .diff-scroll-horizontal {
+  flex: 1;
+  min-width: 0;
+}
+
+.diff-toolbar {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+}
+
+.diff-scroll { flex: 1; min-height: 0; }
+
+.diff-scroll-horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  max-height: 148px;
+}
+
+.diff-scroll-horizontal .diff-item {
+  flex: 0 0 260px;
+  width: 260px;
+  margin-bottom: 0;
+  max-height: 132px;
+  overflow: hidden;
+}
+
+.diff-item {
+  border: 1px solid #edf1f7;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.diff-item:hover {
+  border-color: #9ec5ff;
+  background: #f4f8ff;
+}
+
+.diff-item.active {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.diff-item-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.diff-path,
+.diff-content {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #4e5969;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.diff-highlight {
+  background-color: #ffe58f;
+  color: #612500;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* ===== DocumentPane 内部布局类（照参考项目，约束高度防止撑爆）===== */
+.doc-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-pane-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.doc-viewer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+}
+
+.doc-scroll-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-loading-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+}
+
+/* DOCX preview padding */
+.doc-content { padding: 10px; }

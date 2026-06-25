@@ -43,6 +43,9 @@ dist
 dist-ssr
 *.local
 
+# pdfjs 构建产物（vite.config.ts 自动从 node_modules 拷贝到 public/pdfjs/）
+public/pdfjs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

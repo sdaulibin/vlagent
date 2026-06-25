@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getToken, clearAuth } from "../composables/useAuth";
+import type { FinancialCompareTask } from "../types";
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
@@ -296,6 +297,55 @@ export const getInvoiceResult = async (fileId: number) => {
 export const deleteInvoiceFile = async (fileId: number) => {
   const response = await api.delete(`/invoice_recognition/${fileId}`);
   return response.data;
+};
+
+// ===== 财务报告比对 API =====
+
+export const compareFinancialReports = async (
+  docx: File,
+  pdf: File,
+  docxStartPage: number,
+  docxEndPage?: number | null,
+  pdfStartPage: number = 1,
+  pdfEndPage?: number | null,
+) => {
+  const formData = new FormData();
+  formData.append("file_docx", docx);
+  formData.append("file_pdf", pdf);
+  formData.append("docx_start_page", String(docxStartPage));
+  if (docxEndPage) formData.append("docx_end_page", String(docxEndPage));
+  formData.append("pdf_start_page", String(pdfStartPage));
+  if (pdfEndPage) formData.append("pdf_end_page", String(pdfEndPage));
+  const response = await api.post("/financial-compare/compare", formData);
+  return response.data as { task_id: number; status: string };
+};
+
+export const getFinancialCompareList = async () => {
+  const response = await api.get("/financial-compare/list");
+  return response.data;
+};
+
+export const getFinancialCompareDetail = async (taskId: number) => {
+  const response = await api.get(`/financial-compare/list/${taskId}`);
+  return response.data as FinancialCompareTask;
+};
+
+export const getFinancialCompareStatus = async (taskId: number) => {
+  const response = await api.get(`/financial-compare/${taskId}/status`);
+  return response.data;
+};
+
+export const deleteFinancialCompareTask = async (taskId: number) => {
+  const response = await api.delete(`/financial-compare/${taskId}`);
+  return response.data;
+};
+
+/** 下载比对任务的原文件 blob（docx 或 pdf），供 DocumentPane 渲染 */
+export const getFinancialCompareFile = async (taskId: number, docType: "docx" | "pdf") => {
+  const response = await api.get(`/financial-compare/${taskId}/file/${docType}`, {
+    responseType: "blob",
+  });
+  return response.data as Blob;
 };
 
 export const getInvoiceFileUrl = (fileId: number) =>

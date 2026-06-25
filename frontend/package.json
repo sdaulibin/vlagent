@@ -12,11 +12,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@vitejs/plugin-vue": "^6.0.1",
     "autoprefixer": "^10.4.22",
     "axios": "^1.13.2",
     "docx-preview": "^0.3.7",
+    "element-plus": "^2.14.2",
     "lucide-vue-next": "^0.556.0",
     "pdfjs-dist": "^5.4.624",
     "postcss": "^8.5.6",

@@ -172,7 +172,7 @@ ci-export:
 # CI 导出 Helm Chart
 ci-chart:
 	@echo "📦 Exporting chart: $(PROJECT_NAME)-$(RELEASE_VERSION)-chart.tar.gz"
-	tar -czf $(PROJECT_NAME)-$(RELEASE_VERSION)-chart.tar.gz -C deploy charts/
+	tar -czf $(PROJECT_NAME)-$(RELEASE_VERSION)-chart.tar.gz deploy/charts/
 	@echo "✅ Chart exported"
 
 # =============================================================================
