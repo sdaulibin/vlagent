@@ -10,6 +10,7 @@ import {
   getCredentialFileUrl,
 } from '../api';
 import PowerOfAttorneyResult from '../components/PowerOfAttorneyResult.vue';
+import SettlementCompareResult from '../components/SettlementCompareResult.vue';
 import type { CredentialRecordItem } from '../types';
 
 const router = useRouter();
@@ -22,7 +23,8 @@ const CREDENTIAL_TYPES = [
   { value: 'online_banking_app', label: '网银申请书' },
   { value: 'notice_illegal_activity', label: '违法犯罪告知书' },
   { value: 'account_opening_app', label: '开户申请书' },
-  { value: 'power_of_attorney', label: '授权委托书' }
+  { value: 'power_of_attorney', label: '授权委托书' },
+  { value: 'settlement_application', label: '结算业务申请书' }
 ];
 
 const CREDENTIAL_TYPE_LABELS: Record<string, string> = {
@@ -33,7 +35,8 @@ const CREDENTIAL_TYPE_LABELS: Record<string, string> = {
   online_banking_app: '网银申请书',
   notice_illegal_activity: '违法犯罪告知书',
   account_opening_app: '开户申请书',
-  power_of_attorney: '授权委托书'
+  power_of_attorney: '授权委托书',
+  settlement_application: '结算业务申请书'
 };
 
 const selectedType = ref('id_card');
@@ -71,6 +74,7 @@ const FIELD_LABELS: Record<string, string> = {
   expiry_date: '有效期限',
   header: '文件类型',
   seal_codes: '电子印章编码',
+  seal_details: '电子印章编码（含联次）',
   card_number: '银行卡号',
   payer_name: '付款人',
   payer_account: '付款人账号',
@@ -441,11 +445,40 @@ onUnmounted(() => {
               <PowerOfAttorneyResult :data="resultData" />
             </template>
 
+            <!-- 结算业务申请书：左右两联字段比对展示 -->
+            <template v-else-if="selectedType === 'settlement_application'">
+              <SettlementCompareResult :data="resultData" />
+            </template>
+
             <!-- 其他凭证类型：通用展示 -->
             <template v-else>
               <div class="result-grid">
+                <!-- 电子印章：按颜色区分联次的彩色胶囊（seal_details 为对象数组，需专属渲染） -->
+                <div v-if="resultData.seal_details && Array.isArray(resultData.seal_details) && resultData.seal_details.length > 0" class="result-field md:col-span-2">
+                  <p class="result-field-label font-mono">电子印章编码（含联次）</p>
+                  <p class="result-field-value break-words">
+                    <span
+                      v-for="(item, i) in resultData.seal_details"
+                      :key="i"
+                      class="inline-flex flex-col align-top px-2.5 py-1 rounded text-xs font-mono mr-2 mb-2 border"
+                      :class="item.color === 'black' ? 'bg-slate-800 text-white border-slate-900'
+                            : item.color === 'blue' ? 'bg-blue-600 text-white border-blue-700'
+                            : 'bg-indigo-50 text-slate-700 border-indigo-100'"
+                    >
+                      <span class="inline-flex items-center gap-1.5">
+                        <span class="font-sans opacity-80">{{ item.copy || (item.color === 'black' ? '第一联' : item.color === 'blue' ? '第二联' : '') }}</span>
+                        <span class="font-semibold">{{ item.code }}</span>
+                      </span>
+                      <span v-if="item.vehicle_no || item.route || item.form_no" class="font-sans opacity-70 text-[10px] mt-0.5">
+                        <template v-if="item.vehicle_no">车号 {{ item.vehicle_no }}</template>
+                        <template v-if="item.route">{{ item.vehicle_no ? ' · ' : '' }}线路 {{ item.route }}</template>
+                        <template v-if="item.form_no">{{ (item.vehicle_no || item.route) ? ' · ' : '' }}No.{{ item.form_no }}</template>
+                      </span>
+                    </span>
+                  </p>
+                </div>
                 <template v-for="(val, key) in resultData" :key="key">
-                  <div v-if="String(key) !== 'operators' && String(key) !== 'linked_accounts' && String(key) !== 'authorized_items_by_category' && val !== null" class="result-field">
+                  <div v-if="String(key) !== 'operators' && String(key) !== 'linked_accounts' && String(key) !== 'authorized_items_by_category' && String(key) !== 'seal_details' && !(selectedType === 'electronic_seal' && String(key) === 'seal_codes' && resultData.seal_details) && val !== null" class="result-field">
                     <p class="result-field-label font-mono">{{ FIELD_LABELS[key] || key }}</p>
                     <p class="result-field-value break-words">
                       <template v-if="Array.isArray(val)">

@@ -23,9 +23,19 @@ class IdCardResponse(BaseModel):
 # -----------------------
 # 2. 电子印章 (Electronic Seal)
 # -----------------------
+class SealDetail(BaseModel):
+    code: str = Field("", description="电子印章编码(10位大写字母+数字)")
+    color: Optional[str] = Field("black", description="印章颜色: black(黑色)/blue(蓝色)/other")
+    copy: Optional[str] = Field("", description="所属联次: 第一联/第二联")
+    vehicle_no: Optional[str] = Field("", description="车号(用于判定是否同一张交接单)")
+    route: Optional[str] = Field("", description="线路(用于判定是否同一张交接单)")
+    form_no: Optional[str] = Field("", description="单号 No.(用于判定是否同一张交接单)")
+
+
 class ElectronicSealResponse(BaseModel):
     header: Optional[str] = Field("", description="表头(如文件类型)")
     seal_codes: List[str] = Field(default_factory=list, description="电子印章编码列表")
+    seal_details: List[SealDetail] = Field(default_factory=list, description="电子印章详情(含颜色与联次)")
 
 
 # -----------------------
@@ -212,6 +222,20 @@ class PowerOfAttorneyResponse(BaseModel):
     seal_date: str = Field("", description="公章下面的日期")
     authorized_person_signature: str = Field("", description="被授权人签字")
     sign_date: str = Field("", description="日期")
+
+
+# -----------------------
+# 9. 结算业务申请书 (Settlement Application)
+# -----------------------
+class SettlementApplicationResponse(BaseModel):
+    is_settlement_application: Optional[bool] = Field(None, description="是否为结算业务申请书")
+    right_payee_name: Optional[str] = Field("", description="右联(银行受理通知联)收款人户名")
+    right_payee_account: Optional[str] = Field("", description="右联(银行受理通知联)收款人账号")
+    right_amount: Optional[str] = Field("", description="右联(银行受理通知联)金额")
+    left_payee_name: Optional[str] = Field("", description="左联(申请书主体)收款人户名")
+    left_payee_account: Optional[str] = Field("", description="左联(申请书主体)收款人账号")
+    left_amount: Optional[str] = Field("", description="左联(申请书主体)金额")
+    comparison_result: Optional[dict] = Field(None, description="左右字段比对结果(系统后处理生成)")
 
 
 # 统一的外层 Response 结构

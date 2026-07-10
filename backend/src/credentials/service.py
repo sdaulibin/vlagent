@@ -56,6 +56,69 @@ def _post_process_boolean_fields(data: dict, credential_type: str) -> dict:
     return data
 
 
+# 结算业务申请书：左右两联需比对的字段（左联字段名 → 右联字段名）
+_SETTLEMENT_COMPARE_FIELDS = [
+    ("payee_name", "left_payee_name", "right_payee_name"),
+    ("payee_account", "left_payee_account", "right_payee_account"),
+    ("amount", "left_amount", "right_amount"),
+]
+
+
+def _normalize_for_compare(s: str) -> str:
+    """规范化字符串以便比较：去空格/千分位逗号/货币符号/单位/大小写。"""
+    if not isinstance(s, str):
+        s = str(s) if s is not None else ""
+    # 去除货币符号、单位、空格、逗号千分位、全角字符归一
+    out = s.strip()
+    out = re.sub(r"[¥￥$€£\s,，元]", "", out)
+    out = out.lower()
+    return out
+
+
+def _compare_settlement_fields(data: dict) -> dict:
+    """
+    结算业务申请书后处理：先判断右联字段是否有内容，再比对左右两联三个字段。
+
+    返回写入 data["comparison_result"]:
+      {
+        "right_has_content": bool,        # 右联三个字段中任一有内容即 True
+        "payee_name": "<status>",         # consistent / inconsistent / both_empty / one_side_empty
+        "payee_account": "<status>",
+        "amount": "<status>"
+      }
+    """
+    def _has(v: str) -> bool:
+        return isinstance(v, str) and v.strip() != ""
+
+    # 右联是否有内容（任一字段有内容即认为有内容）
+    right_has_content = any(_has(data.get(r)) for _, _, r in _SETTLEMENT_COMPARE_FIELDS)
+
+    comparison: dict = {"right_has_content": right_has_content}
+
+    for label, left_key, right_key in _SETTLEMENT_COMPARE_FIELDS:
+        left_val = data.get(left_key, "") or ""
+        right_val = data.get(right_key, "") or ""
+        left_has = _has(left_val)
+        right_has = _has(right_val)
+
+        if not left_has and not right_has:
+            status = "both_empty"
+        elif not (left_has and right_has):
+            # 只有一侧有内容
+            status = "one_side_empty"
+        else:
+            # 两侧都有内容，做智能规范化比较
+            if _normalize_for_compare(left_val) == _normalize_for_compare(right_val):
+                status = "consistent"
+            else:
+                status = "inconsistent"
+        comparison[label] = status
+
+    data["comparison_result"] = comparison
+    print(f"[结算业务申请书] 比对结果: {comparison}")
+    return data
+
+
 
 
 def _post_process_authorized_items(data: dict, credential_type: str) -> dict:
@@ -403,6 +466,95 @@ def _split_multi_form_image(image_path: str, output_dir: str) -> List[str]:
         print(f"[WARNING] Image split failed: {e}")
     return [image_path]
 
+def _normalize_seal_detail(d: dict) -> dict:
+    """规范化单个印章详情：清理编码分隔符，补全 color/copy 默认值，规范化单据标识。"""
+    if not isinstance(d, dict):
+        return {}
+    code = str(d.get("code", "") or "").replace("-", "").replace(" ", "")
+    color = str(d.get("color", "") or "").strip().lower()
+    if color not in ("black", "blue", "other"):
+        color = "other"
+    copy = str(d.get("copy", "") or "").strip()
+    # color → copy 兜底（若 AI 漏给 copy）
+    if not copy:
+        copy = {"black": "第一联", "blue": "第二联"}.get(color, "")
+    # 单据标识：strip + 去内部空格 + 转大写，便于跨页精确比对
+    def _clean_key(v):
+        return str(v or "").strip().replace(" ", "").upper()
+    vehicle_no = _clean_key(d.get("vehicle_no"))
+    route = _clean_key(d.get("route"))
+    form_no = _clean_key(d.get("form_no"))
+    return {"code": code, "color": color, "copy": copy,
+            "vehicle_no": vehicle_no, "route": route, "form_no": form_no}
+
+
+def _derive_seal_codes(data: dict) -> None:
+    """从 seal_details 派生 seal_codes（保持向后兼容）。
+    seal_details 为单一数据源，seal_codes 始终由它派生，避免两者不一致。
+    """
+    details = data.get("seal_details")
+    if isinstance(details, list):
+        data["seal_codes"] = [d["code"] for d in details if isinstance(d, dict) and d.get("code")]
+
+
+def _reconcile_by_form_key(seal_details: List[dict]) -> List[dict]:
+    """按「No（单号）」分组统一印章编码。
+
+    同一张交接单的判定依据：**单号 form_no 一致**即视为同一张单
+    （等价于「车号+线路+No 一致」或「仅 No 一致」两种业务情形的并集）。
+    No 是更稳定的分组键：即便车号/线路 OCR 误读也不影响同单判定。
+
+    流程：
+    1. **表头继承**：某联 form_no 为空（粉色套打联常漏读表头）时，
+       若本批次存在唯一一个非空 form_no，则继承之（两联表头物理相同）。
+    2. **分组统一**：同 form_no 的组内若出现多个不同码，视为 OCR 误差，
+       统一为「最佳码」：出现次数最多者；
+       并列时**优先第一联（黑色原件，color=black）**——原件比蓝色套打副本可靠；
+       仍并列则取最长。
+    """
+    # Step A: 表头继承。同批次中若只有一种非空 form_no，用它回填所有空缺联。
+    nonempty_nos = [d.get("form_no", "") for d in seal_details if d.get("form_no", "")]
+    if nonempty_nos:
+        unique_nos = set(nonempty_nos)
+        if len(unique_nos) == 1:
+            donor = nonempty_nos[0]
+            # 同时回填车号/线路（取首个非空者）
+            donor_vno = next((d.get("vehicle_no", "") for d in seal_details if d.get("vehicle_no", "")), "")
+            donor_route = next((d.get("route", "") for d in seal_details if d.get("route", "")), "")
+            for d in seal_details:
+                if not d.get("form_no", ""):
+                    d["form_no"] = donor
+                    print(f"  [印章表头继承] 回填 form_no={donor} → {d.get('color')}")
+                if not d.get("vehicle_no", "") and donor_vno:
+                    d["vehicle_no"] = donor_vno
+                if not d.get("route", "") and donor_route:
+                    d["route"] = donor_route
+
+    # Step B: 按 form_no 分组统一
+    groups: dict[str, list[int]] = {}
+    for idx, d in enumerate(seal_details):
+        key = d.get("form_no", "")
+        if key:  # No 非空才进分组
+            groups.setdefault(key, []).append(idx)
+
+    for key, idxs in groups.items():
+        if len(idxs) < 2:
+            continue  # 组内仅 1 枚，无需统一
+        codes = [seal_details[i]["code"] for i in idxs]
+        unique = set(codes)
+        if len(unique) <= 1:
+            continue  # 已一致
+        # 投票：次数最多 → 黑色原件优先(color=black 的码更可靠) → 最长 → 首个出现
+        counts = {c: codes.count(c) for c in unique}
+        # 各 code 是否来自黑色原件
+        from_black = {c: any(seal_details[i]["color"] == "black" and seal_details[i]["code"] == c for i in idxs) for c in unique}
+        best = max(unique, key=lambda c: (counts[c], from_black[c], len(c)))
+        print(f"  [印章分组统一] key={key} 候选={counts} 黑色原件={from_black} → 统一为 {best}")
+        for i in idxs:
+            seal_details[i]["code"] = best
+    return seal_details
+
+
 def _merge_json_results(results: List[dict]) -> dict:
     """Merge recognition results from multiple tiles with conflict handling."""
     if not results: return {}
@@ -425,31 +577,65 @@ def _merge_json_results(results: List[dict]) -> dict:
                 elif isinstance(v, str) and isinstance(final_data[k], str):
                     if len(v) > len(final_data[k]):
                         final_data[k] = v
+
+    # 电子印章：对 seal_details 规范化并按 (code, color) 去重，再派生 seal_codes。
+    # 按 (code,color) 而非仅 code 去重：两联码相同但颜色不同（第一联黑/第二联蓝）应各保留一条。
+    if isinstance(final_data.get("seal_details"), list):
+        seen = set()
+        merged_details = []
+        for d in final_data["seal_details"]:
+            nd = _normalize_seal_detail(d)
+            dedup_key = (nd["code"], nd["color"]) if nd["code"] else None
+            if dedup_key and dedup_key not in seen:
+                seen.add(dedup_key)
+                merged_details.append(nd)
+            elif not dedup_key and nd not in merged_details:
+                merged_details.append(nd)
+        final_data["seal_details"] = merged_details
+        _derive_seal_codes(final_data)
     return final_data
 
 
 def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] | str | None) -> dict:
-    """对电子印章编码进行核验：清理分隔符，并对每个tile旋转180度重新提取以改善识别。"""
+    """对电子印章编码进行核验：清理分隔符，并对每个tile旋转180度重新提取以改善识别。
+
+    基于 seal_details（含 color/copy）核验。合并时**按 color 配对**原始与旋转结果
+    （旋转不改变颜色，故配对天然可靠），同 color 取更长的 code。
+    核验完成后由 seal_details 派生 seal_codes（单一数据源）。
+    """
     if credential_type != "electronic_seal":
         return data
-    
+
     # Normalize to list
     if image_paths is None:
         return data
     if isinstance(image_paths, str):
         image_paths = [image_paths]
-    
-    seal_codes = data.get("seal_codes", [])
-    if not seal_codes:
+
+    # Step 0: 规范化 seal_details。若 AI 未输出 seal_details，从 seal_codes 兜底构造。
+    seal_details = data.get("seal_details")
+    if not isinstance(seal_details, list) or not seal_details:
+        codes = data.get("seal_codes") or []
+        seal_details = [{"code": c, "color": "other", "copy": ""} for c in codes if c]
+    seal_details = [_normalize_seal_detail(d) for d in seal_details if d]
+    # 去重（按 (code,color)）：两联码相同但颜色不同应各保留一条
+    seen, dedup = set(), []
+    for d in seal_details:
+        dedup_key = (d["code"], d["color"]) if d["code"] else None
+        if dedup_key and dedup_key not in seen:
+            seen.add(dedup_key); dedup.append(d)
+        elif not dedup_key:
+            dedup.append(d)
+    seal_details = dedup
+    if not seal_details:
+        data["seal_details"] = []
+        data["seal_codes"] = []
         return data
+    print(f"  [印章核验] 原始详情(规范化后): {seal_details}")
 
-    # Step 1: Clean dashes/spaces
-    seal_codes = [c.replace("-", "").replace(" ", "") for c in seal_codes]
-    print(f"  [印章核验] 原始编码(清理后): {seal_codes}")
-
-    # Step 2: 对每个tile旋转180度重新提取
+    # Step 1: 对每个tile旋转180度重新提取
     from PIL import Image
-    rotated_results = []
+    rotated_details = []
     for tile_path in image_paths:
         try:
             img = Image.open(tile_path)
@@ -463,10 +649,13 @@ def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] 
                 show_request=False,
             ).strip()
             rotated_data = json.loads(fix_json(resp))
-            codes = rotated_data.get("seal_codes", [])
-            codes = [c.replace("-", "").replace(" ", "") for c in codes]
-            print(f"  [印章核验] tile {tile_path} 旋转提取: {codes}")
-            rotated_results.extend(codes)
+            rot_list = rotated_data.get("seal_details")
+            if not isinstance(rot_list, list):
+                # 兜底：旧式纯编码输出
+                rot_list = [{"code": c, "color": "other", "copy": ""} for c in (rotated_data.get("seal_codes") or [])]
+            rot_list = [_normalize_seal_detail(d) for d in rot_list if d]
+            print(f"  [印章核验] tile {os.path.basename(tile_path)} 旋转提取: {rot_list}")
+            rotated_details.extend(rot_list)
 
             try:
                 os.unlink(rotated_path)
@@ -475,32 +664,33 @@ def _verify_seal_codes(data: dict, credential_type: str, image_paths: list[str] 
         except Exception as e:
             print(f"  [印章核验] tile旋转提取失败: {e}")
 
-    # Step 3: 合并 - 对每个位置取原始和旋转中最长的
-    if not rotated_results:
-        data["seal_codes"] = seal_codes
-        return data
+    # Step 2: 按 color 配对原始与旋转结果，同 color 取更长的 code（旋转提取通常更准确）
+    if rotated_details:
+        # 按 color 索引旋转结果，保留每个 color 下最长的 code
+        best_by_color: dict[str, dict] = {}
+        for d in rotated_details:
+            c = d["color"]
+            cur = best_by_color.get(c)
+            if cur is None or len(d["code"]) > len(cur["code"]):
+                best_by_color[c] = d
+        final_details = []
+        for orig in seal_details:
+            rot = best_by_color.get(orig["color"])
+            if rot and len(rot["code"]) >= len(orig["code"]):
+                # 用旋转得到的更优 code，但保留原始 color/copy/单据标识语义
+                merged = {**orig, "code": rot["code"]}
+                print(f"  [印章核验] color={orig['color']}: 原始={orig['code']}({len(orig['code'])}) vs 旋转={rot['code']}({len(rot['code'])}) -> {merged['code']}")
+                final_details.append(merged)
+            else:
+                final_details.append(orig)
+        seal_details = final_details
 
-    n = len(seal_codes)
-    # 如果旋转结果数量匹配，一一对应取最长
-    if len(rotated_results) >= n:
-        final = []
-        for i in range(n):
-            orig = seal_codes[i] if i < len(seal_codes) else ""
-            rot = rotated_results[i] if i < len(rotated_results) else ""
-            best = rot if len(rot) >= len(orig) else orig  # 优先旋转结果（旋转提取通常更准确）
-            print(f"  [印章核验] 位置{i}: 原始={orig}({len(orig)}字符) vs 旋转={rot}({len(rot)}字符) -> {best}")
-            final.append(best)
-        data["seal_codes"] = final
-    else:
-        # 旋转结果不够，用全局策略：收集所有候选，按长度排序取前N
-        all_codes = list(seal_codes) + rotated_results
-        unique = list(dict.fromkeys(all_codes))
-        by_length = sorted(unique, key=lambda c: len(c), reverse=True)
-        final = by_length[:n]
-        print(f"  [印章核验] 全局候选: {all_codes}, 选取: {final}")
-        data["seal_codes"] = final
+    # Step 3: 按「车号+线路+No」分组统一编码（纠正跨页 OCR 误差）
+    seal_details = _reconcile_by_form_key(seal_details)
 
-    print(f"  [印章核验] 最终结果: {data['seal_codes']}")
+    data["seal_details"] = seal_details
+    _derive_seal_codes(data)
+    print(f"  [印章核验] 最终结果: {data['seal_details']}")
     return data
 
 
@@ -566,6 +756,9 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
                 if credential_type == "notice_illegal_activity" and data.get("bank_account"):
                     data["bank_account"] = _fix_bank_account(data["bank_account"])
                 data = _verify_seal_codes(data, credential_type, compressed_paths)
+                # 结算业务申请书：左右两联字段智能规范化比对
+                if credential_type == "settlement_application":
+                    data = _compare_settlement_fields(data)
                 return data
             except Exception as e:
                 print(f"[{credential_type}] JSON parse failed: {e}")
@@ -590,6 +783,9 @@ def extract_fields_from_images(image_paths: List[str], credential_type: str) -> 
             if credential_type == "notice_illegal_activity" and merged.get("bank_account"):
                 merged["bank_account"] = _fix_bank_account(merged["bank_account"])
             merged = _verify_seal_codes(merged, credential_type, compressed_paths)
+            # 结算业务申请书：左右两联字段智能规范化比对
+            if credential_type == "settlement_application":
+                merged = _compare_settlement_fields(merged)
             return merged
 
 def process_credential(file_path: str, credential_type: str) -> Dict[str, Any]:
