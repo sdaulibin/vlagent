@@ -8,6 +8,8 @@ import InvoiceRecognition from '../views/InvoiceRecognition.vue'
 import CredentialRecognition from '../views/CredentialRecognition.vue'
 import PdfExtract from '../views/PdfExtract.vue'
 import FinancialCompare from '../views/FinancialCompare.vue'
+import CreditComparisonHome from '../credit_comparison/views/CreditComparisonHome.vue'
+import CreditComparisonDetail from '../credit_comparison/views/CreditComparisonDetail.vue'
 import AuthError from '../views/AuthError.vue'
 import { isAuthenticated } from '../composables/useAuth'
 import { useUser } from '../composables/useUser'
@@ -67,6 +69,16 @@ const routes = [
         path: '/financial-compare',
         name: 'FinancialCompare',
         component: FinancialCompare
+    },
+    {
+        path: '/credit-comparison',
+        name: 'credit-comparison',
+        component: CreditComparisonHome
+    },
+    {
+        path: '/credit-comparison/detail',
+        name: 'credit-comparison-detail',
+        component: CreditComparisonDetail
     }
 ]
 

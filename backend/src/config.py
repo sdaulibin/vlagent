@@ -45,7 +45,16 @@ class Settings(BaseSettings):
     UPLOAD_DIR_PDF_EXTRACT: str = Field(
         default="", description="PDF提取上传目录（默认 upload/pdf_extract）"
     )
-    
+    UPLOAD_DIR_CREDIT_COMPARISON: str = Field(
+        default="", description="信用金额对账上传目录（默认 upload/credit_comparison）"
+    )
+    CREDIT_CONVERTED_DIR: str = Field(
+        default="", description="信用金额对账 doc 转换产物目录（默认 upload/credit_comparison/_converted）"
+    )
+    CREDIT_PREVIEW_DIR: str = Field(
+        default="", description="信用金额对账预览产物目录（默认 upload/credit_comparison/_previews）"
+    )
+
     # Image Platform (SunECM)
     ECM_ENABLED: bool = False
     ECM_CACHE_IP: str = "10.238.145.107"
@@ -99,6 +108,17 @@ UPLOAD_DIR_DOCUMENT = _resolve_upload_dir(settings.UPLOAD_DIR_DOCUMENT, "documen
 UPLOAD_DIR_INVOICE = _resolve_upload_dir(settings.UPLOAD_DIR_INVOICE, "invoice")
 UPLOAD_DIR_CREDENTIAL = _resolve_upload_dir(settings.UPLOAD_DIR_CREDENTIAL, "credentials")
 UPLOAD_DIR_PDF_EXTRACT = _resolve_upload_dir(settings.UPLOAD_DIR_PDF_EXTRACT, "pdf_extract")
+
+# 信用金额对账模块：上传目录、转换产物目录、预览产物目录
+UPLOAD_DIR_CREDIT_COMPARISON = _resolve_upload_dir(settings.UPLOAD_DIR_CREDIT_COMPARISON, "credit_comparison")
+CREDIT_CONVERTED_DIR = (
+    settings.CREDIT_CONVERTED_DIR
+    or _os.path.join(UPLOAD_DIR_CREDIT_COMPARISON, "_converted")
+)
+CREDIT_PREVIEW_DIR = (
+    settings.CREDIT_PREVIEW_DIR
+    or _os.path.join(UPLOAD_DIR_CREDIT_COMPARISON, "_previews")
+)
 
 # 向后兼容的模块级变量 (Qwen VL)
 # OPENAI_KEY = settings.OPENAI_KEY

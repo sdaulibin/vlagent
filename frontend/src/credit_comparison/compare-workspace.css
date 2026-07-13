@@ -1,0 +1,480 @@
+/*
+ * credit_comparison 对账工作台（CompareWorkspace）专用样式。
+ *
+ * 这些样式驱动 Word/Excel 双栏画线的核心定位与渲染：
+ * - .compare-doc-stage / .line-canvas 的相对/绝对定位（画线坐标系基准）
+ * - .document-scroll 的固定高度 + overflow:auto（滚动视口）
+ * - .excel-table thead/行头/列头的 sticky（冻结表头，画线裁剪依赖）
+ * - .excel-node-marker 的绝对定位（连线右端点）
+ * - .word-paragraph / .excel-row 的 active/has-exception 配色
+ * - .svg-link-line / .svg-link-dot 的连线样式
+ *
+ * 注意：这里的定位/overflow/z-index 属性是画线逻辑（getBoundingClientRect 测量、
+ * SVG clipPath/mask 裁剪）正确工作的前提，不可随意改动。
+ * 配色通过 --exception-* CSS 变量注入（由 exceptionColors.js 提供）。
+ */
+
+/* ===== 工作台舞台 ===== */
+
+.compare-workspace {
+  display: grid;
+  gap: 0;
+  padding: 14px;
+  height: 100%;
+  min-height: 0;
+}
+
+.compare-doc-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.doc-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.doc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  margin-bottom: 10px;
+}
+
+.doc-panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.doc-panel-header span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.doc-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-select {
+  width: 110px;
+}
+
+/* ===== 滚动视口（固定高度，画线测量的基准） ===== */
+
+.document-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 176px);
+  max-height: calc(100vh - 176px);
+  overflow: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fcfcfd;
+  padding: 12px;
+}
+
+.word-document-scroll {
+  background: #eef1f5;
+  padding: 0;
+}
+
+.excel-document-scroll {
+  border-color: #9acaaf;
+  background: linear-gradient(180deg, #f8fff9 0%, #f3fbf4 100%);
+  padding: 0;
+}
+
+/* ===== Word 文档纸张 ===== */
+
+.word-paper {
+  width: min(780px, calc(100% - 24px));
+  margin: 12px auto;
+  padding: 28px 38px 38px;
+  background: #ffffff;
+  border: 1px solid #d7dde5;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  border-radius: 4px;
+  font-family: "SimSun", "Songti SC", serif;
+  color: #111827;
+}
+
+.word-paper-content {
+  display: grid;
+  gap: 2px;
+}
+
+.word-paragraph {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #111827;
+  text-align: left;
+  line-height: 1.85;
+  font-size: 15px;
+  text-indent: 2em;
+  cursor: pointer;
+  outline: none;
+}
+
+.word-paragraph:hover {
+  background: transparent;
+}
+
+.word-paragraph.sheet-title {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  text-indent: 0;
+  background: #f8fafc;
+  border-color: #d6e2f0;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: default;
+}
+
+.word-paragraph.active {
+  background: rgba(59, 130, 246, 0.028);
+  border-color: rgba(59, 130, 246, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.04);
+}
+
+.word-paragraph.has-exception {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.word-paragraph.has-exception.active {
+  background: rgba(239, 68, 68, 0.026);
+  border-color: rgba(239, 68, 68, 0.11);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.045);
+}
+
+.word-paragraph.has-exception.balance-missing-exception {
+  border-color: transparent;
+}
+
+.word-paragraph-text {
+  display: inline;
+  white-space: pre-wrap;
+}
+
+.word-inline-highlight {
+  display: inline;
+  padding: 0 2px;
+  border: 1px solid var(--exception-color);
+  border-radius: 4px;
+  background: var(--exception-soft-color);
+  color: #111827;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.word-inline-highlight--format {
+  padding: 0 2px;
+  border-width: 1px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.word-inline-highlight--company-name {
+  border-color: #a21caf;
+  background: rgba(162, 28, 175, 0.12);
+  color: #111827;
+  font-weight: inherit;
+  box-shadow: none;
+}
+
+.word-paragraph.has-exception.balance-missing-exception .word-inline-highlight {
+  border-color: var(--exception-color);
+  background: var(--exception-soft-color);
+}
+
+/* ===== Excel 表格（原生 table，冻结表头/列头） ===== */
+
+.excel-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: max-content;
+  min-width: 100%;
+}
+
+.excel-table-wrap {
+  width: max-content;
+  min-width: 100%;
+  overflow: visible;
+  border: 1px solid #9acaaf;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px #cfe8d6;
+}
+
+.excel-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+}
+
+.excel-table th,
+.excel-table td {
+  border: 1px solid #d1d5db;
+  padding: 5px 7px;
+  font-size: 12px;
+  text-align: left;
+  vertical-align: middle;
+  min-width: 92px;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.excel-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #ffffff;
+  color: #111827;
+  font-weight: 600;
+}
+
+.excel-table thead tr.excel-sheet-title-row th,
+.excel-table thead tr.excel-column-label-row th {
+  background: #217346;
+  color: #ffffff;
+}
+
+.excel-table thead th.excel-corner {
+  background: #217346 !important;
+  color: #ffffff !important;
+}
+
+.excel-table thead tr.excel-sheet-title-row th {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.excel-table thead tr.excel-content-header-row th {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* 行头（左侧冻结列） */
+.excel-row-header {
+  width: 54px !important;
+  min-width: 54px !important;
+  max-width: 120px !important;
+  background: #dff2e3 !important;
+  color: #166534 !important;
+  text-align: center !important;
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 20 !important;
+  box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+  display: table-cell !important;
+  box-sizing: border-box !important;
+}
+
+.excel-table thead th.excel-row-header {
+  z-index: 80 !important;
+  background: #dff2e3 !important;
+  color: #166534 !important;
+}
+
+.excel-table thead th.excel-row-header.excel-corner {
+  background: #217346 !important;
+  color: #ffffff !important;
+}
+
+/* 指标代码列（第二冻结列） */
+.excel-table td.excel-code-col,
+.excel-table th.excel-code-col {
+  position: sticky;
+  left: 54px;
+  background: #ffffff;
+  box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.excel-table td.excel-code-col {
+  background: #ffffff !important;
+  box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.excel-table thead th.excel-code-col {
+  z-index: 55;
+  background: inherit;
+  color: inherit;
+}
+
+/* ===== 行标记 marker（连线右端点） ===== */
+
+.excel-cell-marker-cell {
+  position: relative;
+}
+
+.excel-node-marker {
+  position: absolute;
+  top: 50%;
+  left: -8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--exception-color);
+  border: 2px solid #ffffff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 2px var(--exception-strong-color);
+}
+
+.excel-row-header-marker-cell {
+  position: sticky !important;
+  overflow: visible;
+}
+
+.excel-row-header-marker {
+  left: -8px;
+  right: auto;
+}
+
+.excel-node-marker.active {
+  width: 15px;
+  height: 15px;
+}
+
+.excel-node-marker.has-exception {
+  background: var(--exception-color);
+  box-shadow: 0 0 0 2px var(--exception-strong-color);
+}
+
+.excel-node-marker.has-exception.balance-missing-exception {
+  background: var(--exception-color);
+  box-shadow: 0 0 0 2px var(--exception-strong-color);
+}
+
+/* ===== 行状态配色 ===== */
+
+.excel-row {
+  cursor: pointer;
+}
+
+.excel-row.active td,
+.excel-row.active .excel-row-header {
+  background: var(--exception-solid-soft-color);
+}
+
+.excel-row.active td {
+  box-shadow: inset 0 2px 0 var(--exception-color), inset 0 -2px 0 var(--exception-color);
+}
+
+.excel-row.active td.excel-code-col {
+  background: var(--exception-solid-soft-color) !important;
+  color: #111827;
+  box-shadow: inset 1px 0 0 var(--exception-color), inset -1px 0 0 var(--exception-color),
+    inset 0 2px 0 var(--exception-color), inset 0 -2px 0 var(--exception-color);
+}
+
+.excel-row.active .excel-row-header {
+  background: var(--exception-solid-soft-color);
+  color: var(--exception-text-color);
+  box-shadow: inset 3px 0 0 var(--exception-color), inset 0 2px 0 var(--exception-color),
+    inset 0 -2px 0 var(--exception-color);
+}
+
+.excel-row.has-exception td,
+.excel-row.has-exception .excel-row-header {
+  background: var(--exception-solid-soft-color);
+}
+
+.excel-row.has-exception td.excel-code-col,
+.excel-row.has-exception.balance-missing-exception td.excel-code-col {
+  background: var(--exception-solid-soft-color) !important;
+  color: #111827;
+  box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.excel-row.has-exception.balance-missing-exception td,
+.excel-row.has-exception.balance-missing-exception .excel-row-header {
+  background: var(--exception-solid-soft-color);
+}
+
+.excel-row.active.has-exception td.excel-code-col,
+.excel-row.active.has-exception.balance-missing-exception td.excel-code-col {
+  background: var(--exception-solid-soft-color) !important;
+  color: #111827;
+  box-shadow: inset 1px 0 0 var(--exception-color), inset -1px 0 0 var(--exception-color),
+    inset 0 2px 0 var(--exception-color), inset 0 -2px 0 var(--exception-color);
+}
+
+/* ===== SVG 连线层 ===== */
+
+.line-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.svg-link-line {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+  opacity: 0.72;
+}
+
+.svg-link-line.active {
+  stroke-width: 1.6;
+  opacity: 1;
+}
+
+.svg-link-dot {
+  fill: #2563eb;
+}
+
+/* ===== 响应式 ===== */
+
+@media (max-width: 960px) {
+  .doc-panel-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compare-doc-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-workspace {
+    padding: 12px;
+  }
+
+  .document-scroll {
+    height: calc(100vh - 220px);
+    max-height: calc(100vh - 220px);
+  }
+
+  .word-paper {
+    width: calc(100% - 16px);
+    padding: 22px 20px 26px;
+  }
+}

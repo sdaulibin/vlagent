@@ -65,6 +65,14 @@ async def init_db():
     from src.financial_compare.models import FinancialCompareTask
     from src.permissions.models import UserPermission
     from src.modules.models import Module
+    from src.credit_comparison.models import (
+        CreditCompareTask,
+        CreditFinancialRecord,
+        CreditCompanyProfitLoss,
+        CreditExcelProfitLoss,
+        CreditCompareLink,
+        CreditExceptionGroup,
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -123,6 +131,12 @@ async def init_db():
                   gradient="icon-gradient-teal", hover_class="group-hover:text-teal-700", sort_order=8,
                   category="document", category_label="文档比对", category_color="#ea580c",
                   bg_color="linear-gradient(135deg, #0d9488, #14b8a6)", name_en="Financial Report Compare"),
+                M(key="credit-comparison", title="统计报送数据核对",
+                  description="上传 Word 数据变动说明与 Excel 报表，自动抽取指标并进行跨源对账，标注金额、单位、口径等差异",
+                  icon="Scale", route="/credit-comparison",
+                  gradient="icon-gradient-emerald", hover_class="group-hover:text-emerald-700", sort_order=9,
+                  category="document", category_label="文档比对", category_color="#ea580c",
+                  bg_color="linear-gradient(135deg, #059669, #10b981)", name_en="Credit Amount Comparison"),
             ]
             for seed in seeds:
                 session.add(seed)
@@ -140,6 +154,12 @@ async def init_db():
                   gradient="icon-gradient-teal", hover_class="group-hover:text-teal-700", sort_order=8,
                   category="document", category_label="文档比对", category_color="#ea580c",
                   bg_color="linear-gradient(135deg, #0d9488, #14b8a6)", name_en="Financial Report Compare"),
+                Module(key="credit-comparison", title="统计报送数据核对",
+                  description="上传 Word 数据变动说明与 Excel 报表，自动抽取指标并进行跨源对账，标注金额、单位、口径等差异",
+                  icon="Scale", route="/credit-comparison",
+                  gradient="icon-gradient-emerald", hover_class="group-hover:text-emerald-700", sort_order=9,
+                  category="document", category_label="文档比对", category_color="#ea580c",
+                  bg_color="linear-gradient(135deg, #059669, #10b981)", name_en="Credit Amount Comparison"),
             ]
             for m in _NEW_MODULES:
                 if m.key not in existing_keys:
@@ -156,6 +176,7 @@ async def init_db():
                 "credential-recognition": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #7c3aed, #8b5cf6)", "Credential Recognition"),
                 "pdf-extract": ("credential", "凭证提取", "#7c3aed", "linear-gradient(135deg, #0891b2, #06b6d4)", "PDF Extract"),
                 "financial-compare": ("document", "文档比对", "#ea580c", "linear-gradient(135deg, #0d9488, #14b8a6)", "Financial Report Compare"),
+                "credit-comparison": ("document", "文档比对", "#ea580c", "linear-gradient(135deg, #059669, #10b981)", "Credit Amount Comparison"),
             }
             result = await session.execute(select(Module))
             for module in result.scalars().all():
